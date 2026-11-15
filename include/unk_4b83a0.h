@@ -26,7 +26,7 @@ public:
     iterator Erase(iterator f, iterator l);          // 0x484380
 };
 struct EntryBase { int head[11]; ~EntryBase() {} };
-struct EntryMeshList { char flag2c; MeshVec meshes; EntryMeshList() : meshes() { flag2c = 0; }
+struct EntryMeshList { char flag2c; MeshVec meshes; EntryMeshList() : flag2c(0), meshes() {}
     ~EntryMeshList() {} };
 class SceneEntry : public EntryBase {
 public:
