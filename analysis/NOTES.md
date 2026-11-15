@@ -521,3 +521,30 @@ followed by M calls to an inline function:
   order (`d++, sa++, sb++, n++`) can swap two spilled registers in a loop tail (0x4b91c0).
 - **Word copy loops**: `shr ecx,1; rep movsd; adc ecx,ecx; rep movsw` is VC6 turning a plain `for (k...) dst[out++] = src[k];` loop over unsigned shorts into a string copy; no memcpy form gives it (0x4aa690, lead from FillTriangle 0x472710).
 - **Raise a variable's weight with a second written-out use** (not an unused copy, which does nothing): `r * (float)target[i] * error` instead of reusing `t` made VC6 step `target` as the induction pointer (0x491e20 MATCHED).
+
+## Scheduler and register tie-break study (2026-11-15, synthetic VC6 experiments, ~270 compiles)
+
+Proven (each reproduced in several independent synthetic functions):
+- **Callee-saved register order is esi, edi, ebx, ebp by use weight** (loop uses weigh more). Equal-weight ties go to
+  the variable whose *defining assignment* comes first in flow order; the last-defined one is spilled. Declaration
+  order and first-use order have no effect. Between parameters, the later parameter wins a tie. To swap two
+  registers, reorder the defining assignments (when independent) or change use weight.
+- **`lea r,[r2]` vs `mov r,r2` for a counter copy:** `while (n--)` (post-decrement in the condition) gives `lea`;
+  `for(;n;n--)`, `for(;n>0;n--)`, `do{}while(--n)` give `mov` or no copy. Switching form also moves stack slots.
+- **Loop tail:** the counter `dec` is hoisted right after the independent ALU ops and independent stores sink to just
+  before the branch (`add; dec; store; jne`). A store stays before `dec` only with a real dependence or a real
+  conditional block boundary between them; labels/goto and folded conditions do not split the block.
+- **Constant initialisers** are emitted in source assignment order (`a=0; b=1` vs `b=1; a=0` swaps xor/mov);
+  declaration order does not matter. Constants the allocator re-materialises after an inlined destructor
+  (0x436250 back-edge) follow no source lever found.
+- **x87 gap filling:** ready integer instructions are hoisted into the gap between an `fld` and its dependent
+  `fadd`. A named accumulator (`float a = K; a += x;`) lets an independent int load move above the final `fadd`; a
+  single expression tree (`K + x`) keeps it after. Frame/global loads hoist across fst/fstp; loads through a pointer
+  did not.
+- **`lea [a+b]` base/index:** source operand order never changes it; in register cases the base is the later-defined
+  operand. Inside std::string inlines it flipped with the stack string object's member layout.
+
+Residuals explained but not fixed: 0x41b270 (store-before-dec order has no plain-tie source form; idiom.py finds 0
+matched examples), 0x436250, 0x4ae4b0 (needs `while(n--)` for lea but that loop's slot layout), 0x477690 (one-tree
+form gets the schedule but VC6 then emits `fld x; fadd K`, 2 insns).
+Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
