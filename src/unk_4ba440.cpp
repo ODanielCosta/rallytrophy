@@ -474,6 +474,7 @@ void SegmentInfo::Update()
 // Semantics complete (inline-asm Xform/Rot, EBP frame). 66->47 insns differ: i-indexed loop over planes/tplanes + if/else idx stores.
 // Tried 2026-10-31 re-pass: ~35 variants (param-slot counter, q-pointer vs indexed, ternary vs if/else, 6 dot orders (original y,z,x kept), while/!= loops, t hoisted, a/c tail forms, volatile self); still differs: original has one induction pointer q with jmp-to-test loop and lea of P/T after the first Xform, esi/edi prologue swapped, tail a/c in stack temps.
 // 2026-11-13 pass 2: 16 -> ~7 insns (37 bytes differ): Rot arg P/T inline, tail a/c as a ScenePoint w (stack slots shared with t) + float f copy of farD; still missing the kept stores of w.x/w.y (original does fstp/fld of both). 2026-11-13 pass 1: 44 -> 16 insns differ (500 -> 505 vs 523 bytes): ScenePoint (header) operator* for the 0x40b0c0 call, P/T locals declared after XformSelf and Rot called with &tplanes[4*i] inline. Remaining: Rot slot stores in m,p,o order (ours p,m,o; param permutations did not change it), a/c tail kept in stack temps in the original (volatile/array/ref/address-taken forms all worse).
+// 2026-11-14 round 11: no gain (7 insns/37 bytes unchanged) over ~20 tail variants (ref/ptr aliases, ScenePoint copy, double temps, w.z=f, operator*, folded ctor args, split sums): only the tail differs, original stores w.x (fstp) and reloads it for x*x while y/f stay on the FPU stack.
 void ViewFrustum::Init(FrustumDevice* device)
 {
     ViewFrustum* self = this;
