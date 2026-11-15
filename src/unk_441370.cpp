@@ -3809,6 +3809,7 @@ public:
 // Inlining depth 2: depth 1 kept the by-value RallyInfo name/description copies out of line (nested copy ctor = depth 2).
 #pragma inline_depth(2)
 // NONMATCHING: RALLYTROPHY 0x443790
+// 2026-11-14 (r11): 19 more orderings of the name-print colour/scaleX/scaleY block (local col, nx/ny order, *=, 0.85f*x): none beat 8 insns / 36 bytes; compiler hoists the colour store regardless of source position.
 // 2026-11-13 (idiom/calls/sizegap): 95 -> 8 insns differ, size gap closed (5296/5296). inline_depth(2) lets the by-value copy's
 // name/description expand (TSE_StrCp: hand copy ctor = alloc byte, Tidy(false), Assign(o, 0, npos)); DrawSelector's `selected`
 // param is int (the `and edx,0xff` promote). Left: lea operand order in the five TSE_Str::Append sites ([len+n] vs [n+len],
