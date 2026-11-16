@@ -4258,6 +4258,7 @@ int RaceMode::FUN_0048b080(int award)
 // 320 at 1764): the device pointer for Printf is loaded early here. Colour-setter forms change nothing. A default-
 // constructed Color assigned 0x80000000 puts its store after the array-ctor pushes as in the original (410 -> 390).
 // 2026-11-12: tried SetScale for the 1.5625 pair, SetColorObj, colour store after the if, rank in a local: 390 -> 389 at best, no gain.
+// 2026-11-16 (round 23): rank read into a local before the Printf: 49 -> 42 insns differ, 329 bytes, size 1764 (8 short). tools/reorder.py moves were unsound here (SetScale above a Print, colour store above DrawRect) and rejected; Printf/scale-store order, player/color order, FormatTime temp: no gain.
 int RaceMode::FUN_0048b620(int reset)
 {
     TextRenderer* text = DAT_0056b0c8->text;
@@ -4347,7 +4348,8 @@ int RaceMode::FUN_0048b620(int reset)
         if (DAT_00501464 != 3) {
             text->scaleX = DAT_0056aea8 * 1.5625f;
             text->scaleY = DAT_0056aeac * 1.5625f;
-            text->Printf(DAT_0056b0ac, DAT_0056aea8 * 8.0f, DAT_0056aeac * 710.0f, "%i.", player->unk1a58);
+            int rank = player->unk1a58;
+            text->Printf(DAT_0056b0ac, DAT_0056aea8 * 8.0f, DAT_0056aeac * 710.0f, "%i.", rank);
         }
         char buffer[16];
         text->SetScale(DAT_0056aea8, DAT_0056aeac);
