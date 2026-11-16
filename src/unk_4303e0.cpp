@@ -112,7 +112,7 @@ extern "C" void __fastcall FUN_00433bc0(Game*);
 extern "C" void __fastcall FUN_00434a50(Game*);
 extern "C" void __fastcall FUN_00434df0(Game*);
 extern "C" void __fastcall FUN_00434dd0(Game*);
-extern "C" void __fastcall FUN_00434ba0();
+extern "C" void __fastcall FUN_00434ba0(Game*);
 extern "C" void __fastcall FUN_004327d0(Game*);
 extern "C" void __fastcall FUN_00425e50(Game*);
 extern "C" void __fastcall FUN_004a9520(void*, void*, const char*, float, float);
@@ -130,12 +130,8 @@ extern "C" void fun_0049a5a0();
 extern "C" void __fastcall FUN_004af120(void*);
 extern "C" void __fastcall FUN_004adf50(void*);
 
-// NONMATCHING: RALLYTROPHY 0x4309d0
-// State 0-2 share the audio/resource update calls. The target lays the shared block after case 0 so cases 1 and 2 jump
-// backward to it; VC6 places it after cases 1 and 2, changing the dispatch targets. Other small switch-order differences remain.
-// Tried 2026-10-30 night: case order permutations, goto-into-case-0 label, per-case inline tails, if-chain, post-switch tail; moving DAT_00501472=0 before FUN_004a4870 in cases 1/2 fixed store order (28->16 insns); still differs: VC6 always places the shared audio block after case 2, the original has it after case 0 with cases 1/2 jumping back.
-// 2026-11-16 pass (round 19): 11 more variants (UIRect** array + index, plain/all-volatile/partial-volatile receivers, float temps, named receiver pointer); none beat 10 insns (54 bytes), same size 1031.
-// Tried 2026-10-31 re-pass: 13 more variants (goto-to-shared-label in all 3 cases, if(0){label} block, for/do-while wrapper, case order 1,2,0, volatile state/this barrier before goto, end-of-loop label); all 16+ insns differ, VC6 always tail-merges the audio block after case 2 (last copy), never at case 0; stays 16 insns (over the permuter limit).
+// FUNCTION: RALLYTROPHY 0x4309d0
+// Matched 2026-11-16: while(1){if(DAT_0057b9f4) goto cleanup;..} loop with the audio tail written out in each of cases 0-2 (no goto); a goto-shared tail never matched.
 void Game::FUN_004309d0() {
     Config config;
     config.Define(G9_GameIniKeys, 12);
@@ -162,7 +158,8 @@ void Game::FUN_004309d0() {
         ((RaceMode*)emptyObject)->RaceMode::Lock();
     menu.FUN_0043cb50(0);
     FUN_00432aa0(this);
-    while (!DAT_0057b9f4) {
+    while (1) {
+        if (DAT_0057b9f4) goto G2_cleanup;
         int state = FUN_00432e10(this);
         DAT_00501460 = 0;
         if ((unsigned int)state <= 6) {
@@ -170,20 +167,27 @@ void Game::FUN_004309d0() {
             case 0:
                 FUN_004a4870("data/settings/game.ini"); DAT_00501458 = 0; DAT_0050145c = 1; DAT_00501473 = 0;
                 FUN_00433220(this); DAT_00501472 = 0;
-            G2_update_audio:
                 FUN_004af120((char*)this + 0x1393e4);
                 FUN_004af120((char*)this + 0x139404);
                 FUN_004adf50((char*)this + 0x139424);
                 break;
             case 1:
                 DAT_00501472 = 0; FUN_004a4870("data/settings/game.ini"); DAT_00501458 = 1; DAT_0050145c = 0; DAT_00501473 = 0;
-                FUN_00433bc0(this); goto G2_update_audio;
+                FUN_00433bc0(this);
+                FUN_004af120((char*)this + 0x1393e4);
+                FUN_004af120((char*)this + 0x139404);
+                FUN_004adf50((char*)this + 0x139424);
+                break;
             case 2:
                 DAT_00501472 = 0; FUN_004a4870("data/settings/game.ini"); DAT_00501458 = 0; DAT_0050145c = 1; DAT_00501473 = 0;
-                FUN_00434a50(this); goto G2_update_audio;
+                FUN_00434a50(this);
+                FUN_004af120((char*)this + 0x1393e4);
+                FUN_004af120((char*)this + 0x139404);
+                FUN_004adf50((char*)this + 0x139424);
+                break;
             case 3: FUN_00434df0(this); break;
             case 4: FUN_00432b00(this); FUN_00425e50(this); ((GameView*)this)->FUN_00432b30(0, 0); break;
-            case 5: if (DAT_00508bdc) FUN_00434ba0(); else goto G2_cleanup; break;
+            case 5: if (DAT_00508bdc) FUN_00434ba0(this); else goto G2_cleanup; break;
             case 6: FUN_00434dd0(this); break;
             }
         }
@@ -1396,8 +1400,8 @@ public:
 };
 
 // NONMATCHING: RALLYTROPHY 0x432e10
-// Tried 2026-10-30 night: while-loop + goto-six, Get() returns UIRect*&, volatile rect reloads (mask search of 64), x*width/y*height fix, permute -r 20; 10 insns left: ecx load/push/EH-state store order around the six rect calls (original loads are plain but not CSE'd).
 // 2026-11-16 pass (round 19): 11 more variants (UIRect** array + index, plain/all-volatile/partial-volatile receivers, float temps, named receiver pointer); none beat 10 insns (54 bytes), same size 1031.
+// Tried 2026-10-30 night: while-loop + goto-six, Get() returns UIRect*&, volatile rect reloads (mask search of 64), x*width/y*height fix, permute -r 20; 10 insns left: ecx load/push/EH-state store order around the six rect calls (original loads are plain but not CSE'd).
 // Tried 2026-10-31 re-pass: 30+ variants (volatile/plain mask on the six rect loads, volatile/plain local receiver pointers, sequential float temps, HudPoint temps, rv/off decl order, one-expression forms) plus permute -r 40; none beat 10 insns (all-volatile 14); original orders ecx load, lea, push, EH store per rect call while VC6 sinks the ecx load past the EH-state store.
 // Current candidate: 1011 bytes vs 1031, 554 differing bytes. PE disassembly restores the six rectangle reads for the
 // mouse-warp center and scaled SetCursorPos call, plus the independent escape/transition, confirm and loop-exit paths;
@@ -4228,7 +4232,6 @@ struct G15_Str {
 };
 
 // NONMATCHING: RALLYTROPHY 0x437220
-// 2026-11-16 pass (round 19): 11 more variants (UIRect** array + index, plain/all-volatile/partial-volatile receivers, float temps, named receiver pointer); none beat 10 insns (54 bytes), same size 1031.
 // Tried 2026-10-31 re-pass: 18 more tail shapes (ternary, switch, do/break, goto, nested-block returns, bit-mask select, volatile-free sel reuse); all 23 (single cleanup, 1309-1326 bytes) or 29-43 (duplicated epilogue); original shares one epilogue yet duplicates the string cleanup per return, still unreproduced.
 // Tried 2026-10-30 night: 14 return-shape variants (goto/result var/ternary/braced string scope); `int r = -1; if (closed) r = sel; return r;` gives 34->23 (single cleanup, 1311 vs 1346 bytes); original duplicates the string cleanup per return yet shares one epilogue, which no source shape reproduced. Retried with the twin's shape (early `if (closed) return sel/v->confirmSel; return -1;`, `!closed` form, ternary, no sel local, color/x order, decl order): 30-43 insns and 1384 bytes (cleanup and epilogue both duplicated), worse than 23.
 // original: FUN_00437220 (fastcall; confirmation dialog, -1 while open, else the chosen answer)
