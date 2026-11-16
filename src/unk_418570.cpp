@@ -651,6 +651,7 @@ float TriCollector::Closest(float r, float* pos, float* out, float* nrm)
     } while (0)
 
 // NONMATCHING: RALLYTROPHY 0x419770
+// Pass 2026-11-16: size 1094 -> 1128 (orig 1130), differing bytes 1000 -> 944 (insns differ 164 -> 182, alignment shift): lo/hi copied as int bits then -= r (original int-copies pos, as P); open: original i in memory + q bits in ebp (ours i in ebx), no ED::~ED call at exit (local-class dtor never inlines; file-scope ED/Sph419 variants lose the 4th saved register: 204/197), pop-before-je epilogue, e1/e2/dv int-copy variants (+20 bytes, worse), tail sqrt keeps y,z on the FPU. Statement-order, while/for(;;) and struct-held i variants compile identically.
 // Pass 2026-11-13: 170 -> 164 insns differ (1090 -> 1094 bytes, orig 1130): TriClosest4b call (as orig), x/y/z bounds as nested ifs with local float pairs (xb,xa loaded before the first compare, as the original's two-fld pattern); open: orig keeps i in memory and q bits in ebp (ours i in ebx, q in memory -> e1/e2/dv z-copies fuse), ss ScenePoint (no ED::~ED) always worse (205+), Near419 forceinline puts q in a reg but adds and eax,0xff/bool store (893 bytes differ but 184 insns).
 // Tried 2026-11-04: original state 0 (ebp-0x94, zeroed x/y/z at esp+0x10..0x18) is the sum accumulator, not an empty ED: `ScenePoint ss` (+ qz dead volatile store for the 0x5c slot) gives the original 3/7/3 state stores and removes the ED::~ED call but 4th saved register (esi) is lost: 170->207 insns, not adopted.
 // Tried 2026-11-01 re-pass: 220->170 insns differ (~30 variants): rewritten Closest-style (Sph419 P, ScenePoint lo/hi with lo.x = pos[0] - r, ED empty-dtor local first, float s[3], plane test dv.x = pos[0]-a->x with dot in the asm order z,y,x, int bit-compare of d2 vs q); frame 0x88 now matches. Still differs: q/d2 stack slots (orig q at 0x64, d2 at 0x6c, P at 0x70 vs ours one slot lower), shared xor-eax zero, dv.y/z int-copied then fsub in the original but fused here, bounds checks load vertex pointers up front in the original, e1/e2 int-copied first; too far for permute.
@@ -662,8 +663,8 @@ int TriCollector::Contact(float r, float* pos, float* a_, float* b, float* c, in
     s[2] = s[1] = s[0] = 0.0f;
     int n = 0;
     Sph419 P(pos, r);
-    ScenePoint lo(*(ScenePoint*)pos); lo.x = pos[0] - r; lo.y -= r; lo.z -= r;
-    ScenePoint hi(*(ScenePoint*)pos); hi.x += r; hi.y += r; hi.z += r;
+    ScenePoint lo; {int* d=(int*)&lo; const int* sp=(const int*)pos; d[0]=sp[0]; d[1]=sp[1]; d[2]=sp[2];} lo.x -= r; lo.y -= r; lo.z -= r;
+    ScenePoint hi; {int* d=(int*)&hi; const int* sp=(const int*)pos; d[0]=sp[0]; d[1]=sp[1]; d[2]=sp[2];} hi.x += r; hi.y += r; hi.z += r;
     for (unsigned i = 0;
  hits.begin() != 0 && i < hits.size(); i++) {
         Tri* t = hits[i];
