@@ -26,12 +26,14 @@ static __forceinline int RoundF(float v)
 // Tried 2026-10-30 night: decl order/register/while-loop/pointer-walk/+1-folded nx variants, `StageGrid* g = this` member access + volatile diag in loop 1 (627->603 insns); still differs: original keeps this in esi and gx/gy/i in registers across loop tops (ours spills), x87 round interleave.
 // Tried 2026-11-01 repass: x87 association checked (only fsub/fsubr and slot differences, sums/lim/round chains agree); 11 variants (this-> direct, pointer-walk and count-down x loops, rows/cols locals, volatile g, double diag, while gy) all 599-642 insns differ vs 603 base; original uses count-down inner loops with cursor spills, ours differs in regalloc throughout, not within permuter range.
 // Tried 2026-11-16 (r26): type==2 branch swapped to `!= 2` first (594 vs 599 insns but +16 bytes), diag via cw/ch locals or direct members (603-624 insns), reorder.py sweep (no gain); calls.py shows all 6 calls match, so the +62 bytes are regalloc/spills (orig keeps this in esi), not extra inlining.
+// Pass 2026-11-16 (L2): vector loop bound as `i < (first==0 ? 0 : (last-first)>>2)` (inline size(); loops no longer rotated), type!=2 arm first, nx/ny = RoundF()+1 shared by both edges, margin non-volatile int copy: 2402 -> 2378 bytes, 599 -> 521 insns differ.
 // The point transform is the X87XformT asm helper (657 -> 627 differing instructions; the positional byte count got worse, 2153 -> 2190).
 void StageGrid::FillCells()
 {
     StageGrid* g = this;
     float invW = DAT_004e1348 / g->cellW;
-    float margin = *(volatile float*)&DAT_004e13b4;
+    int mbits = *(int*)&DAT_004e13b4;
+    float margin = *(float*)&mbits;
     int gy = 0, gx;
     float invH = DAT_004e1348 / g->cellH;
     float cw = g->cellW;
@@ -41,13 +43,13 @@ void StageGrid::FillCells()
         for (gx = 0; gx < g->cols; gx++) {
             BYTE* cell = g->cells + (g->cols * gy + gx) * 0xb0;
             unsigned int i;
-            for (i = 0; IV(cell, 0x64) != 0 && i < (unsigned int)((IV(cell, 0x68) - IV(cell, 0x64)) >> 2); i++) {
+            for (i = 0; i < (unsigned int)(IV(cell, 0x64) == 0 ? 0 : (IV(cell, 0x68) - IV(cell, 0x64)) >> 2); i++) {
                 int obj = IV(IV(IV(cell, 0x64) + i * 4, 0), 4);
-                float r = *(volatile float*)&g->radius + FV(obj, 0xc4);
-                int nx = RoundF((r + diag) * invW);
-                int ny = RoundF((r + diag) * invH);
-                int x0 = gx - (nx + 1), x1 = nx + 1 + gx;
-                int y0 = gy - (ny + 1), y1 = gy + ny + 1;
+                float r = g->radius + FV(obj, 0xc4);
+                int nx = RoundF((r + diag) * invW) + 1;
+                int ny = RoundF((r + diag) * invH) + 1;
+                int x0 = gx - nx, x1 = nx + gx;
+                int y0 = gy - ny, y1 = gy + ny;
                 if (x0 < 0) x0 = 0;
                 if (g->cols < x1) x1 = g->cols;
                 if (y0 < 0) y0 = 0;
@@ -66,23 +68,15 @@ void StageGrid::FillCells()
                     }
                 }
             }
-            for (i = 0; IV(cell, 0x74) != 0 && i < (unsigned int)((IV(cell, 0x78) - IV(cell, 0x74)) >> 2); ) {
+            for (i = 0; i < (unsigned int)(IV(cell, 0x74) == 0 ? 0 : (IV(cell, 0x78) - IV(cell, 0x74)) >> 2); ) {
                 int obj = IV(IV(IV(cell, 0x74) + i * 4, 0), 4);
-                if (IV(obj, 4) == 2) {
-                    int n = g->rows * g->cols;
-                    BYTE* c = g->cells + 0xc;
-                    for (; n > 0; n--) {
-                        ((TimedLists*)c)->InsertA(IV(IV(cell, 0x74), i * 4), 0.0f);
-                        c += 0xb0;
-                    }
-                    i++;
-                } else {
+                if (IV(obj, 4) != 2) {
                     float r = g->radius + FV(obj, 0xc4);
                     float rd = r + diag;
-                    int nx = RoundF(rd * invW);
-                    int ny = RoundF(rd * invH);
-                    int x0 = gx - (nx + 1), x1 = gx + nx + 1;
-                    int y1 = gy + ny + 1, y0 = gy - (ny + 1);
+                    int nx = RoundF(rd * invW) + 1;
+                    int ny = RoundF(rd * invH) + 1;
+                    int x0 = gx - nx, x1 = nx + gx;
+                    int y1 = gy + ny, y0 = gy - ny;
                     if (x0 < 0) x0 = 0;
                     if (g->cols < x1) x1 = g->cols;
                     if (y0 < 0) y0 = 0;
@@ -101,15 +95,23 @@ void StageGrid::FillCells()
                         }
                     }
                     i++;
+                } else {
+                    int n = g->rows * g->cols;
+                    BYTE* c = g->cells + 0xc;
+                    for (; n > 0; n--) {
+                        ((TimedLists*)c)->InsertA(IV(IV(cell, 0x74), i * 4), 0.0f);
+                        c += 0xb0;
+                    }
+                    i++;
                 }
             }
-            for (i = 0; IV(cell, 0x84) != 0 && i < (unsigned int)((IV(cell, 0x88) - IV(cell, 0x84)) >> 2); i++) {
+            for (i = 0; i < (unsigned int)(IV(cell, 0x84) == 0 ? 0 : (IV(cell, 0x88) - IV(cell, 0x84)) >> 2); i++) {
                 int obj = IV(IV(cell, 0x84), i * 4);
                 float r = margin + FV(obj, 0x28);
-                int nx = RoundF((r + diag) * invW);
-                int ny = RoundF((r + diag) * invH);
-                int x0 = gx - (nx + 1), x1 = nx + 1 + gx;
-                int y0 = gy - (ny + 1), y1 = gy + ny + 1;
+                int nx = RoundF((r + diag) * invW) + 1;
+                int ny = RoundF((r + diag) * invH) + 1;
+                int x0 = gx - nx, x1 = nx + gx;
+                int y0 = gy - ny, y1 = gy + ny;
                 if (x0 < 0) x0 = 0;
                 if (g->cols < x1) x1 = g->cols;
                 if (y0 < 0) y0 = 0;
@@ -126,14 +128,14 @@ void StageGrid::FillCells()
                             ((TimedLists*)(c + 0xc))->PushC(obj);
                     }
             }
-            for (i = 0; IV(cell, 0x94) != 0 && i < (unsigned int)((IV(cell, 0x98) - IV(cell, 0x94)) >> 2); i++) {
+            for (i = 0; i < (unsigned int)(IV(cell, 0x94) == 0 ? 0 : (IV(cell, 0x98) - IV(cell, 0x94)) >> 2); i++) {
                 rd = diag;
                 int obj = IV(IV(cell, 0x94), i * 4);
                 rd += DAT_004e13d4;
-                int nx = RoundF(rd * invW);
-                int ny = RoundF(rd * invH);
-                int x0 = gx - (nx + 1), x1 = nx + 1 + gx;
-                int y0 = gy - (ny + 1), y1 = gy + ny + 1;
+                int nx = RoundF(rd * invW) + 1;
+                int ny = RoundF(rd * invH) + 1;
+                int x0 = gx - nx, x1 = nx + gx;
+                int y0 = gy - ny, y1 = gy + ny;
                 if (x0 < 0) x0 = 0;
                 if (g->cols < x1) x1 = g->cols;
                 if (y0 < 0) y0 = 0;
@@ -150,14 +152,14 @@ void StageGrid::FillCells()
                             ((TimedLists*)(c + 0xc))->PushD(obj);
                     }
             }
-            for (i = 0; IV(cell, 0xa4) != 0 && i < (unsigned int)((IV(cell, 0xa8) - IV(cell, 0xa4)) >> 2); i++) {
+            for (i = 0; i < (unsigned int)(IV(cell, 0xa4) == 0 ? 0 : (IV(cell, 0xa8) - IV(cell, 0xa4)) >> 2); i++) {
                 rd = diag;
                 int obj = IV(IV(cell, 0xa4), i * 4);
                 rd += DAT_004e13d0;
-                int nx = RoundF(rd * invW);
-                int ny = RoundF(rd * invH);
-                int x0 = gx - (nx + 1), x1 = nx + 1 + gx;
-                int y0 = gy - (ny + 1), y1 = gy + ny + 1;
+                int nx = RoundF(rd * invW) + 1;
+                int ny = RoundF(rd * invH) + 1;
+                int x0 = gx - nx, x1 = nx + gx;
+                int y0 = gy - ny, y1 = gy + ny;
                 if (x0 < 0) x0 = 0;
                 if (g->cols < x1) x1 = g->cols;
                 if (y0 < 0) y0 = 0;
