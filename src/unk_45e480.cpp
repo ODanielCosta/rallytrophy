@@ -1247,6 +1247,7 @@ char* CarCopy(char* dst, const char* src, size_t n)
 // `lea eax,[esi+0x1bd94]; mov ebp,eax` and the build has `lea ebp,[esi+0x1bd94]` (30 source forms tried).
 // Tried 2026-10-30 night: 9 more (shared r/l pointer locals, r[i-3] indexing, do-while, ptr-walk, &arr[0][i]) plus permute -r 20; none gave the extra mov; the 73 differing insns are only +2 jump-offset shifts from the one missing mov.
 // Tried 2026-10-31 re-pass: 15 more (forceinline Id()/Id2() pointer helpers, volatile base pointer, char* base walk, split fl/fr cursors, fr[k-3] do-while, comma-increment) plus permute -r 40; all stay at 73 insns (just the missing `mov ebp,eax` after lea eax).
+// Tried 2026-11-16 (r26): 38 more (r aliases via &*, +0, casts, (char*)+off, self->, countdown/do-while/while, comma-init, r[-3]/(r-3), l=r-3, register, reassign r after loop); all 73 insns. volatile r gives 2276 bytes/23 insns but only by switching to index-form addressing (not the original shape), so rejected.
 CarObject::~CarObject()
 {
     delete shadow;
