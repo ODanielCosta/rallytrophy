@@ -1969,6 +1969,7 @@ extern G8_Opponent DAT_004f7c30[];
 // `this` alias, zero as a variable, volatile locals, fastcall free function: none flips the allocation.
 // Tried 2026-10-30 night: ~30 variants (declaration order permutations, init order/chained inits, do-while vs for(;;), ternary vs if, lastA/lastB decl swap, volatile info, reordered career stores): declaration order has no effect at all; original keeps carClass at [esp+0x20] and info at [esp+0x24] (ours swapped), lastA above lastB, 12 bytes longer; still 191 insns differ.
 // Tried 2026-11-01 re-pass: 17 more variants (volatile self/this alias, local g for this, init order/chains, zero-store tweaks, decl moves of mode/limit/arcade, load order); none beats 191 insns; diff is the edi/ebx/ebp priority swap (orig this=edi zero=ebx one=ebp; ours zero=edi one=ebx this=ebp), not within permuter range.
+// Tried 2026-11-15 (round 18, ~45 compiles): inline vs local menu/career alias, d/e temp folding, rally-1 local, lastA/lastB store forms and orders, `1 == n`/`n-1 == 0`/one-variable compares, init/zero-store order, dropping constant stores to probe weights (this/zero/one allocation never flips; this stays lowest). Best stays 186 insns; no kept change.
 int GameG8::FUN_00433bc0()
 {
     DAT_00508f60 = 0;
