@@ -105,9 +105,15 @@ struct M2_Car {
 inline void Extend(const Vec3& e, Vec3& mn, Vec3& mx)
 {
     unsigned int sign = 0x80000000;
-    if (sign & *(unsigned int*)&e.x) mn.x += e.x; else mx.x += e.x;
-    if (sign & *(unsigned int*)&e.y) mn.y += e.y; else mx.y += e.y;
-    if (sign & *(unsigned int*)&e.z) mn.z += e.z; else mx.z += e.z;
+    unsigned int sx = *(unsigned int*)&e.x;
+    float a = e.x;
+    if (sign & sx) { float t = a; t = t + mn.x; mn.x = t; } else { float t = a; t = t + mx.x; mx.x = t; }
+    unsigned int sy = *(unsigned int*)&e.y;
+    float b = e.y;
+    if (sign & sy) { float t = b; t = t + mn.y; mn.y = t; } else { float t = b; t = t + mx.y; mx.y = t; }
+    unsigned int sz = *(unsigned int*)&e.z;
+    float c = e.z;
+    if (sign & sz) { float t = c; t = t + mn.z; mn.z = t; } else { float t = c; t = t + mx.z; mx.z = t; }
 }
 
 inline void Scale(Vec3& v, float s)
@@ -117,6 +123,16 @@ inline void Scale(Vec3& v, float s)
     v.z *= s;
 }
 
+// Erase of the whole vector with copy as a call and _Destroy as a call, like the original's inline erase.
+struct M2_IntVec : std::vector<int> {
+    void EraseAll()
+    {
+        iterator s = std::copy(end(), end(), begin());
+        _Destroy(s, end());
+        _Last = s;
+    }
+};
+
 // Registers the car's world box (the body's local box, enlarged, rotated into the world) with the stage.
 // NONMATCHING: RALLYTROPHY 0x4581f0
 // 931 vs 923 bytes. Logic and EH state order (lo, hi, ax, ay, az, mn, mx, h, sphere) match; the frame layout (h sits above ay in
@@ -125,6 +141,7 @@ inline void Scale(Vec3& v, float s)
 // Tried 2026-10-31 pass 2 (30 variants): h declared at every position/as float[3]/split floats/aliased on sphere.center/via pointer/volatile h.x, Extend with named floats, int sign words, by-value forceinline helpers, e+mn forms; none below 167 insns (stack slot of h never moves: it stays below lo; original stores h.x*0.5 to memory and Length reloads all three, ours keeps h.x on the FPU).
 // Tried 2026-11-01 pass 3 (~65 variants): per-component Extend for ay/az as `unsigned sa=*(unsigned*)&e.c; float a=e.c; if (sg&sa){float t=a; t=t+mn.c; mn.c=t;}` DOES give the original's mov ecx,[e]; fld e; test; fadd mn shape (size 931->925) but h stays at the frame bottom; h declared before every local, h as float[3]+Vec3& (922 bytes, lo/hi slots then match but ay/az swap, h EH state lost), all 6 orders of ay/az/h, float[3] ay/az, qq volatile slot, volatile h.x store, volatile-view loads: slot order is not declaration-driven, so h above ay is unresolved.
 // Pass 2026-11-13: Scale() helper for ay/az, matrix declared before box, trans after the scaling, Length as z*z+y*y+x*x: 167 -> 134 insns differ, 931 -> 925 bytes. Left: ay/az scale shape (original fld st(0); fmul mem), h slot above ay, EH-state/Collect tail order.
+// Pass 2026-11-15: erase as M2_IntVec::EraseAll (copy + _Destroy both calls, call list now matches), ax/ay/az scaled with the written-out `hi.c - lo.c` (CSE), Extend per component with sign word + loaded edge: 134 -> 91 insns differ, 925 -> 915 bytes. Left: h/radius tail (original stores h to memory), mx(mn) copy order, Collect-arg order.
 // original: FUN_004581f0
 void Car::FUN_004581f0()
 {
@@ -143,12 +160,15 @@ void Car::FUN_004581f0()
     Vec3 ax(*(Vec3*)(matrix));
     Vec3 ay(*(Vec3*)(matrix + 4));
     Vec3 az(*(Vec3*)(matrix + 8));
-    float dx = hi.x - lo.x;
-    ax.x *= dx;
-    ax.y *= dx;
-    ax.z *= dx;
-    Scale(ay, hi.y - lo.y);
-    Scale(az, hi.z - lo.z);
+    ax.x *= hi.x - lo.x;
+    ax.y *= hi.x - lo.x;
+    ax.z *= hi.x - lo.x;
+    ay.x *= hi.y - lo.y;
+    ay.y *= hi.y - lo.y;
+    ay.z *= hi.y - lo.y;
+    az.x *= hi.z - lo.z;
+    az.y *= hi.z - lo.z;
+    az.z *= hi.z - lo.z;
     const float* trans = body->pos;
     Vec3 mn;
     {
@@ -174,7 +194,7 @@ void Car::FUN_004581f0()
     h.z += mn.z;
     sphere.center = h;
     M2_Query* q = &v->query;
-    q->v.erase(q->v.begin(), q->v.end());
+    ((M2_IntVec*)&q->v)->EraseAll();
     q->mode = 0x11;
     q->sphere = &sphere;
     q->minX = mn.x;
