@@ -99,6 +99,10 @@ struct SndPath {
 // path dtor exit ordering. Volatile zero/self, pointer loops, i++/src++ placement, decl orders did not flip ebx/ebp.
 // num[4] rejected (2026-11-01): _itoa of the stage int overflows 4 bytes from 1000 up, so the buffer stays 8.
 // Tried 2026-11-01 re-pass (num[8] kept): 23 more variants (volatile zero/self, decl orders, hoisted num/pos/count/recs/i, recs++ and src++ loops, float pos[3] = 1821 bytes but 184 insns) stay at 162 insns; ebx/ebp roles unchanged.
+// Pass 2026-11-16 (r26): no change kept (162 insns, 1837/1822). Register-masked diff shows the only real differences are the ebx(this)/ebp(zero) swap
+// and the NpfRec loop base bias (+0x20 here, plain recs in the original); the extra inlined path dtor at `return` (+30) is the other. Nesting the second
+// phase in `if (Exists)` removes that dtor but f2 then shares f's 16K slot (frame 0x40c0 vs 0x8138); do/while, while, else, extra braces do the same.
+// Also no effect: &recs[i] alias, pointer/char* steppers, named Vector3 members, hoisted i/zero, len+ptr order, reorder.py.
 void StageSoundLoader::LoadSoundFiles()
 {
     int idx, count2, ver, magic;
