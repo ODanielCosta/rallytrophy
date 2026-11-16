@@ -354,6 +354,7 @@ static __forceinline void BoxWorldPoint(Vec3* o, const float* p, const float* m,
 // Pass 2026-11-13 (agent): 597 -> 407 insns differ (2741 -> 2917 bytes of 3131): r/a as float r[9]/a[9] (frame slots now exact), centerB hoisted to function scope after worldB (slot -0x48 exact; EH state order now differs), t/ra/rb locals for compares (cross tests give the fadd st,st(1) form; the original's fxch/fcomp st(1)/fstp st(0) compare still not reproduced). Open: fcomp form, x,z,y term order of r00/r02 (VC6 emits z,y,x), missing inline return-0 cleanups (original has 7 dtor pairs, we 3).
 // Pass 2026-11-16 (agent): 407 -> 150 insns differ (2917 -> 2971 bytes of 3131): original test order is A axes, B axes, then 9 cross tests; named sum (float sm = ...; float s = ra; s += rb;) gives the fcomp st(1)/fstp form and fadd st,st(1); r0/r2/r3/r5/r6/r8 as C + (B + A) without the q temp. Open: original keeps 6 cloned return-0 epilogues (tests 1,2,3 and 13,14,15; tests 4-12 jump back to the first three), we merge to 2 (160 bytes); no source lever found (see REPORT).
 // Pass 2026-11-16 round 28: 97 -> 33 insns differ (3133 -> 3131 bytes, size exact): dropped the inner scope braces and trailing return 0 (arrays, centerA, centerB now function scope after the radius test; centerB declared with its initializer, so the EH states match). Open: centerA/centerB init scheduling (~15 insns); r0/r2/r3/r5/r6/r8 term order x,z,y vs our z,x,y (operand swaps and assoc permutations make no difference).
+// Pass 2026-11-16 round 30: 33 -> 28 insns differ (size exact): centerA built as `Vec3 centerA; centerA.x = boxA[0]; centerA.y = boxA[1]; centerA.z = boxA[2];` (x stays on the x87 stack, y/z int-copied like the original). r-term order already matches; only the centerA/centerB init schedule hunk remains (original does fadd x straight after fld; ours hoists the int loads into the gap). Tried: e/g/d/f variants (x via float temp, x add before/after copies, B before A) all lose the y/z reload or shrink 12 bytes.
 int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
                  float* positionA, float* positionB)
 {
@@ -388,7 +389,7 @@ int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
         axisB[2].x = matrixB[8];
         axisB[2].y = matrixB[9];
         axisB[2].z = matrixB[10];
-        Vec3 centerA = *(Vec3*)boxA;
+        Vec3 centerA; centerA.x = boxA[0]; centerA.y = boxA[1]; centerA.z = boxA[2];
         Vec3 centerB = *(Vec3*)boxB;
         centerA.x += boxA[3];
         centerA.y += boxA[4];
