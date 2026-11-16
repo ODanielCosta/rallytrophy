@@ -1497,6 +1497,7 @@ __forceinline static void Copy(Vec3& d, const Vec3& s) { d.x = s.x; d.y = s.y; d
 // units ahead, offsets the p sideways by the road width and derives the steering offset (unk34).
 // Tried 2026-11-01 re-pass: lazy dist2 sqrt inside the && compares and 0.0f read as DAT_004e134c for v0/v1/v2/gap/unk14c .y (787->698 insns, 3502->3543 bytes vs 3592); ~30 variants (other .y sites, p.y, unk28, dist order, local pointer/declaration order) no better; still differs: original keeps player in edi/path in ebp (ours ebp/ebx) so the whole register allocation and several fst/fstp reloads of the n/v components differ.
 // Pass 2026-11-13: 720 -> 594 insns differ (3545 -> 3532 bytes vs 3592): u0/u1 as #define expressions not locals (-55), body cached via CarBody* + int-copied velocity, p.y=0 in the cap branch, v0.y/v1.y literal 0.0f at two sites, t2<=1 branch order in cases 1-2. Not fixed: player/index register split (index reloaded from player->unk1a7c; orig keeps it in ebx), x87 preloads in dist0/dist1 Length.
+// Pass 2026-11-16 (L1): 594 -> 564 insns differ (3532 -> 3537 bytes vs 3592): case-3 t2<=1 as the if arm with unk14c.y=0 only in the t2>1 arm (orig jumps over the store), .y zeros as immediates at v1 init/gap/unk14c, v1 init y via DAT, separate lenN/kN for the final normalisation. Ctor forms of v0/v1/v2/gap, pair flips of the other .y sites: worse.
 float AIDriver::FUN_0049e3d0()
 {
     Vec3 n;
@@ -1555,7 +1556,7 @@ float AIDriver::FUN_0049e3d0()
     v0.y = DAT_004e134c;
     Vec3 v1;
     v1.x = u1->x - u0->x;
-    v1.y = 0.0f;
+    v1.y = DAT_004e134c;
     v1.z = u1->z - u0->z;
     float len1 = (float)sqrt(v1.z * v1.z + v1.x * v1.x);
     FUN_004b3dd0(&p, u0, &v1, &n);
@@ -1573,7 +1574,7 @@ float AIDriver::FUN_0049e3d0()
     // Gap between this segment's end and the next segment's first corner.
     Vec3 gap;
     gap.x = ((Vec3*)&next->unk28[0])->x - ((Vec3*)cur->b)->x;
-    gap.y = DAT_004e134c;
+    gap.y = 0.0f;
     gap.z = ((Vec3*)&next->unk28[0])->z - ((Vec3*)cur->b)->z;
     float lenGap = (float)sqrt(gap.z * gap.z + gap.x * gap.x);
     float total = len2 + len1 + len0;
@@ -1624,7 +1625,7 @@ float AIDriver::FUN_0049e3d0()
         v1.y = p.y + v1.y;
         v1.z = p.z + v1.z;
         v1 -= *u0;
-        v1.y = DAT_004e134c;
+        v1.y = 0.0f;
         SubV(u1, u0, &n);
         float nl = n.x * n.x + n.z * n.z;
         nl = nl + n.y * n.y;
@@ -1672,7 +1673,13 @@ float AIDriver::FUN_0049e3d0()
         unk140.x = sp.Eval(u0->x, u1->x, ((Vec3*)cur->b)->x, ((Vec3*)&next->unk28[0])->x);
         unk140.z = sp.Eval(u0->z, u1->z, ((Vec3*)cur->b)->z, ((Vec3*)&next->unk28[0])->z);
         float t2 = t + step2;
-        if (t2 > DAT_004e1348) {
+        if (t2 <= DAT_004e1348) {
+            sp.t = t2;
+            sp.t2 = t2 * t2;
+            sp.t3 = sp.t2 * t2;
+            unk14c.x = sp.Eval(u0->x, u1->x, ((Vec3*)cur->b)->x, ((Vec3*)&next->unk28[0])->x);
+            unk14c.z = sp.Eval(u0->z, u1->z, ((Vec3*)cur->b)->z, ((Vec3*)&next->unk28[0])->z);
+        } else {
             t2 = (t2 - DAT_004e1348) * len2; // original chains ((t2-1)*len)*step through one temp
             t2 = t2 * stepGap;
             sp.t = t2;
@@ -1680,14 +1687,8 @@ float AIDriver::FUN_0049e3d0()
             sp.t3 = sp.t2 * t2;
             unk14c.x = sp.Eval(u1->x, ((Vec3*)cur->b)->x, ((Vec3*)&next->unk28[0])->x, next->unk28[1].x);
             unk14c.z = sp.Eval(u1->z, ((Vec3*)cur->b)->z, ((Vec3*)&next->unk28[0])->z, next->unk28[1].z);
-        } else {
-            sp.t = t2;
-            sp.t2 = t2 * t2;
-            sp.t3 = sp.t2 * t2;
-            unk14c.x = sp.Eval(u0->x, u1->x, ((Vec3*)cur->b)->x, ((Vec3*)&next->unk28[0])->x);
-            unk14c.z = sp.Eval(u0->z, u1->z, ((Vec3*)cur->b)->z, ((Vec3*)&next->unk28[0])->z);
+        unk14c.y = 0.0f;
         }
-        unk14c.y = DAT_004e134c;
     }
 
     // Blend the node values and take the line direction.
@@ -1722,9 +1723,10 @@ float AIDriver::FUN_0049e3d0()
     float px = n.z;
     n.z = -n.x;
     n.x = px;
-    float inv2 = DAT_004e1348 / (float)sqrt(n.x * n.x + n.z * n.z);
-    n.x = n.x * inv2;
-    n.z = n.z * inv2;
+    float lenN = (float)sqrt(n.x * n.x + n.z * n.z);
+    float kN = DAT_004e1348 / lenN;
+    n.x = n.x * kN;
+    n.z = n.z * kN;
     unk34 = *(volatile float*)&n.y * forward.y + n.z * forward.z + n.x * forward.x; // original keeps the n.y (= 0) term
 
     pos = (Vec3*)player->car->body->unk14;
