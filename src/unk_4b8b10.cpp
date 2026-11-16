@@ -1238,6 +1238,7 @@ struct RfDir { RfPod* Scale(RfPod* out, float k) const; };           // 0x40b0c0
 // original: FUN_004b95b0
 // Tried 2026-10-31: scale temps as a POD hidden-result call (no EH frame, matches stack size 0x48 and call shapes) + per-use d->vertex reloads; 106->~40 insns differ. Left: deform[i] pointer reuse at loop top (orig esi/ebx split), fadd operand order of the nrmB add, fst vs fstp+fld of z and x*x+y*y+z*z load order.
 // Tried 2026-10-31 night (re-pass): slot pointer `pl=&deform[i]` with count via (*pl)->count and temp-ordered nrmB x add 23->19 insns; left: orig loads l before lea of slot (esi/ebx pair), fstp+fld reload of n[2] and x*x+y*y+z*z load order; ~25 more variants (volatile slot/l reads, count-first, temp orders, volatile n[2], q chains) were no better.
+// Pass 2026-11-15 (r17): n[] normal read via `nn = &d->vertex->position.x + 3` (not CSE'd with the RV store) + one-expression x*x+y*y+z*z + `RV->n[0] += pt4->x`: 21 -> 12 insns, 473 -> 476 bytes. Left: l loaded before lea of slot (esi/ebx), count before dirty store; ~20 pl/l/count orderings (double deform[i], int dt, n first) all worse.
 void MeshModel::Refresh()
 {
     if (dirtyCount == 0) return;
@@ -1261,8 +1262,8 @@ void MeshModel::Refresh()
                     float* nv = &d->vertex->position.x + 3;
                     nv[0] = pt3->x; nv[1] = pt3->y; nv[2] = pt3->z;
                     RfPod t4; RfPod* pt4 = ((RfDir*)&d->nrmB)->Scale(&t4, w);
-                    { float b = RV->n[0]; float a = pt4->x; RV->n[0] = b + a; } RV->n[1] += pt4->y; RV->n[2] += pt4->z;
-                    float q = RV->n[0] * RV->n[0]; q = q + RV->n[1] * RV->n[1]; q = q + RV->n[2] * RV->n[2];
+                    RV->n[0] += pt4->x; RV->n[1] += pt4->y; RV->n[2] += pt4->z;
+                    float* nn = &d->vertex->position.x + 3; float q = nn[0] * nn[0] + nn[1] * nn[1] + nn[2] * nn[2];
                     int bits = *(int*)&q;
                     int r = DAT_00573bc0[(bits >> 12) & 0xfff] + 0x3f800000 + (-(int)((bits * 2 + 0x81000001U) & 0xfe000000) >> 2);
                     r &= 0x7fffffff;
