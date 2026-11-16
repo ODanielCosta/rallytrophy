@@ -1666,6 +1666,7 @@ static inline int Bal(int a) { return a + 1; }
 // Tried 2026-10-31 re-pass: 14 more variants, none better than 18 insns: Bal count 10/12/14, Bal split start/middle/end (6+6, 4+8), mass scale as explicit per-axis *= / mass*x / float* walk / local copy / double / temp-split / volatile mass, `float mass; mass = ...` split; Scale3 forms all give the same reload-from-stack instead of fld st(0).
 // 2026-11-11: 43 -> 27 diff lines. (3) solved: mass read through a volatile cast into a float local after the GetVector3 call and before the copy gives fld mass + fld st(0) per axis. EH state 7 solved: steer copy-constructed from the call result. Left: (2) esi/eax message pointer (the 2 bytes; four more c_str spellings no change), (1) push before fcos, trunkAxes[5] store order (six statement orders, none better), wiper1Angle push placement.
 // 2026-11-16 round 30: 47 variants, none below 13 insns differ (baseline 13, 4486 vs 4484): hood/trunk axis statement orders, cos/sin temps, hoodMax temp forms, c_str() spellings via a local helper (fewer bytes differ but 16 insns, extra call). No source change.
+// 2026-11-16 round 31: (2) solved in the header: TmpString::c_str as `const char* r = ptr; if (r == 0) r = ""; return r;` (as IniString) loads the pointer straight into esi; size 4486 -> 4484 (= target), 2777 -> 48 differing bytes. Left: push before fcos, hood sin store order, trunkAxes tail order.
 void Car::LoadCarIni(const char* path, unsigned int checksum)
 {
     CarIniView* v = (CarIniView*)this;
