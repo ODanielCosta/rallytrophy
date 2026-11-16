@@ -3762,6 +3762,7 @@ struct G13_WarpPoint {
 // Tried 2026-11-01 re-pass: volatile init of wait/choice/first, volatile wait store-back, volatile first read, extra int local, result via temp, permute -r 40 (best 1 insn, no MATCH); still only the back-edge `mov edi,1 / xor ebx,ebx` order differs (VC6 re-materialises the two constants after the inlined G13_String dtor).
 // Tried 2026-11-14: wait=0 moved to loop end (+first=1/choice=choice), trailing continue, for(;cond;) head, BeginScene if-wrap, string in inner block, first/choice/wait reorder: none beat 1 insn (back-edge swap).
 // Pass 2026-11-16 (agent, ~45 variants): the true diff is the two top stores [esp+1c]/[esp+10] (wait/choice) swapped; decl order wait,choice,first fixes it but flips the back-edge mov edi,1/xor ebx,ebx. Also no change: pointer/unsigned/bool types for wait/first/choice, init-from-another-local (!wait, first=choice, one=1), x/y/color decl moves, for(;;), extra locals, return !choice. Slots (slotmap) already equal.
+// Pass 2026-11-16 (inline-helper lever, ~200 compiles): Set0/Set1/Init helpers for wait/choice/first in all declaration x helper-order combos (147) plus in-loop helper stores: only three outcomes, prologue swap (4B), first store hoisted (5B), back-edge swap (6B); never combined, no gain over 1 insn.
 // Modal "question / Yes / No" dialog: Left/Right or the mouse pick the answer, Enter or a click confirms, Esc cancels.
 // Returns 1 for Yes (class Game in the merged header). original: FUN_00436250
 int GameObj::FUN_00436250(MenuScreen* screen)
