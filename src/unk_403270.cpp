@@ -406,6 +406,7 @@ class CarBody { public: void FUN_0046be50(int mode); };
 
 static inline int Bal(int a) { return a + 1; }  // discarded calls: inline-budget ballast
 // NONMATCHING: RALLYTROPHY 0x403ca0
+// 2026-11-16: `double t = rec.r.a2c; car->unk1a20 = (float)t;` gives the original's fld/fstp copy, but the int copies then rotate registers (edx for eax), 22 insns. The mov esi,eax placement (car bound before the Read pushes) is the real blocker; ~65 car-form variants leave it.
 // Calling convention (thiscall on the header, bool result), object sizes, constructor arguments, the PathText
 // string calls and block order follow the target. Direct singleton field stores before taking the `race` alias
 // improve the object comparison (158 differing bytes vs. 589 in the prior form), but the frame remains four
