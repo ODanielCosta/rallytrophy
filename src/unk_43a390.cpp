@@ -142,6 +142,7 @@ Screen1378::~Screen1378()
 // and register allocation remain different (432 bytes, same as original; 12 insns differ).
 // Tried 2026-10-30 night: ~300 store-order/volatile-cast variants; size now matches, but original interleaves the 0xe/0xf/5/6 immediate stores with the second sprite early and VC6 sinks them.
 // Tried 2026-10-31 re-pass: interleaved first/second 9c/98/60/18/1c store order (16 insns, size 426); permute.py -r 40 best stayed at 12 insns, no MATCH; orig emits second->9c right after first->9c and spills ebp to [esp+1c] between, which VC6 scheduling keeps sinking.
+// Tried 2026-11-16 (round 20): ~17 more order/volatile/alias variants (original store order incl. s->9c early, member-cast second, local-from-new aliases): none below 12 insns / 97 bytes; the EH state=-1 store (ebp spill) is what VC6 hoists above first->9c, orig keeps it after.
 void Screen1378::Setup(MenuGame* game)
 {
     if (m_state) {
