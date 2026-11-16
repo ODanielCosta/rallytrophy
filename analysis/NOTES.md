@@ -700,3 +700,10 @@ With /Oa, measured in synthetic reductions:
 - A store sinks only until its value register is reused. A value in ecx is pinned ahead of `mov ecx,this`; a value in eax can follow it. Stores cross `add esp,N` and `mov ecx,this`, but never a call. A late store before a call is therefore usually a register choice, not a scheduling choice (StageScreen::LoadLayout).
 - A member initialised inside a nested sub-object's inline constructor is emitted in source order, so it lands first. The same member in the outer constructor's flat initialiser list sinks below the following dword zero stores and lets both allocator bytes share `dl`. A wrapper struct is not codegen-neutral; flattening it matched SceneEntry::SceneEntry.
 - Inlined list PopHead (ModelCacheState::Reload): the `m_head` store sinks when `prev` is hoisted before the branch and stays early when `prev` is read in each arm. That flips the other inline site too, so it produced no net gain.
+- **Inline helpers pin stores (2026-11-16 rounds 8-9).** A store written inside a small inline function stays where the source puts it, the same as a store in an inline sub-object constructor. The same store written flat in the caller sinks. Two places used this:
+  - Wheel::Wheel: `SetNormalY(normal)` replaced a `volatile` store and went from 27 to 8 bytes.
+  - ModelCacheState::Reload: two inline sites need different orders, so phase 1 calls a twin `PopHeadB` with identical semantics that reads `prev` inside each arm, and went from 18 to 12 bytes.
+  
+  Two related forms:
+  - Accumulators move integer instructions earlier inside x87 code: `float s = b; s -= a; s *= inv;` instead of `(b - a) * inv` (FUN_00491c10, 2 -> 1 insn).
+  - Writing the constant first, `ny = 0.85f; ny *= oldY`, moved a lea after the fmul (TrackSelectMenu::Run, 4 -> 3 insns).
