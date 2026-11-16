@@ -100,6 +100,7 @@ inline void CrossAsm(float* o, const float* a, const float* b)
 // NONMATCHING: RALLYTROPHY 0x41ef60
 // Tried 2026-10-30 night: first loop rewritten with Vec3 v/c locals, direct PointVel pointer use, sign-branch order and negS compare flipped, 24 declaration-order permutations of posS/negS/limit/c (740->734 insns); loops 2-3 differ structurally (original has inlined Vec3 helper/normalize/operator* temps, 3319 vs our 3079 bytes), not reachable by local variants.
 // Tried 2026-11-01 re-pass: re-derived every float sum association from the original x87 (pen, k denominator, dn, t2, p/q/F projections, work, first-loop d), fixed the depth test to read h[12..14] (n*d) not h[9..11]; e0..e2 now (a*s)*h[12] via a Vec3 copy; 740->712 insns, 3122 of 3319 bytes; still differs structurally (inlined Vec3 helper temps, per-axis select copies through int slots).
+// 2026-11-16 round 29: no gain (589 insns, 3345/3319); tried loop counter spill/address-taken/volatile, h/c/limit decl orders, second-sqrt for inv (CSE'd back), n=h+8 bias pointer, arm/r/l as direct Vec3(h[i]-BF()) (arm: 3321 bytes, 113 hunks but 597 insns), none lowered insns.
 // NONMATCHING: Xform (this+0x15c) and cross-product x87 blocks now inline asm like the original; frame matches; remaining diffs are register/stack allocation and statement order (3107 of 3319 bytes, 2990 differing).
 void RespBody::Respond(void* car, void* stage, int flag)
 {
