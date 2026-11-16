@@ -173,6 +173,7 @@ inline EffectVertex* FlareSet(EffectVertex* quad, const Vec3& d, Camera* camera,
 // Tried 2026-10-30 night: shared float temp/bit-compare for near plane, pos*m operand order, forceinline ScaleVec for normalise and R/U, Vec3 d*inv, double inv, quad normal x,y,z order, local declaration order (204 insns, only the inline inv multiply changed); still differs: original keeps inv on the FPU stack (fld y; fmul st,st(1)), frame is 4 bytes larger (extra 8-byte slot before depth), depth/near compare via [ebp+0xc] float copy, return-path layout.
 // Tried 2026-11-01 re-pass: 17 more variants (depth operand order pos*m, sqrt as double 1.0/ls, volatile/shared nearZ, nearZ in dead camera param slot, sign-test branch flip, dead float/volatile locals for the extra frame slot); none under 204 insns differ. The 4-byte larger frame and nearZ in [ebp+0xc] are not reproduced; permuter not run (far over 10 insns).
 // 2026-11-13 pass: 205 -> 190 insns differ (1777 -> 1765 vs 1767 bytes): c -= ScenePoint operator*(1.0f) (0x40b0c0, call now matches), per-component corner positions then += corner[j], int dz copy for the near clamp. Remaining: nearZ dead store to [ebp+0xc] + 4-byte larger frame, inv kept on the FPU stack, R/U scale (size loaded once, fstp st(0)), angle math with DrawQuad args pushed early, return-path layout of the f sign test.
+// 2026-11-15 pass: 190 -> 179 insns differ (1765 vs 1767): everything after the alpha clamp nested under if (bits(a) >= 0) with the else-if return kept; sibling forms (sign test nested, a>0.001 nest, per-component R/U scale, Dot/depth operand swaps, d*=inv variants) were equal or worse.
 void CityLight::Render(RenderDevice* device, Camera* camera)
 {
     Vec3 d;
@@ -235,38 +236,37 @@ void CityLight::Render(RenderDevice* device, Camera* camera)
     }
     float e = exponent;
     float a = (float)pow(f, e) * scale + bias;
-    if (*(int*)&a < 0) {
+    if (*(int*)&a >= 0) {
+        if (*(int*)&a > 0x3f800000) {
+            a = 1.0f;
+        } else if (a <= 0.001f) {
         return;
+        }
+        c = *(Vec3*)&position;
+        int v = FloatToInt(a * 255.0f) & 0xff;
+        DWORD col = (v << 8) | v;
+        col = col | (col << 16);
+        for (int j = 0; j < 4; j++) {
+            quad[j].position.x = c.x;
+            quad[j].position.y = c.y;
+            quad[j].position.z = c.z;
+            quad[j].position += corner[j];
+        }
+        quad[0].color = col;
+        quad[1].color = col;
+        quad[2].color = col;
+        quad[3].color = col;
+        float rightAngle = (d.z * camera->right.z + d.y * camera->right.y + d.x * camera->right.x) * 0.7f;
+        float upAngle = (d.z * camera->up.z + d.y * camera->up.y + d.x * camera->up.x) * 0.7f;
+        float ang = rightAngle + upAngle;
+        ang = ang * 3.1415927f;
+        float cs = (float)cos(ang) * 0.5f;
+        float sn = (float)sin(ang) * 0.5f;
+        FlareUV(quad, cs, sn);
+        device->DrawQuad(quad, flare, depth);
+        FlareUV(quad, cs, -sn);
+        device->DrawQuad(quad, flare, depth);
     }
-    if (*(int*)&a > 0x3f800000) {
-        a = 1.0f;
-    } else if (a <= 0.001f) {
-        return;
-    }
-    c = *(Vec3*)&position;
-    int v = FloatToInt(a * 255.0f) & 0xff;
-    DWORD col = (v << 8) | v;
-    col = col | (col << 16);
-    for (int j = 0; j < 4; j++) {
-        quad[j].position.x = c.x;
-        quad[j].position.y = c.y;
-        quad[j].position.z = c.z;
-        quad[j].position += corner[j];
-    }
-    quad[0].color = col;
-    quad[1].color = col;
-    quad[2].color = col;
-    quad[3].color = col;
-    float rightAngle = (d.z * camera->right.z + d.y * camera->right.y + d.x * camera->right.x) * 0.7f;
-    float upAngle = (d.z * camera->up.z + d.y * camera->up.y + d.x * camera->up.x) * 0.7f;
-    float ang = rightAngle + upAngle;
-    ang = ang * 3.1415927f;
-    float cs = (float)cos(ang) * 0.5f;
-    float sn = (float)sin(ang) * 0.5f;
-    FlareUV(quad, cs, sn);
-    device->DrawQuad(quad, flare, depth);
-    FlareUV(quad, cs, -sn);
-    device->DrawQuad(quad, flare, depth);
 }
 
 // Module end: the STL header statics guard and its atexit registration (the stub of this file).
