@@ -106,6 +106,7 @@ struct V24 {
 // original's order: dv, lo, hi, sphere, a, b, n1, n2, down) match, and the record lerp / box / sample points are
 // vector operations as in the original. Left: register allocation (the original keeps the record pointer in edi
 // and the trace in edi later) and the frame layout.
+// 2026-11-16 pass: POS/DIR/dv/lo/hi/sph copies as int-bit stores, dv -= POS, `a += Scale()`/`b += Scale()` (reads the returned pointer), rand compare flipped: 369 -> 297 insns differ, 2292 -> 2346 bytes (orig 2332).
 void Stage::FUN_00417540(Player* player, int time, int dt)
 {
     int car = *(int*)((BYTE*)player + 0x28);
@@ -158,7 +159,7 @@ void Stage::FUN_00417540(Player* player, int time, int dt)
             r[8] = 0.0f;
             if (mode != 2) {
                 int lim = RoundF(F(0x248, float) * DAT_004e1404);
-                if (lim < (rand() & 0x3ff)) goto tail;
+                if ((rand() & 0x3ff) > lim) goto tail;
             }
             F(0x1378, float) = r[0];
             F(0x1380, float) = r[2];
@@ -167,9 +168,9 @@ void Stage::FUN_00417540(Player* player, int time, int dt)
             F(0x139c, int) = 0;
             F(0x13a0, int) = 0;
             F(0x1394, int) = 0;
-            DIR.x = r[3];
-            DIR.y = r[4];
-            DIR.z = r[5];
+            F(0x1390, int) = *(int*)&r[3];
+            F(0x1394, int) = *(int*)&r[4];
+            F(0x1398, int) = *(int*)&r[5];
             DIR -= *(AVec*)&r[0];
             F(0x136c, unsigned int) = idx;
             F(0x1374, int) = 1;
@@ -192,10 +193,11 @@ tail:
     if (-1 < cur && F(0x1374, int) != 0) {
         int b2 = *(int*)(car + 0x24);
         AnimVec dv;
-        dv.x = *(float*)(b2 + 0x14) - F(0x1378, float);
+        dv.x = *(float*)(b2 + 0x14);
         rate = F(0x234, float);
-        dv.y = *(float*)(b2 + 0x18) - F(0x137c, float);
-        dv.z = *(float*)(b2 + 0x1c) - F(0x1380, float);
+        *(int*)&dv.y = *(int*)(b2 + 0x18);
+        *(int*)&dv.z = *(int*)(b2 + 0x1c);
+        dv -= POS;
         f4 = dv.x * dv.x;
         f4 = dv.z * dv.z + f4;
         f4 = dv.y * dv.y + f4;
@@ -226,7 +228,9 @@ tail:
             return;
         }
         f5 = f5 / r[6];
-        POS = *(AVec*)&r[3];
+        F(0x1378, int) = *(int*)&r[3];
+        F(0x137c, int) = *(int*)&r[4];
+        F(0x1380, int) = *(int*)&r[5];
         POS -= *(AVec*)&r[0];
         POS *= f5;
         POS += *(AVec*)&r[0];
@@ -234,18 +238,24 @@ tail:
         AnimVec lo;
         AnimVec hi;
         AnimSphere sph;                // x y z radius
-        lo = POS;
-        hi = POS;
+        lo.x = POS.x - DAT_004e13dc;
+        int py = *(int*)&POS.y;
+        int pz = *(int*)&POS.z;
+        int px = *(int*)&POS.x;
+        *(int*)&lo.y = py;
+        *(int*)&lo.z = pz;
+        *(int*)&hi.x = px;
+        *(int*)&hi.y = py;
+        *(int*)&hi.z = pz;
         float rad = DAT_004e13f4 + DAT_004e13f4;
-        lo.x -= DAT_004e13dc;
+        *(int*)&sph.x = px;
+        *(int*)&sph.y = py;
+        *(int*)&sph.z = pz;
         lo.y -= rad;
         lo.z -= DAT_004e13dc;
         hi.x += DAT_004e13dc;
         hi.y += rad;
         hi.z += DAT_004e13dc;
-        sph.x = POS.x;
-        sph.y = POS.y;
-        sph.z = POS.z;
         sph.r = rad;
         AnimTrace* trace = (AnimTrace*)((BYTE*)this + 0x13b8);
         ((AnimalTrace*)trace)->Erase(trace->first, trace->last);
@@ -266,14 +276,8 @@ tail:
         a.y += DAT_004e13f8;
         b = POS;
         b.y += DAT_004e13f8;
-        AVec off1 = ((AnimDir*)&DIR)->Scale(*(float*)(obj + 0xb4));
-        a.x = a.x + off1.x;
-        a.y = a.y + off1.y;
-        a.z = a.z + off1.z;
-        AVec off2 = ((AnimDir*)&DIR)->Scale(*(float*)(obj + 0xa8));
-        b.x = b.x + off2.x;
-        b.y = b.y + off2.y;
-        b.z = b.z + off2.z;
+        a += ((AnimDir*)&DIR)->Scale(*(float*)(obj + 0xb4));
+        b += ((AnimDir*)&DIR)->Scale(*(float*)(obj + 0xa8));
         AnimVec n1;
         AnimVec n2;
         AnimVec down;
@@ -309,3 +313,4 @@ tail:
         *(float*)(obj + 0x1c) = F(0x1380, float);
     }
 }
+
