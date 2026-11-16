@@ -155,6 +155,7 @@ void WindowRain::vf6(RenderDevice* device, Camera* camera, int unused)
 // Tried 2026-10-30 night: dy as a local, int copy of the vertex into a Vec3* w = &s->world (gets the ecx=&world.z base, frame size now matches; 127->72 insns); separate angle pointers, store reorders, indexed spots[j] did not add the original second induction pointer (edx=s) or its imm 100.0 stores; bounds-copy register rotation still differs.
 // Tried 2026-11-01: cursor float* cz=&s->world.z re-derived in the for-increment (keeps edx=s and ecx separate), dy declared after the right/up constant stores, drops loop as indexed dr=&drops[j]; 72->36 insns, size 955 matches. Left: bounds-copy register rotation (orig starts eax, ours edx; bounds.w/struct copy/vmd/reverse order no help), zero/imm store order in loop, add ecx,0x2c vs lea ecx,[edx+0x10]; volatile barriers on cz stores only reach 34.
 // Pass 2026-11-13: for-increment `cz = &(s + 1)->world.z, s++, src++` (8 -> 7 insns differ, 45 -> 41 bytes). ~120 store-order permutations, loop-init placement, `cz += 11`/char* strides (949 bytes), `cz += 0` tried: no better.
+// Pass 2026-11-16 (helper lever): inline-helper wrapping of 100.0 stores, 1.0/0.0 stores, vertex copy+zeros, dy placement, loop-init order: all stay 41 bytes / 7 insns; swapping angleA/cz[-3] or hoisting dy is worse (9-25 insns). Left: cmp ebp,edi above src load, 100.0 store order, lea vs add.
 void WindowRain::Init(RainScene* scene)
 {
     int i = 0;
