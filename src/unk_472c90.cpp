@@ -268,6 +268,7 @@ struct RainMatrix {
 // Tried 2026-10-30 night: local `r=&query.tris` pointer (449->443), step/right/world declaration orders, late step, size/begin locals in the tri pick; whole-function reg allocation still differs (orig spills this, size in ebx; wind slot 0x14 higher).
 // Re-pass 2026-11-01: float sums checked against the original (same fadd association, only fld/fmul operand order differs in the splash facing test); `RainEffect* volatile self = this;` read for threshold and splashSizeOld/New brought 443->348 insns differ (3323 vs 3324 bytes); tried self for other fields, px/py/pz or int-copied camera position before WorldMatrix, decl order of step/world, no r pointer; still differs: this in ebx with automatic spill vs ours volatile self push, WorldMatrix init order after camera loads, slot offsets.
 // Pass 2026-11-13: 344 -> 342 insns differ, 2773 -> 2629 differing bytes (3321 vs 3324). File-scope ctor-less RainMatrix + inline identity stores (EH state 0 before the stores), camera position copied as ints before the matrix, self declared after wind. Open: this=ebx w/o volatile self (439 insns), vertex=edi/camera=esi roles, lo/hi copy+Clear scheduling.
+// Pass 2026-11-15 (r16): 342 -> 339 insns differ (3321 vs 3324 bytes): volatile self declared before RainMatrix world, lens scale written out per use (`wind.x *= 0.05f / scale` x3, no k local). Tried: r pointer forms (Tris()/query.tris direct -> 473 insns), non-volatile this (439), t2 copy for splash sizes (417-439), lo/hi adjust after Clear (379), Sub via S414Vec3 for e (425; calls.py Sub diffs on pos-A are alias names only), fused wind exprs, self at function top (343).
 void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, float dt)
 {
     if (DAT_00501428 == 0) {
@@ -276,6 +277,7 @@ void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, floa
     int step = FloatToInt(dt * 1000.0f);
     int* cpi = (int*)&camera->position;
     int c0 = cpi[0], c1 = cpi[1], c2 = cpi[2];
+    RainEffect* volatile self = this;
     RainMatrix world;
     world.m[1] = world.m[2] = world.m[3] = 0.0f;
     world.m[4] = world.m[6] = world.m[7] = 0.0f;
@@ -285,16 +287,14 @@ void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, floa
     ((int*)world.m)[13] = c1;
     ((int*)world.m)[14] = c2;
     Vec3 wind;
-    RainEffect* volatile self = this;
     if (camera->hasLens) {
         wind.x = world.m[12] - camera->lensPos[0];
         wind.y = world.m[13] - camera->lensPos[1];
         wind.z = world.m[14] - camera->lensPos[2];
         float scale = camera->lensScale;
-        float k = 0.05f / scale;
-        wind.x *= k;
-        wind.y = wind.y * k;
-        wind.z = wind.z * k;
+        wind.x *= 0.05f / scale;
+        wind.y *= 0.05f / scale;
+        wind.z *= 0.05f / scale;
     } else {
         wind.x = 0;
         wind.y = 0;
