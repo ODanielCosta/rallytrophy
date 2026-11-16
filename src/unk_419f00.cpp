@@ -202,10 +202,12 @@ void ColModel::FreeVerts()
 // NONMATCHING: RALLYTROPHY 0x41b590
 // Tried 2026-10-30 night: swapped compare shape (`lo > v1` else-arm, `v1 > hi`), hi loaded separately from lo, shared lo/hi locals, int mins/maxes, partial result kept in maxx, pointer-based loop, v2 re-read from v[]; 115->61 insns differ; still differs: original keeps the tri pointer in ebp with the counter spilled, ours spills the pointer; x/y/z register reuse (esi/edi/ebx) differs.
 // Tried 2026-11-01 re-pass: ~45 variants (induction pointer v as loop var with +16 steps, base 0x28/0x2c/0x30, for/while/end-pointer loops, volatile t/n/v0/v1, volatile v[1] reloads (matches the original's per-use reload, 413 bytes), separate xb/yb temps, unsigned char flags, lo/hi hoisting, combos); 61 insns stay (best 60 with volatile t); VC6 always spills the tri pointer and uses ebp as the shl/or scratch, original keeps the pointer in ebp and the counter spilled, so min/max registers rotate; Y/Z combine as shl 6/shl 4 instead of lea/or/shl.
+// Tried 2026-11-15 (r14): while (n--) + t = v + 0x14 step gives exact size 412 (352 differing bytes, 61 insns); if/else, v[1] temps, init order, v-as-induction (+12 TVert*), t-relative store, hi=lo=: no gain.
 void ColModel::ComputeSel()
 {
     ColTri* t = tris;
-    for (int n = nTris; n != 0; n--) {
+    int n = nTris;
+    while (n--) {
         TVert** v = (TVert**)((char*)t + 0x2c);
         TVert* v0 = v[-1];
         TVert* v1 = v[0];
@@ -218,7 +220,7 @@ void ColModel::ComputeSel()
         maxx |= (maxy * 4 | miny) << 4;
         AXIS(3, loz, hiz, minz, maxz)
         *(unsigned short*)((char*)v - 0x1a) = (unsigned short)(unsigned char)(maxz << 2 | minz) << 8 | maxx;
-        t++;
+        t = (ColTri*)((char*)v + 0x14);
     }
 }
 
