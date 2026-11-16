@@ -263,6 +263,7 @@ static __forceinline void ClampChannel(float& v)
 // Tried 2026-10-30 night: byte-struct texels (PxQ), per-channel hi/lo clamp locals in the x loop, bpp branch flip, b ternary/else forms (260->140); j=ix+(ix<w-1) still sbb/neg vs original mov 1/jb/xor, sum order c3..c0 and stack slots still differ.
 // Tried 2026-11-01 re-pass: 4 j=ix+(ix<w-1) forms (if/else, ++, int k; 160-196 worse) and 6 hi/lo clamp-local declaration orders (140-142, no gain); remaining 140 insns are slot allocation of hi/lo/weights, sum order and hoisted y-loop regs, too many for local edits.
 // Tried 2026-11-01 Bal sweep: Bal(1) x0-12 at start crossed with end 0,1,2,3,4,6 (77 variants) all identical 140 insns/1074 bytes (no std::string in this function, so no inline budget to move); sum order c3..c0 with 7 hi/lo declaration orders, and 24 weight declaration permutations (151+ worse, 1067 bytes): no gain; original stores w0->-8,w1->-0x14,w2->-0x1c with w3 on the x87 stack and sums terms in w3,w2,w1,w0 order.
+// 2026-11-16 pass: sums c3..c0, branch 'one' + byte-offset j4=(ix+one)<<2 for c1/c3, dst via img->pixels (140 -> 4 normalised hunk lines, 1085 vs 1080); left: y-loop head reloads edi=height (orig restores it with mov edi,ecx at the loop tail).
 void __fastcall FUN_004ac920(ImgW5* img, int edx, unsigned int width, unsigned int height, unsigned int format)
 {
     struct PxQ { unsigned char b,g,r,a; };
@@ -274,8 +275,8 @@ void __fastcall FUN_004ac920(ImgW5* img, int edx, unsigned int width, unsigned i
         PoolFree(img->pixels); PoolFree(img->palette);
     } else src=(unsigned int*)img->pixels;
     img->format=7;
-    unsigned int* dst=(unsigned int*)PoolAlloc(width*height*4);
-    img->pixels=(unsigned char*)dst; img->palette=0;
+    img->pixels=(unsigned char*)PoolAlloc(width*height*4); img->palette=0;
+    unsigned int* dst=(unsigned int*)img->pixels;
     for (unsigned int y=0; y<height; ++y) {
         unsigned int fy=((y<<16)/(height-1))*((unsigned int)img->height-1);
         unsigned int iy=fy>>16;
@@ -288,14 +289,14 @@ void __fastcall FUN_004ac920(ImgW5* img, int edx, unsigned int width, unsigned i
             float hi0=255.0f,lo0=0.0f,hi1=255.0f,lo1=0.0f,hi2=255.0f,lo2=0.0f,hi3=255.0f,lo3=0.0f;
             unsigned int fx=((x<<16)/(width-1))*((unsigned int)img->width-1);
             unsigned int ix=fx>>16;
-            unsigned int j=(ix<(unsigned int)img->width-1)+ix;
-            PxQ c0=((PxQ*)a)[ix], c1=((PxQ*)a)[j], c2=((PxQ*)b)[ix], c3=((PxQ*)b)[j];
+            unsigned int one=1; if (ix>=(unsigned int)img->width-1) one=0; unsigned int j4=(ix+one)<<2;
+            PxQ c0=((PxQ*)a)[ix], c1=*(PxQ*)((char*)a+j4), c2=((PxQ*)b)[ix], c3=*(PxQ*)((char*)b+j4);
             float tx=(float)(fx&65535)*0.0000152587890625f;
             float w0=(1.0f-tx)*sy, w1=tx*sy, w2=(1.0f-tx)*ty, w3=tx*ty;
-            float blue=(float)c0.b*w0+(float)c1.b*w1+(float)c2.b*w2+(float)c3.b*w3+0.5f;
-            float green=(float)c0.g*w0+(float)c1.g*w1+(float)c2.g*w2+(float)c3.g*w3+0.5f;
-            float red=(float)c0.r*w0+(float)c1.r*w1+(float)c2.r*w2+(float)c3.r*w3+0.5f;
-            float alpha=(float)c0.a*w0+(float)c1.a*w1+(float)c2.a*w2+(float)c3.a*w3+0.5f;
+            float blue=(float)c3.b*w3+(float)c2.b*w2+(float)c1.b*w1+(float)c0.b*w0+0.5f;
+            float green=(float)c3.g*w3+(float)c2.g*w2+(float)c1.g*w1+(float)c0.g*w0+0.5f;
+            float red=(float)c3.r*w3+(float)c2.r*w2+(float)c1.r*w1+(float)c0.r*w0+0.5f;
+            float alpha=(float)c0.a*w0+(float)c2.a*w2+(float)c1.a*w1+(float)c3.a*w3+0.5f;
             if (*(int*)&blue<*(int*)&lo0) blue=0.0f; else if (*(int*)&blue>*(int*)&hi0) blue=255.0f; if (*(int*)&green<*(int*)&lo1) green=0.0f; else if (*(int*)&green>*(int*)&hi1) green=255.0f; if (*(int*)&red<*(int*)&lo2) red=0.0f; else if (*(int*)&red>*(int*)&hi2) red=255.0f; if (*(int*)&alpha<*(int*)&lo3) alpha=0.0f; else if (*(int*)&alpha>*(int*)&hi3) alpha=255.0f;
             int ib=RoundF(blue), ig=RoundF(green), ir=RoundF(red), ia=RoundF(alpha);
             *dst++=(((ia<<8|ir)<<8|ig)<<8)|ib;
