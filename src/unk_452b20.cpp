@@ -281,12 +281,12 @@ static inline float G_DotV(const Vec3& a, const Vec3& b) { return a.x * b.x + a.
 static inline float G_DotC(const Vec3& a, const Vec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 static __forceinline void G_Copy(Vec3& d, const Vec3& s) { d.x = s.x; d.y = s.y; d.z = s.z; }
 static __forceinline void G_AddRev(Vec3& d, const Vec3& s) { float a = s.x; d.x = a + d.x; d.y = s.y + d.y; d.z = s.z + d.z; }
-static __forceinline void G_Copy3(Vec3& d, const Vec3& s) { *(int*)&d.y = *(int*)&s.y; *(int*)&d.z = *(int*)&s.z; d.x = s.x; }
 static inline void G_Mul(Vec3& v, float k) { v.x *= k; v.y *= k; v.z *= k; }
 static inline void G_Set(Vec3& v, float x, float y, float z) { v.x = x; v.y = y; v.z = z; }
 #define V ((G_Car*)this)
 
-// NONMATCHING: RALLYTROPHY 0x452eb0
+// FUNCTION: RALLYTROPHY 0x452eb0
+// 2026-11-16 MATCH: p = vec copies use plain G_Copy (was int/float G_Copy3). Older notes:
 // 2726 vs 2693 bytes; logic complete (all four spring-point accelerations, the 0.5/0.65/0.35 blends and both
 // SpringFollower updates). Open: struct copy of a call result still goes through `mov reg,ebx` (original stores
 // straight through ebx), fadd operand order for ctrl += k*vec, register choice (edx/eax/ecx) for the asm pointer
@@ -333,7 +333,7 @@ void Car::FUN_00452eb0(float dt)
         G_AddRev(V->ctrl3, V->ctrl2);
     }
     {
-        G_Copy3(p, V->vec20d0);
+        G_Copy(p, V->vec20d0);
         p += V->vec1018;
         const float* trans = V->body->pos;
         const float* mat = V->body->mat;
@@ -346,7 +346,7 @@ void Car::FUN_00452eb0(float dt)
         G_Mul(V->ctrl5, factor);
     }
     {
-        G_Copy3(p, V->vec203c);
+        G_Copy(p, V->vec203c);
         p += V->vec1024;
         const float* trans = V->body->pos;
         const float* mat = V->body->mat;
