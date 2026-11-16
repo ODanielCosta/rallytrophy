@@ -341,29 +341,26 @@ void BinkVideo::Render(RenderDevice* device)
 
 extern std::vector<void*> DAT_00508298; // shared free list, reserved to 0x200 entries on first use
 
-// NONMATCHING: RALLYTROPHY 0x40a680
-// 2026-11-16: pos.x store-pinning forms (one-use base pointer, zero-register reuse right after, XformVec/XformMat ctor-body stores) all tried; none beat 2 insns/28 bytes, ctor-body forms add a state-0 store.
-// 300/300 bytes, 28 differ: the target stores pos.x before the diagonal and sets EH state 1 after pos.z/pos.y;
-// here the zero stores of pos sink below the state store. Both members unwind through the empty dtor 0x402c90.
-// Tried: setting x/diagonal in the member ctors (splits the state stores), pos store chains, 0.0f literals.
-// Tried 2026-10-30 night: volatile barrier on each of pos.x/z/y/unk50 with all 24 orderings of those four stores (120 variants); best stays 2 insns differ, none match; volatile only moves the EH-state store earlier (right after xor edi,edi) and cannot place it after pos.y.
-// Tried 2026-10-31 re-pass: single-field volatile stores on pos.x/z/y/unk50, volatile reads of pos.x/unk4c/m00/pos.y (head and tail), 9 variants best 2 insns; permute.py -r 40 stayed at baseline (2, 28), no MATCH; the pos.x store still sinks below the EH-state store.
-// Tried 2026-11-11 (about 30 forms, measured with and without /G6 scheduling): any code between the two member
-// constructors forces a state-0 store the original lacks, and stores placed in the pos constructor change the
-// prologue (push edi before mov esi,ecx), so all stores are body statements; the body always emits the 1.0 chain,
-// then the state store, then the zero stores, whatever the written order, type (int/float/double) or helper form.
-// Closest other shape: `m(&pos)` with a constructor doing x, diagonal, z, y (exact order, but a state-0 store).
-SceneXform::SceneXform()
+// Inline free helpers pin their stores at source position (a flat store sinks below the EH-state store).
+static inline void SetX0(XformVec& v) { v.v[0] = 0; }
+static inline void SetZY(XformVec& v) { v.v[2] = 0; v.v[1] = 0; }
+static inline void Diag(XformMat& m) { m.m[0][0] = m.m[1][1] = m.m[2][2] = m.m[3][3] = 1.0f; }
+static inline void Rest(XformMat& m)
 {
-    pos.v[0] = 0;
-    m.m[0][0] = m.m[1][1] = m.m[2][2] = m.m[3][3] = 1.0f;
-    pos.v[2] = 0;
-    pos.v[1] = 0;
-    unk50 = 0;
     m.m[0][3] = 0; m.m[0][2] = 0; m.m[0][1] = 0;
     m.m[1][3] = 0; m.m[1][2] = 0; m.m[1][0] = 0;
     m.m[2][3] = 0; m.m[2][1] = 0; m.m[2][0] = 0;
     m.m[3][2] = 0; m.m[3][1] = 0; m.m[3][0] = 0;
+}
+
+// FUNCTION: RALLYTROPHY 0x40a680
+SceneXform::SceneXform()
+{
+    SetX0(pos);
+    Diag(m);
+    SetZY(pos);
+    unk50 = 0;
+    Rest(m);
     unk4c = 0;
     DAT_00508298.reserve(0x200);
 }
