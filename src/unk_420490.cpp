@@ -934,6 +934,7 @@ extern void __cdecl FUN_004239c0(StageScreen* s, short sel, StageEntry* e, int s
 // Tried 2026-10-31: Load(path,1,0,0) was already right; dir/path as StagePathText, 2nd char buf[32], pointer loop, if/else per unit (tail-merged), Length/Width AppendCall + Height/Weight std append, float factors (228->132); still differs: local layout (orig order num,path,buf,ini,dir; ours num,buf,ini,path,dir, decl order has no effect) and Weight's inline-vs-call _Eos split.
 // Tried 2026-11-01: the 8th push_back is the StageInsert template (out-of-line Ucopy/Destroy/SizeCall, StageConstruct for the inlined Ufill with M=1; helper above C_ADD) on a StageIntVec view of m_items: 62->31 insns; still differs: ours spills the first-loop cursor and keeps s in a different slot (ebx taken by end), end/last stores order; volatile-read ra, r=&vec and begin-reload idioms alone did not help.
 // Tried 2026-11-01 re-pass: 16 more variants (all Append* combos per unit, num/buf order, e=entries+i, volatile count/entries, hoisted unit flag, v fp temp); none beat 132 insns; still differs: ebp/entries load placement in the prologue, EH-state stores (0x1/0x2) one call early, and inline _Eos/Append split in Height/Weight.
+// 2026-11-15: Weight unit as std::string::assign(buf) (inline _Eos, was AssignGrow) + AppendInl for its first append (keeps the later appends' _Eos as calls): 49 -> 16 insns differ, 1799 -> 1800 bytes. Open: ebp/entries load before the n>0 test, lea [n+len] operand order at 3 append sites, [ptr+len] order in the Weight assign.
 void StageScreen::RefreshUnits()
 {
     int n = count;
@@ -960,7 +961,12 @@ void StageScreen::RefreshUnits()
         UNIT(a, "Length", 0x12, 0x13, AppendCall, 0.0393701f)
         UNIT(b, "Width", 0x12, 0x13, AppendCall, 0.0393701f)
         UNIT(c, "Height", 0x12, 0x13, AppendStd, 0.0393701f)
-        UNIT(d, "Weight", 0x10, 0x11, AppendStd, 2.2046225f)
+        { int v = ini.Find("Weight");
+        if (DAT_00501300[0] != 0) v = (int)((float)v * 2.2046225f);
+        FUN_004c1902(v, buf, 10);
+        ((std::string*)&S(d))->assign(buf);
+        if (DAT_00501300[0] != 0) { S(d).AppendInl(DAT_004f2e40); S(d).AppendStd(FUN_00405380(0x11)); }
+        else S(d).AppendStd(FUN_00405380(0x10)); }
 #undef UNIT
 #undef S
     }
