@@ -11,6 +11,7 @@ static inline int Bal(int a){return a;}
 // Tried 2026-10-31: 6 discarded Bal(1) calls at start restore the out-of-line std::string _Eos/inline budget (348->199 with palette index form + exact 565/5551/4444 expressions from the asm); volatile zero `z` for the null test, h loaded before w: 175. Still differs: original keeps 0 in ebp (cmp esi,ebp in h guards, xor ebp,ebp after the call, not before) and `mov [esp+0x18],edi` spills sit after the alloc args; per-case row/h spill registers differ.
 // Tried 2026-11-01 re-pass: 21 variants (z read-zero after alloc, h>z/x>z guards, volatile w/h loads, w-before-h, n=w*h*4 local, result split decl, fm local, named string temp, Bal moves): all 175-198 vs base 175; the compiler ignores z in guards and the ebp-zero / post-alloc spill order never moved.
 // Tried 2026-11-01 Bal sweep: start 0-12 (0/1 worse 182/183, 2-12 all 175 at 1540 bytes), end 0-12 on start 0/2/6 (1 gives 225 at 1532, 2+ shrink to 1304/1264 and 250+ differ): no gain, still 175.
+// 2026-11-16 pass: 175 -> 128 insns differ, code+jump table now 1556 = original (was 1540): case 5 '++s' in the for-increment, g/r split (g=,r=,g|=,a=,r|=), case 6 and case 1/2 declarations in b,g,r(,a) order; ~120 variants (z forms, or-order permutations, s++ tail in case 6) rejected. Left: volatile z prologue stores (orig keeps img/0 in edi/ebp across the whole function), case 3 row in eax vs ebp (ebp is the zero in the original), cmp/test h guards in cases 2/3.
 unsigned int* __fastcall FUN_004ab910(ImgW5* img, int)
 {
     Bal(1);Bal(1);Bal(1);Bal(1);Bal(1);Bal(1);
@@ -35,7 +36,7 @@ unsigned int* __fastcall FUN_004ab910(ImgW5* img, int)
         for (; h>0; --h, row+=img->stride) {
             unsigned short* s=(unsigned short*)row;
             for (int x=w; x>0; --x) {
-                unsigned int v=*s++, r=(v&0x7c00)<<9, g=(v&0x3e0)<<6, b=(v&31)<<3;
+                unsigned int v=*s++, b=(v&31)<<3, g=(v&0x3e0)<<6, r=(v&0x7c00)<<9;
                 *d++=((g&0x1fe000|r&0xffe0001f|b)>>5)|r|g|b|0xff000000;
             }
         }
@@ -45,7 +46,7 @@ unsigned int* __fastcall FUN_004ab910(ImgW5* img, int)
         for (; h>0; --h, row+=img->stride) {
             unsigned short* s=(unsigned short*)row;
             for (int x=w; x>0; --x) {
-                unsigned int v=*s++, g=(v&0x7e0)<<5, r=(v&0xf800)<<8, b=(v&31)<<3;
+                unsigned int v=*s++, b=(v&31)<<3, g=(v&0x7e0)<<5, r=(v&0xf800)<<8;
                 *d++=((((g>>1)&0x1fe000)|(r&0xffe0001f)|b)>>5)|r|g|b|0xff000000;
             }
         }
@@ -68,12 +69,14 @@ unsigned int* __fastcall FUN_004ab910(ImgW5* img, int)
         row=img->pixels;
         for (; h>0; --h, row+=img->stride) {
             unsigned short* s=(unsigned short*)row;
-            for (int x=w; x>0; --x) {
-                unsigned int v=*s++;
+            for (int x=w; x>0; --x, ++s) {
+                unsigned int v=*s;
                 unsigned int b=(v&31)<<3; b|=b>>5;
-                unsigned int g=(v&0x3e0)<<6; g|=(g>>5)&0xff00;
-                unsigned int r=(v&0x7c00)<<9; r|=(r>>5)&0xff0000;
+                unsigned int g=(v&0x3e0)<<6;
+                unsigned int r=(v&0x7c00)<<9;
+                g|=(g>>5)&0xff00;
                 unsigned int a=v&0x8000;
+                r|=(r>>5)&0xff0000;
                 if (a) a=0xff000000;
                 *d++=a|r|g|b;
             }
@@ -83,8 +86,8 @@ unsigned int* __fastcall FUN_004ab910(ImgW5* img, int)
         row=img->pixels;
         for (; h>0; --h, row+=img->stride) {
             unsigned short* s=(unsigned short*)row;
-            for (int x=w; x>0; --x) {
-                unsigned int v=*s++, a=(v&0xfffff000)<<16, r=(v&0xf00)<<12, g=(v&0xf0)<<8, b=(v&15)<<4;
+            for (int x=w; x>0; --x, ++s) {
+                unsigned int v=*s, b=(v&15)<<4, g=(v&0xf0)<<8, r=(v&0xf00)<<12, a=(v&0xfffff000)<<16;
                 *d++=((r&0xff00000|a&0xf000000f|g&0xff000|b)>>4)|a|r|g|b;
             }
         }
