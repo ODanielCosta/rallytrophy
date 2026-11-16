@@ -144,13 +144,13 @@ Instruction-multiset view: 43 functions are pure register/scheduling permutation
 | 0x49e3d0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049e3d0 | size | 3532 | 3592 | 2787 | 114 | `mov    DWORD PTR [esi+0x28],0x0` | `mov    DWORD PTR [esp+0x74],eax` |  |
 | 0x49f1f0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049f1f0 | size | 485 | 522 | 351 | 15 | `mov    ebx,ecx` | `push   esi` |  |
 | 0x49ffa0 | src/unk_49fee0.cpp | AIDriver::FUN_0049ffa0 | size | 1142 | 1149 | 937 | 26 | `sub    esp,0xc0` | `sub    esp,0xd4` |  |
-| 0x4a0420 | src/unk_49fee0.cpp | AIDriver::FUN_004a0420 | other | 2615 | 2615 | 188 | 0 | `mov    DWORD PTR [esp+0x2c],0x0` | `mov    DWORD PTR [esp+0x30],0x0` |  |
+| 0x4a0420 | src/unk_49fee0.cpp | AIDriver::FUN_004a0420 | other | 2615 | 2615 | 192 | 0 | `mov    DWORD PTR [esp+0x2c],0x0` | `mov    DWORD PTR [esp+0x50],0x0` |  |
 | 0x4a1050 | src/unk_49fee0.cpp | AIDriver::FUN_004a1050 | order+registers | 819 | 819 | 49 | 0 | `mov    ecx,DWORD PTR [ecx+0x28]` | `mov    eax,DWORD PTR [ecx+0x28]` |  |
 | 0x4ab010 | src/unk_4ab010.cpp | ConvertImageFormat | size | 2320 | 2302 | 1476 | 29 | `je     0x4ab8f9` | `je     0x4ab90b` |  |
 | 0x4ab910 | src/unk_4ab910.cpp | FUN_004ab910 | other | 1556 | 1556 | 893 | 4 | `mov    ebx,DWORD PTR [edi]` | `xor    ebp,ebp` |  |
 | 0x4abf30 | src/unk_4ab910.cpp | FUN_004abf30 | size | 2030 | 2034 | 587 | 7 | `mov    edi,DWORD PTR ds:0x0` | `mov    esi,DWORD PTR ds:0x0` |  |
 | 0x4ac920 | src/unk_4ab910.cpp | FUN_004ac920 | size | 1085 | 1080 | 886 | 2 | `je     0x4acd4f` | `je     0x4acd54` |  |
-| 0x4ad1d0 | src/unk_4acd60.cpp | FUN_004ad1d0 | other | 3131 | 3131 | 252 | 0 | `mov    eax,DWORD PTR [ebp+0x10]` | `fld    DWORD PTR [esi]` |  |
+| 0x4ad1d0 | src/unk_4acd60.cpp | FUN_004ad1d0 | other | 3131 | 3131 | 129 | 0 | `fadd   DWORD PTR [esi+0xc]` | `mov    ecx,DWORD PTR [esi+0x4]` |  |
 | 0x4ae1f0 | src/unk_4ade80.cpp | ModelCacheState::Reload | order+registers | 699 | 699 | 18 | 0 | `mov    DWORD PTR [esp+0x30],ecx` | `cmp    eax,DWORD PTR [esp+0x34]` |  |
 | 0x4ae4b0 | src/unk_4ae4b0.cpp | ModelCacheUpload::UploadVertices | other | 1115 | 1115 | 2 | 2 | `mov    ebx,ecx` | `lea    ebx,[ecx]` |  |
 | 0x4af950 | src/unk_4af960.cpp | BmfReader::BmfReader | order | 1227 | 1227 | 29 | 0 | `mov    DWORD PTR [esi+0x60],ebx` | `push   edx` |  |
