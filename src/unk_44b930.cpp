@@ -340,6 +340,7 @@ void ReplayMenu::BuildRects()
 // 2026-11-15 tie-break study: 29 more variants (rally/Game locals, g early, offset forms, ternary, split value read); all 13 bytes. Cause is scheduling: the Game load is hoisted above the multiply so edx is busy and rally takes the free esi; no source lever found.
 // 2026-11-16: 18 more (operand order of the sum, int-cast base, 1512-byte struct-array index, off/g/x2 locals, 63*24 split) and reorder.py over the whole body (best = baseline): all 4 insns / 13 bytes.
 // 2026-11-16 pass 2 (workspace F5): 20 more (self->m_game, 63*24 split, offset-first, p[378] base, int-cast, rally assigned inside the 0xb4 call, rec alias, top-declared rec, g local, ternary/split value, int flag, temp t, re-read flagE); all 13 bytes / 4 insns or far worse.
+// 2026-11-16 pass 3 (F8, register-weight angle): ~48 more (rally local early/late/split in two, unsigned/long/const/ptr types, flag as rec->flagE, 10 operand/offset orders, records[k] re-reads, moving the v block earlier); all 4 insns / 13 bytes or far worse. rec is not in esi after the sub in the original either (reloaded later); the split is only rally dest = edx (orig) vs esi (dying rec reg, ours) because our Game load is scheduled before the multiply.
 // original: FUN_0044c580
 void ReplayMenu::DrawField(int k)
 {
