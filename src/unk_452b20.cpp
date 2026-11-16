@@ -1149,6 +1149,7 @@ __forceinline void F2_Copy3(F2_V& d, const F2_V& s) { *(int*)&d.y = *(int*)&s.y;
 // Tried 2026-10-30 night: ~35 variants (sum/normalise order, F2_Copy3 y/z int-copy + x float store, d.z/d.x tail order; 98->49 insns). Still differs: y/z load order and spilled x/y stay in the opposite order at the top (z loaded before y), the x-first normalise form re-enregisters y/z, and the F2_Cross call takes lea edi/push edi instead of an in-place esi add.
 // Tried 2026-10-31 re-pass: reusing len2 as the sqrt-branch scale k (original keeps it in the len2 slot [ebp-4]) 49->47 insns; ~15 more variants (len2 reuse in the 1/Length branch, sum orders, double len, operand order) no better; x87 order of the normalise/rotate sums and the F2_Cross edi/lea call form still differ.
 // 2026-11-16 r24: plain float local k in the 1/Length branch (len2 reuse there let VC6 cross-jump into the sqrt branch tail; the sqrt branch keeps len2), F2_Rot* R = &q->rot with per-component r1 copy: 34 -> 13 insns, 830 -> 843 bytes. Left: static-guard byte load (mov cl) is scheduled after d.z instead of between the part-B pos adds; r1 pointer spill order.
+// 2026-11-16 r25: `static axis` moved before the d.z scale (guard load now hoisted as in the original), d.z scale no longer volatile: 13 -> 12 insns. ~60 variants (static at 12 other positions, d.z forms, r1/r2 pointer forms) no better; original has the d.z fmul between the guard test and jne.
 void Car::FUN_00454d10()
 {
     F2_CarView* c = (F2_CarView*)this;
@@ -1205,8 +1206,8 @@ void Car::FUN_00454d10()
         float inv = 1.0f / (float)sqrt(z * z + x * x + 1.0f);
         d.x = x * inv;
         d.y = inv;
-        d.z = *(volatile float*)&d.z * inv; // original reloads the stored (rounded) d.z here
         static Vec3 axis(0.0f, 0.0f, 1.0f);
+        d.z = d.z * inv; // original reloads the stored (rounded) d.z here
         F2_Rot* R = &q->rot;
         F2_Cross(&d, (const F2_V*)&axis, &R->r0);
         F2_V* r1 = &R->r1;
