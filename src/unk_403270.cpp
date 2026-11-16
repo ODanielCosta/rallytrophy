@@ -333,6 +333,9 @@ struct GhostTrack {                                   // car body +0x1c874
 struct GhostLog { void Read(ReplayFile* f); };        // car body +0x1bed0, 0x401b00
 class CarBody { public: void FUN_0046be50(int mode); };
 
+static __forceinline void FSet(float& d, float v) { d = v; }
+static __forceinline float FId(float v) { return v; }
+
 // NONMATCHING: RALLYTROPHY 0x403ca0
 // Calling convention (thiscall on the header, bool result), object sizes, constructor arguments, the PathText
 // string calls and block order follow the target. Direct singleton field stores before taking the `race` alias
@@ -340,6 +343,7 @@ class CarBody { public: void FUN_0046be50(int mode); };
 // bytes smaller and the target's shared failure cleanup calls out-of-line _Tidy(true) (here expanded inline).
 // Tried 2026-10-30 night: record is {int hdr; CarRecord} (0x1d4 read, ReadSetup gets +4), global store order, cars/decl-order/pragma/early-return variants; still differs: name sits 4 bytes higher (target's cars/new temp is above PathText), fld/fstp float copy, failure-path out-of-line _Tidy(true).
 // Tried 2026-10-31 re-pass: hoisting cars/f/race/i/num/magic/has/new-temp locals above PathText, nf/nc temp-var forms, volatile cars: the new-temp slot stays at [esp+0x1c] below name (target [esp+0x2c] above it), all unchanged at 79 diff lines; volatile forms worse (164-205); 9 other diffs (fld/fstp float copy, failure-path _Tidy) untouched; too far (>10 insns) for permute.
+// 2026-11-16 round 23: ~35 variants, none better (39 insns/100 bytes). FSet(float&,float) forceinline gives the fld/fstp but reorders loads (51 insns); a PathText twin with ~Tidy(true) matches the failure exit but then the success exit is out of line too (1100 bytes, 44 insns; explicit Free(true) first: 1150); Bal(1) padding, early returns, ok-flag single exit, new-expression if/else forms: no effect or worse.
 bool ReplayHeader::Load(int index)
 {
     PathText name("savegame/replay");
