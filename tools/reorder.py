@@ -214,7 +214,9 @@ def analyze(stmt, ctx):
     for i, (k, t) in enumerate(toks):
         if t in BARRIER_WORDS:
             info.barrier = True
-        if k == "id" and i + 1 < len(toks) and toks[i + 1][1] == "(" and not is_type(t.split("::")[-1]) and t != "sizeof":
+        # any name( is a call (method, free function or constructor) unless it is a builtin type or sizeof;
+        # the [A-Z][a-z] type guess is not trusted here (Print(, DrawRect( are calls)
+        if k == "id" and i + 1 < len(toks) and toks[i + 1][1] == "(" and t.split("::")[-1] not in BUILTIN and t != "sizeof":
             if t.split("::")[-1] not in ctx.pure:
                 info.barrier = True
         if t == "*" and unary_star(toks, i):
@@ -361,6 +363,8 @@ def selftest():
     sw = lambda x, y: not depends(analyze(x, c), analyze(y, c))
     assert sw("a = b + 1;", "c = d + 2;")
     assert not sw("a = 1;", "b = a;")
+    assert not sw("text->Print(dev, x, y, s);", "text->scaleX = 1.0f;")
+    assert not sw("DrawRect(pos, color);", "color.value = 0;")
     assert not sw("a = 1;", "a = 2;")
     assert not sw("b = a;", "a = 3;")
     assert not sw("foo(1);", "a = 2;") and not sw("a = 2;", "foo(1);")
