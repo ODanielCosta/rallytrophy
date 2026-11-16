@@ -49,6 +49,7 @@ struct ColTriRaw {
     void* v[3];                  // 0x28
     int e[3];                    // 0x34
 };
+struct V3D { float x, y, z; float* Sub(float* out, const float* o) const; }; // 0x414330, returns its out pointer
 struct DV3 { float v[3]; ~DV3() {} };
 struct EdgeEnt { int lo, hi, id; };
 
@@ -67,6 +68,7 @@ struct LL { float x, y, z; LL() {} ~LL() {} };
 // NONMATCHING: RALLYTROPHY 0x419f30
 // reason: logic complete; original uses an ebp frame and 2386 vs 2510 bytes (register allocation differs); throw type/ctor arity (orig takes 1 stack arg) unverified
 // 2026-11-13 pass (490 -> 362 insns differ, 2234 -> 2307 bytes): edge insert unrolled x3 with top-tested search + id=e->id; tri cursor; ternary min/max; tr=(ColTriRaw*)tris+i with ti2; int-register vertex copy; unrolled final e[] fixup via tris member.
+// Pass 2026-11-16 (L1): wverts stored after tris alloc via W local, p2/p3/p1 y,z int-bit copies, *to triOk cursor, srcT loaded inside the || test, V3D Sub returns used by X87Cross, DAT_005085xx update order 04,08,0c: 362 -> 350 insns, 2307 -> 2345 bytes (orig 2386); open: tri loop keeps this/tris base in stack slots in the original, tri filter cursor (orig edi=tp, ours tp+8), mesh reload from [ebp+8] after first test.
 // Tried 2026-11-01 re-pass: plain zeroing loops + no volatile mesh reload + volatile zero reg z improved 591->557 insns differ (2529->2489 bytes); memset, tri cursor, srcV hoist, z in loops, volatile p2.y/z all worse or equal; plateau far from 10 so no permuter.
 // Tried 2026-10-31: memset zeroing, LV/LT/LL vector-ctor new[], volatile reload of the mesh param (VM), per-iteration verts reload, size CSE (630->591 insns); still differs: original keeps 0 in esi, frame 0x74 vs ours 0x80, and the tri-filter keeps p2.y/z in stack temps; Vec3-copy and EH-state variants all landed worse.
 ColModel::ColModel(void* meshp, int)
@@ -74,8 +76,8 @@ ColModel::ColModel(void* meshp, int)
     ColSrcMesh* mesh = (ColSrcMesh*)meshp;
     int z = 0;
     root = (TriNode*)z;
-    int srcT0 = mesh->nTris;
-    if (mesh->nVerts == 0 || srcT0 == 0) {
+    int srcT0;
+    if (mesh->nVerts == 0 || (srcT0 = mesh->nTris) == 0) {
         throw ColLogicError(CStr("missing collision model"));
     }
 #define VM mesh
@@ -90,24 +92,28 @@ ColModel::ColModel(void* meshp, int)
     memset(triOk, 0, srcT * 4);
     ColSrcTri* st = VM->tris;
     ColSrcTri* tp = st;
-    for (i = 0; i < srcT; i++, tp++) {
+    int* to = triOk;
+    for (i = 0; i < srcT; i++, tp++, to++) {
         if (tp->obj->kind < 0x11) {
             int ic = tp->c, ib = tp->b, ia = tp->a;
             float* vb = VM->verts;
             S414Vec3* p2 = (S414Vec3*)(vb + ib * 3);
             S414Vec3* p1 = (S414Vec3*)(vb + ia * 3);
             S414Vec3* p3 = (S414Vec3*)(vb + ic * 3);
-            float ey = p2->y, ez = p2->z;
+            int iy = ((int*)p2)[1], iz = ((int*)p2)[2];
+            float ey = *(float*)&iy, ez = *(float*)&iz;
             float ex = p2->x - p1->x; ey -= p1->y; ez -= p1->z;
             if (ey * ey + ez * ez + ex * ex > DAT_004e134c) {
-                ey = p3->y; ez = p3->z;
+                iy = ((int*)p3)[1]; iz = ((int*)p3)[2];
+                ey = *(float*)&iy; ez = *(float*)&iz;
                 ex = p3->x - p2->x; ey -= p2->y; ez -= p2->z;
                 if (ey * ey + ez * ez + ex * ex > DAT_004e134c) {
-                    ey = p1->y; ez = p1->z;
+                    iy = ((int*)p1)[1]; iz = ((int*)p1)[2];
+                    ey = *(float*)&iy; ez = *(float*)&iz;
                     ex = p1->x - p3->x; ey -= p3->y; ez -= p3->z;
                     if (ey * ey + ez * ez + ex * ex > DAT_004e134c) {
                         nTris++;
-                        triOk[i] = 1;
+                        *to = 1;
                         remap[st[i].a] = 1;
                         remap[st[i].b] = 1;
                         remap[st[i].c] = 1;
@@ -123,9 +129,10 @@ ColModel::ColModel(void* meshp, int)
             nVerts++;
         }
     }
-    ColVert* V = (ColVert*)new LV[nVerts]; verts = V;
-    ColVert* W = (ColVert*)new LV[nVerts]; wverts = W;
-    ColTri* TT = (ColTri*)new LT[nTris]; tris = TT;
+    verts = (ColVert*)new LV[nVerts];
+    ColVert* W = (ColVert*)new LV[nVerts];
+    tris = (ColTri*)new LT[nTris];
+    wverts = W;
     centers = (ColLocal*)new LL[nTris];
     for (i = 0; i < VM->nVerts; i++) {
         int id = remap[i];
@@ -196,10 +203,10 @@ ColModel::ColModel(void* meshp, int)
             tr->n[2] = 0;
         } else {
             float u[3];
-            ((S414Vec3*)pc)->Sub(u, pa);
+            float* up = ((V3D*)pc)->Sub(u, pa);
             DV3 w;
-            ((S414Vec3*)pb)->Sub(w.v, pa);
-            X87Cross(tr->n, w.v, u);
+            float* wp = ((V3D*)pb)->Sub(w.v, pa);
+            X87Cross(tr->n, wp, up);
             float kk = DAT_004e1348 / (float)sqrt(tr->n[2] * tr->n[2] + tr->n[1] * tr->n[1] + tr->n[0] * tr->n[0]);
             tr->n[0] = kk * tr->n[0];
             tr->n[1] = kk * tr->n[1];
@@ -213,7 +220,7 @@ ColModel::ColModel(void* meshp, int)
         centers[i].y = tr->center[1];
         centers[i].z = tr->center[2];
         int e0lo, e0hi;
-        if (b <= a) { e0hi = a; e0lo = b; } else { e0hi = b; e0lo = a; }
+        if (a < b) { e0lo = a; e0hi = b; } else { e0lo = b; e0hi = a; }
         int e1lo = b, e1hi = c;
         if (c <= b) { e1lo = c; e1hi = b; }
         int e2lo, e2hi;
@@ -233,8 +240,8 @@ ColModel::ColModel(void* meshp, int)
     delete table;
     delete remap;
     ClearInts();
+    DAT_00508504 += nVerts;
     DAT_00508508 += nTris;
     DAT_0050850c += nInts;
-    DAT_00508504 += nVerts;
     ComputeSel();
 }
