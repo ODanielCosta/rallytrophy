@@ -990,6 +990,7 @@ static const float K610 = 610.0f;
 static const float K230 = 230.0f;
 static const float K130 = 130.0f;
 // NONMATCHING: RALLYTROPHY 0x421fa0
+// 2026-11-15 r16: row string as StagePathText (assign inline + AppendStd("/") + AppendInl(buf): out-of-line _Eos as original), SetScale after entry, Vec2 one before rc: 449 -> 418 insns, 4124 -> 4128 bytes (size now exact); open: frame 4 bytes larger (0xd0 vs 0xcc), EH state of rc 0xb vs 0xc (orig has one more state before the row loop), sa/sb/K-temps in k loop.
 // 2026-11-13: StrT s0 (out-of-line ctor) for the row string, Fun_004242a0 as StageScreen member, direct m_selected in Enter/click blocks, int selected, per-slot K* static const floats (literal*sx/sy order), SetScale for the second scale pair: 573 -> 396 insns differ.
 // 2026-11-13 round 2: text uses in the DAT_00501334 and avail0/scale blocks read m_game->text (lower weight: fixes the ebx/edi text vs m_items-lea swap), shared `float x` temp for tail Prints and row-loop 54*sx, named Color + Vec2(1,1) per row (EH states 11/12/13 as original), tail K576/K424/K450: try_variants 449 insns (hunks 77 -> 70, orig insns in hunks 137 -> 86, built 4124 vs 4128); open: row-loop float temps/selected byte, K48/K15, tail temps.
 // 2026-11-12: every text->color = X as text->SetColorObj(Color(X)): 677 -> 578 insns differ (built 4272 -> 4036 bytes; orig 4128); SetScale(x, y) for the adjacent scale pairs is neutral (+-2 insns); notFirst/first-late/wait-first zero-register variants worse or neutral.
@@ -1141,30 +1142,29 @@ int StageScreen::Layout()
             text->SetColorObj(Color(DAT_00508bfc));
             text->scaleY = DAT_0056aeac + DAT_0056aeac;
             text->Print(DAT_0056b0ac, 54.0f * DAT_0056aea8, 142.0f * DAT_0056aeac, FUN_00405380(0x65), 0, 1.0f, 1.0f);
-            text->scaleX = DAT_0056aea8;
             StageEntry* entry = &entries[list[unk124[0]].car];
-            text->scaleY = DAT_0056aeac;
+            text->SetScale(DAT_0056aea8, DAT_0056aeac);
             DrawPhoto(entry, avail);
             DrawBook(entry, avail);
             float y = K262 * sy;
             for (int r4 = 0; r4 < 4; r4++) {
                 x = K54 * sx;
                 int selected = (m_selected == r4);
+                Vec2 one(1.0f, 1.0f);
                 Color rc(selected ? DAT_00508c0c : DAT_00508c04);
                 text->SetColorObj(rc);
-                Vec2 one(1.0f, 1.0f);
-                StrT s0; std::string& s = *(std::string*)&s0;
+                StagePathText s0; std::string& s = *(std::string*)&s0;
                 switch (r4) {
                 case 0: {
                     text->Print(DAT_0056b0ac, x, y, strB.ptr ? strB.ptr : "", 0, 1.0f, 1.0f);
                     int cur = unk124[0];
                     char buf[32];
                     FUN_004c1902(cur + 1, buf, 10);
-                    s = buf;
-                    s += "/";
+                    s.assign(buf);
+                    s0.AppendStd("/");
                     int cnt = unk124[1];
                     FUN_004c1902(cnt, buf, 10);
-                    s += buf;
+                    s0.AppendInl(buf);
                     DrawSelector(text, &s, K350 * sx, y, K130 * sx, selected, cur, 0, cnt - 1);
                     break;
                 }
