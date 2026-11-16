@@ -551,6 +551,7 @@ void Player::FUN_00491620(const void* packet)
 // the Stage lives in ebp and is spilled around the idiv).
 // Tried 2026-10-30 night: ~25 variants (decl order, size reuse, case 4 as length=3;break); length=3;break took 36->25 insns differ (380 vs 388 bytes); case 2 still allocates time/total swapped and the original spills the Stage into the size arg slot [esp+0x18], not reproduced.
 // Tried 2026-10-31 re-pass: ~34 more variants (volatile spill of Stage into the size slot via *(Stage* volatile*)&size, element-in-local for the delta sub, case 3 temp/volatile-store copies, decl/statement order of total/distance/time, size-as-return); none beat 25 insns differ; the volatile spill gets the [esp+0x18] store but then total/time registers and the idiv-region ordering diverge (stage ends in ecx/eax not ebp).
+// 2026-11-15 (round 17): case 3 load-order locals, if-form/goto/pointer-out/combined-expression delta: none below 16 insns.
 // Handles one network message about this player and returns its length.
 // 2026-11-11: the lap delta as `delta -= sections > 0 ? unk1884[...] : 0` puts time in edi and total in esi as in the
 // original (25 -> 16 insns, 384 vs 388). Left: the original keeps delta in eax across the test, computes the index in
