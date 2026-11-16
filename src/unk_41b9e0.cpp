@@ -1535,21 +1535,22 @@ CarBody::~CarBody()
     delete[] elems;
 }
 
-// NONMATCHING: RALLYTROPHY 0x41bab0
-// NONMATCHING: statement scheduling differs (8 insns: vtable store and EH-state store placement around the SetScale arg copy; EH temp now matches)
-// Tried 2026-10-30 night: explicit inertia stores (not loop) + DWORD* up copy took 89->19 insns; ~14 variants of the SetScale temp (local DV3, brace init, hoisted, reordered) not better; original copy is interleaved with the zero stores and registers an EH temp slot ([esp+0x4c]=esp) that we never emit.
-// Tried 2026-10-31 re-pass: DV3 got an inline copy ctor (fixes the [esp+0x4c]=esp EH temp, 19->9 insns); volatile on force2.x gives 8; 30 other volatile/order/ctor-body variants and permute -r 40 gave nothing; vtable store and the 0x15 EH-state store still land after the arg copy instead of before/after the zero stores.
-// Tried 2026-11-16 (round 21): 12 more reorders (SetScale before invMass, zero-store groups moved past SetScale, explicit DV3 temp, id/mass moved, inline inv) -> none below 8 insns; no kept change.
+static __forceinline void Z3(ScenePoint& v){ v.z = 0; v.y = 0; v.x = 0; }
+
+// FUNCTION: RALLYTROPHY 0x41bab0
+// Matched 2026-11-16: zero-store groups live in inline free helpers (Z3), so they keep source position against the EH-state and vtable stores.
+
+
 CarBody::CarBody(const CarBody* proto, float m, const DWORD* s, const DWORD* u)
 {
     float inv = DAT_004e1348 / m;
     mass = m;
-    vel.z = 0; vel.y = 0; vel.x = 0;
-    angVel.z = 0; angVel.y = 0; angVel.x = 0;
-    linMom.z = 0; linMom.y = 0; linMom.x = 0;
+    Z3(vel);
+    Z3(angVel);
+    Z3(linMom);
     attach = 0;
     d230 = 0;
-    angMom.z = 0; angMom.y = 0; angMom.x = 0;
+    Z3(angMom);
     invMass = inv;
     SetScale(*(DV3*)s);
     DWORD* pu = (DWORD*)&up;
@@ -1557,11 +1558,11 @@ CarBody::CarBody(const CarBody* proto, float m, const DWORD* s, const DWORD* u)
     pu[1] = u[1];
     pu[2] = u[2];
     centre = pos + up.Rot(&rot);
-    force.z = 0; force.y = 0; force.x = 0;
-    torque.z = 0; torque.y = 0; torque.x = 0;
-    force2.z = 0; force2.y = 0; *(volatile float*)&force2.x = 0;
+    Z3(force);
+    Z3(torque);
+    Z3(force2);
     *(DWORD*)&dt = 0x3c23d70a;
-    torque2.z = 0; torque2.y = 0; torque2.x = 0;
+    Z3(torque2);
     mesh.Insert(((CarBody*)proto)->mesh.At(0), 0.0f);
     CopyMeshTransform();
     src14c.Init(&rot);
