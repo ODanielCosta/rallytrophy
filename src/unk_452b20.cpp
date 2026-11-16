@@ -120,6 +120,7 @@ struct F_CarView {
 // Tried 2026-11-11: the plain form (copy x, y, z; then += x, y, z; no volatile) has the original's instruction set
 // at the exact size but starts the x87 chain three integer moves early (21 insns vs 17 with the volatile form kept
 // here); the result copy as a struct assignment, int copies or int temporaries does not move it.
+// 2026-11-16 round 22: ~20 more variants, none beat 17 insns: G_Copy float form is moot (the copy is already int movs in the original, and ours); sums non-volatile/lamp-first/deferred p.x via block temp, struct-assign and local-temp result copies all 21-41 insns (one temp form: 135 bytes but 25 insns).
 void Car::FUN_00452b20()
 {
     F_CarView* c = (F_CarView*)this;
