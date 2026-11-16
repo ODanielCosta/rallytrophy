@@ -26,7 +26,7 @@ Instruction-multiset view: 44 functions are pure register/scheduling permutation
 | 0x40fcc0 | src/unk_40f390.cpp | StageGrid::Build | size | 1709 | 1716 | 1176 | 6 | `mov    DWORD PTR [ebp-0x1c],edi` | `mov    DWORD PTR [ebp-0x20],edi` |  |
 | 0x410720 | src/unk_410720.cpp | StageScene::LoadEffect | size | 2111 | 2128 | 954 | 10 | `mov    eax,DWORD PTR [esi+0xa8]` | `push   edi` |  |
 | 0x411600 | src/unk_411170.cpp | StageConfigLoader::LoadConfig | size | 8615 | 8628 | 487 | 84 | `mov    ecx,DWORD PTR [eax]` | `fld    DWORD PTR [ebx+0x1d0]` |  |
-| 0x4137c0 | src/unk_4137c0.cpp | SceneSetup::FUN_004137c0 | size | 2879 | 2914 | 1859 | 30 | `je     0x413cd7` | `je     0x413cbf` |  |
+| 0x4137c0 | src/unk_4137c0.cpp | SceneSetup::FUN_004137c0 | size | 2899 | 2914 | 1868 | 5 | `je     0x413cd7` | `je     0x413cbf` |  |
 | 0x4150b0 | src/unk_414fe0.cpp | StageSounds::FUN_004150b0 | size | 689 | 697 | 131 | 11 | `jb     0x415361` | `jb     0x415359` |  |
 | 0x415370 | src/unk_415370.cpp | StageSoundLoader::LoadSounds | other | 3209 | 3209 | 248 | 16 | `jle    0x4156d6` | `mov    DWORD PTR [ebp-0x2c],ebx` |  |
 | 0x416260 | src/unk_416260.cpp | StageSoundLoader::LoadSoundFiles | size | 1837 | 1822 | 814 | 26 | `mov    ebp,ecx` | `mov    ebx,ecx` |  |
@@ -35,7 +35,7 @@ Instruction-multiset view: 44 functions are pure register/scheduling permutation
 | 0x417ee0 | src/unk_416f30.cpp | ?Ins@PropVec@@QAEXPAUStageProp@@IABU2@@Z | size | 804 | 818 | 391 | 30 | `mov    ecx,edi` | `mov    edx,edi` |  |
 | 0x418b90 | src/unk_418570.cpp | SweepQuery::Cast | size | 2138 | 2054 | 1793 | 47 | `jmp    0x41937e` | `jmp    0x4193d2` |  |
 | 0x4193a0 | src/unk_418570.cpp | TriCollector::Closest | size | 962 | 974 | 901 | 12 | `push   esi` | `mov    ebp,DWORD PTR [esp+0x7c]` | eh 2,4,4 vs 2,2 |
-| 0x419770 | src/unk_418570.cpp | TriCollector::Contact | size | 1094 | 1130 | 1000 | 53 | `fmul   DWORD PTR [esp+0xa8]` | `mov    edi,DWORD PTR [esp+0xac]` | eh 3,7,3 vs 7 |
+| 0x419770 | src/unk_418570.cpp | TriCollector::Contact | size | 1128 | 1130 | 944 | 46 | `fmul   DWORD PTR [esp+0xa8]` | `mov    edi,DWORD PTR [esp+0xac]` | eh 3,7,3 vs 7 |
 | 0x419be0 | src/unk_418570.cpp | TriCollector::ContactList | size | 730 | 748 | 602 | 25 | `mov    DWORD PTR [esp+0x1c],0x0` | `mov    DWORD PTR [esp+0x14],0x0` | eh 5 vs 1,5,1 |
 | 0x419f30 | src/unk_419f30.cpp | ColModel::ColModel | size | 2345 | 2386 | 1932 | 51 | `mov    eax,DWORD PTR [ebp+0x8]` | `push   ebx` |  |
 | 0x41a890 | src/unk_41a890.cpp | ColModel::ColModel | size | 2278 | 2298 | 337 | 13 | `mov    ebx,DWORD PTR [eax-0x4]` | `mov    ebx,DWORD PTR [eax]` | eh -1,1,-1,2,-1,3,-1,4,-1,5,-1,6,-1,7,-1,8,-1 vs -1,1,-1,2,-1,3,-1,4,-1,5,-1,6,-1,7,-1 |
@@ -142,7 +142,7 @@ Instruction-multiset view: 44 functions are pure register/scheduling permutation
 | 0x49c130 | src/unk_49b8e0.cpp | AIDriver::FUN_0049c130 | size | 3839 | 3877 | 2901 | 72 | `mov    DWORD PTR [esp+0x64],eax` | `mov    DWORD PTR [esp+0x68],eax` |  |
 | 0x49d970 | src/unk_49b8e0.cpp | AIDriver::FUN_0049d970 | size | 2600 | 2631 | 2113 | 28 | `mov    DWORD PTR [esp+0xa0],ecx` | `mov    DWORD PTR [esp+0x70],ecx` |  |
 | 0x49e3d0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049e3d0 | size | 3537 | 3592 | 2797 | 101 | `mov    DWORD PTR [esi+0x28],0x0` | `mov    DWORD PTR [esp+0x74],eax` |  |
-| 0x49f1f0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049f1f0 | size | 485 | 522 | 351 | 15 | `mov    ebx,ecx` | `push   esi` |  |
+| 0x49f1f0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049f1f0 | size | 495 | 522 | 364 | 20 | `mov    ebx,ecx` | `push   esi` |  |
 | 0x49ffa0 | src/unk_49fee0.cpp | AIDriver::FUN_0049ffa0 | size | 1142 | 1149 | 937 | 26 | `sub    esp,0xc0` | `sub    esp,0xd4` |  |
 | 0x4a0420 | src/unk_49fee0.cpp | AIDriver::FUN_004a0420 | other | 2615 | 2615 | 192 | 0 | `mov    DWORD PTR [esp+0x2c],0x0` | `mov    DWORD PTR [esp+0x50],0x0` |  |
 | 0x4a1050 | src/unk_49fee0.cpp | AIDriver::FUN_004a1050 | order+registers | 819 | 819 | 49 | 0 | `mov    ecx,DWORD PTR [ecx+0x28]` | `mov    eax,DWORD PTR [ecx+0x28]` |  |
