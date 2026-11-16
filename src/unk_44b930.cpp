@@ -426,14 +426,9 @@ void ReplayMenu::RefreshRecords()
     }
 }
 
-// NONMATCHING: RALLYTROPHY 0x44cfb0
-// Same shape, 625 vs 632 bytes: the original spills `this` (saved at entry) and keeps the label and record pointers in
-// ebp/ebx; mine keeps `this` in ebx and spills the record pointer; the SEH prologue also schedules differently.
-// Tried 2026-10-30 night: pointer-induction locals for labels/records, self copy of this, cached m_selected, label x/y via float/int temps or const char* first, reordered game/text; all stay 50+ insns (compiler normalizes pointers; temps change size to 640/624); original spills this and keeps label x/y in stack temps across the c_str() select, not reproduced.
-// Tried 2026-10-31 re-pass: 11 variants (volatile self for m_selected/DrawField, label x/y float/int temps, volatile m_selected read, game/text order, ternary forms); best 50 insns, others 51-68; spill of this at entry and ebp/ebx pointer allocation still not reproduced.
-// 2026-11-12: x and y are one pair of stack variables set in both branches and the record string is chosen inside
-// the Print arguments, as the original's code shows; 630 vs 632 bytes, 330 differ (was 623/334). Left: the original
-// spills `this` at entry and keeps the label and record cursors in ebp/ebx; ours keeps `this` in a register.
+// FUNCTION: RALLYTROPHY 0x44cfb0
+// Matches (2026-11-15): two Print calls (if/else on the record name, not a ternary argument), y loaded before x,
+// `int sel = (i == m_selected)` computed before `Color col` is constructed.
 // original: FUN_0044cfb0 (vtable slot 3, Draw)
 void ReplayMenu::Slot3(int skipPresent)
 {
@@ -451,18 +446,22 @@ void ReplayMenu::Slot3(int skipPresent)
         game->FUN_00435de0(480.0f, 240.0f);
         game->FUN_00435f50(480.0f, 590.0f);
         for (int i = 0; i < 10; i++) {
+            int sel = (i == m_selected);
             Color col;
-            col.value = (i == m_selected) ? DAT_00508c0c : DAT_00508c04;
+            col.value = sel ? DAT_00508c0c : DAT_00508c04;
             text->color = col.value;
             float x, y;
             if (i < 2) {
-                x = labels[i].x;
                 y = labels[i].y;
+                x = labels[i].x;
                 text->Print(DAT_0056b0ac, x, y, labels[i].text.c_str(), 0, 1.0f, 1.0f);
             } else {
                 x = FA1_COLX * DAT_0056aea8;
                 y = ((i - 2) * FA1_PITCH + FA1_ROWY) * DAT_0056aeac;
-                text->Print(DAT_0056b0ac, x, y, records[i - 2].empty ? FUN_00405380(0x27) : records[i - 2].name, 0, 1.0f, 1.0f);
+                if (records[i - 2].empty)
+                    text->Print(DAT_0056b0ac, x, y, FUN_00405380(0x27), 0, 1.0f, 1.0f);
+                else
+                    text->Print(DAT_0056b0ac, x, y, records[i - 2].name, 0, 1.0f, 1.0f);
             }
         }
         if (m_selected > 1) {
