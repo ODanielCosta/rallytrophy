@@ -1148,6 +1148,7 @@ __forceinline void F2_Copy3(F2_V& d, const F2_V& s) { *(int*)&d.y = *(int*)&s.y;
 // and the first part's y/z position stores; the function static (0x508c60, atexit 0x455060) is in place.
 // Tried 2026-10-30 night: ~35 variants (sum/normalise order, F2_Copy3 y/z int-copy + x float store, d.z/d.x tail order; 98->49 insns). Still differs: y/z load order and spilled x/y stay in the opposite order at the top (z loaded before y), the x-first normalise form re-enregisters y/z, and the F2_Cross call takes lea edi/push edi instead of an in-place esi add.
 // Tried 2026-10-31 re-pass: reusing len2 as the sqrt-branch scale k (original keeps it in the len2 slot [ebp-4]) 49->47 insns; ~15 more variants (len2 reuse in the 1/Length branch, sum orders, double len, operand order) no better; x87 order of the normalise/rotate sums and the F2_Cross edi/lea call form still differ.
+// 2026-11-16 r24: plain float local k in the 1/Length branch (len2 reuse there let VC6 cross-jump into the sqrt branch tail; the sqrt branch keeps len2), F2_Rot* R = &q->rot with per-component r1 copy: 34 -> 13 insns, 830 -> 843 bytes. Left: static-guard byte load (mov cl) is scheduled after d.z instead of between the part-B pos adds; r1 pointer spill order.
 void Car::FUN_00454d10()
 {
     F2_CarView* c = (F2_CarView*)this;
@@ -1156,11 +1157,12 @@ void Car::FUN_00454d10()
     len2 = v.z * v.z + len2;
     len2 = v.x * v.x + len2; // original: (y*y + z*z) + x*x
     if (len2 > 196.0f) {
-        // Original keeps the scale in len2's slot: x times the unrounded value (fst; fmulp), y/z times the stored
-        // float; the volatile stores keep y/z in memory as the original does (they are stored there in every branch).
-        v.x = v.x * (len2 = 1.0f / v.Length());
-        *(volatile float*)&v.y = v.y * len2;
-        *(volatile float*)&v.z = v.z * len2;
+        // The volatile stores keep y/z in memory as the original does (they are stored there in every branch).
+        // A separate k (not len2) keeps VC6 from cross-jumping this branch's tail into the sqrt branch.
+        float k = 1.0f / v.Length();
+        v.x = v.x * k;
+        *(volatile float*)&v.y = v.y * k;
+        *(volatile float*)&v.z = v.z * k;
     } else if (len2 < 4.0f) {
         v.x = 0.0f;
         v.y = 0.0f;
@@ -1205,9 +1207,13 @@ void Car::FUN_00454d10()
         d.y = inv;
         d.z = *(volatile float*)&d.z * inv; // original reloads the stored (rounded) d.z here
         static Vec3 axis(0.0f, 0.0f, 1.0f);
-        F2_Cross(&d, (const F2_V*)&axis, &q->rot.r0);
-        q->rot.r1 = d;
-        F2_Cross(&q->rot.r0, &q->rot.r1, &q->rot.r2);
+        F2_Rot* R = &q->rot;
+        F2_Cross(&d, (const F2_V*)&axis, &R->r0);
+        F2_V* r1 = &R->r1;
+        r1->x = d.x;
+        r1->y = d.y;
+        r1->z = d.z;
+        F2_Cross(&R->r0, r1, &R->r2);
     }
 }
 
