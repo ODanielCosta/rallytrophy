@@ -326,6 +326,7 @@ void Car::FUN_004691e0(int cockpit)
 // Tried 2026-10-31 re-pass: 16 more (o decl early/late, for/while, b&&a cond, advance order, unk98 store moved, volatile on unk24/nodes1, two/one int locals) all 16-17 insns differ, pure regalloc a/b/2/1 rotation; permute.py -r 40 found no MATCH.
 // 2026-11-15 tie-break study: 27 more (a/b def order, one/two consts, register hints, loop forms, tail order); none better, const locals grow to 547. Original ranks b>1>2/o>a (a lands in edx); ours a>b>1>2.
 // 2026-11-16 const-weight pass: 13 more (cond order, o first/hoisted m,o, a/b load order, advance order, early next, b->data in test, for(;;) break, unk98 first) none better; same 18 bytes/17 insns.
+// 2026-11-16 weight pass 2: 16 more (a pre-loop test, a split a0/a, do-while, early next, b break-in-loop, cond via break either order, o declared outside, b->data in test); none better (a2 while(b){if(!a)break;} gives 16 insns but 20 bytes).
 void Car::FUN_004693a0(int mode)
 {
     CarModelView* v = (CarModelView*)this;
