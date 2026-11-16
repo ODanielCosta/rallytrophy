@@ -342,6 +342,7 @@ void BinkVideo::Render(RenderDevice* device)
 extern std::vector<void*> DAT_00508298; // shared free list, reserved to 0x200 entries on first use
 
 // NONMATCHING: RALLYTROPHY 0x40a680
+// 2026-11-16: pos.x store-pinning forms (one-use base pointer, zero-register reuse right after, XformVec/XformMat ctor-body stores) all tried; none beat 2 insns/28 bytes, ctor-body forms add a state-0 store.
 // 300/300 bytes, 28 differ: the target stores pos.x before the diagonal and sets EH state 1 after pos.z/pos.y;
 // here the zero stores of pos sink below the state store. Both members unwind through the empty dtor 0x402c90.
 // Tried: setting x/diagonal in the member ctors (splits the state stores), pos store chains, 0.0f literals.
