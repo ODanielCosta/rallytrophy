@@ -592,6 +592,7 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   (Load needs >=10, LoadSlot >=27).
 - The `mov [state],-1` before the out-of-line Tidy call is dropped if the same Tidy was already compiled earlier in
   the TU; a per-function twin class (ReplayPath, FB2_LoadPath) restores it.
-- VC6 clones the epilogue at each `return` only in the FIRST function emitted in the TU (EH-frame functions tested);
-  any emitted function before it makes the returns share one epilogue. SkidMarks ctor matched by moving SetQuality
-  below it. Function order in a file is therefore a lever.
+- SkidMarks ctor matched (cloned per-return epilogues) after moving SetQuality below it in the file. The general rule
+  "only the first emitted function clones epilogues" is NOT confirmed: a follow-up sweep found synthetic EH and non-EH
+  functions cloning at every return in any position, and moving LoadRelay / FUN_004ad1d0 first changed nothing.
+  Function order can matter in a specific file; treat it as a variant to try, not a rule.
