@@ -71,6 +71,7 @@ float __cdecl TriTestB(void* model, unsigned short* tri, void* verts, float* pt)
 // Tried 2026-10-30 night: AddTo inline vec add, copy-init Vec3, switch(DAT_00581e28), d/e/facing in dead param slot, GV3 memory diff vectors, TraceMeshPart nTris at 0x0e, guard first, reversed dot order; still differs: original keeps 0 in edi (i=0 CSE'd with push 0/cmp), c/rad reloaded from [ebx+0xc4] without address CSE, translation dot loads w[14] first, stack slot order.
 // Re-pass 2026-11-01: all 15 float sums re-associated to the asm fadd order (m12-14, d, df, tri d, ef, t, second, den; rounding fix, score unchanged 251 insns); also tried zero-in-edi (i/volatile z at top), set/list/seg/guard declaration order, volatile list load: no change or worse.
 // Pass 2026-11-13 (big-function agent): 252 -> 206 insns differ, size 1616 -> 1633 (orig 1635). Kept: sphere centre/radius read straight from the node (CC/RAD macros), parts[i] re-read per member, p = tv+24 via the re-read, dir pointer for the first sphere dot and first loop dot, if(cnt) do-while. Rejected: zero-in-edi via i declared early (pools 0 but spills i), inlined dq, named SegmentInfo fields, dir for the 2nd loop dot. Still open: 0 pooled in edi / node in ebx, tv kept in a stack slot with tris in ebx, 2nd loop dot lea of &s[9].
+// Pass 2026-11-15 (r15): 206 -> 204 insns differ (per-iteration loads reordered: model, tri, p, then twoSided); zero-in-edi/i-early/list-size/CC-form/df-without-q variants all no gain or worse.
 float __cdecl TraceNodeSweep(TraceNode* nParam)
 {
     TraceNode* n = nParam;
@@ -110,12 +111,12 @@ float __cdecl TraceNodeSweep(TraceNode* nParam)
                 float best = 1.0f;
                 for (unsigned i = 0; i < list->size(); i++) {
                     float* tv = (*list)[i];
-                    unsigned cnt = set->parts[i]->nTris;
                     float* model = (float*)set->parts[i]->model;
-                    char* verts = (char*)set->parts[i]->verts;
-                    unsigned twoSided = ((int*)model)[0x27] & 1;
                     unsigned short* tri = set->parts[i]->tris;
                     float* p = (float*)((char*)(*list)[i] + 24);
+                    unsigned twoSided = ((int*)model)[0x27] & 1;
+                    unsigned cnt = set->parts[i]->nTris;
+                    char* verts = (char*)set->parts[i]->verts;
                     if (cnt != 0) do {
                         d = p[-4] * dir[2]; d = p[-5] * dir[1] + d; d = dir[0] * tv[0] + d;
                         if (twoSided != 0 || *(int*)&d <= 0) {
