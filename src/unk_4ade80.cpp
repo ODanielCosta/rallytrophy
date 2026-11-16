@@ -67,6 +67,7 @@ void ModelCacheState::Add(void* mesh)
 // Tried 2026-11-16 round 22: count/flags after `pending`, no nextCount temp (`count += w`), `tri = w*3` temp and count2 declared before loop 2: 40 -> 12 insns differ; left: m_head store sched in PopHead (phase 1), edx/ecx/eax picks in phase 2 and the ResizeB/Build* arg setup; PopHead rewrites (hoisted next/prev, reordered stores) and PopHead-before-Insert all worse.
 // Tried 2026-11-16 round 26: Insert/PopHead swap (130 insns), hoisted h node, count/flags store order, unsigned cast, hand-expanded PopHead in phase 1 (4 forms, +/-3 bytes, 32-120 insns), reorder.py exhausted: stays 12 insns/18 bytes.
 // Tried 2026-11-16 round 25 (~100 compiles, stays 12 insns/18 bytes): PopHead bodies (hoisted prev/next, m_head->prev, *(Node**) reads, tail temp, per-site helpers), phase-2 count forms (int, short temp, `*=3`, named/unnamed nextCount, store order in else), reorder.py/permute.py: none moved the m_head-store/cmp order (phase 1) or the edx/ecx and eax-avoiding picks in phase 2 else/tail.
+// 2026-11-16 round 27: phase-specific PopHead bodies (PopHeadB: per-arm block-scoped prev, used in phase 1) fixes the phase-1 m_head store order; 18 -> 12 differing bytes, phase 2 (hoisted PopHead) unchanged: edx/ecx picks, lea/push eax vs edx, ResizeB arg regs.
 void ModelCacheState::Reload(RenderDevice* renderer)
 {
     device = renderer;
@@ -84,7 +85,7 @@ void ModelCacheState::Reload(RenderDevice* renderer)
             count += *(unsigned short*)((char*)mesh + 0xc);
             flags = nextFlags;
             batch.Insert(batch.end(), mesh);
-            pending.PopHead();
+            pending.PopHeadB();
         } else {
             BuildVertices(count, (unsigned char)flags, &batch);
             batch.Resize(0);
