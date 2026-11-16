@@ -640,3 +640,15 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
 - A `double` local (stored to memory only through a `(float)` cast store) moves the following int one slot LATER
   without changing the x87 ops - the lever that matched WheelSpray (atlasU/atlasV). No lever found to move an int
   EARLIER (FUN_00491c10, LoadCarIni's push-before-fcos).
+
+## Stack slot allocation (2026-11-16 study; matched CarEmitterB::SpawnCore1)
+- Slots are ordered by per-variable reference count (higher count = lower address); ties go to the first-referenced
+  variable, not the first declared. A variable read several times in one expression counts once if loaded once.
+- Counts are per VARIABLE, not per slot: disjoint scratch floats sharing a slot keep separate counts, while one
+  reused variable sums them. Merging or splitting scratch locals therefore moves slot order (SpawnCore1 matched by
+  reusing one `sv` for slip/speed/lat as SpawnCore2 does).
+- An int living in a register but read by `fild` gets a home slot ranked only by its home stores and fild reads.
+- A local whose lifetime starts after a parameter's last use takes that dead parameter slot (highest-count local
+  wins); if the parameter is used later, the local gets a fresh slot.
+- Disjoint lifetimes share slots even in one scope (float+double share an 8-byte slot). A call result held in a
+  register gets no slot; a float held across a call always spills; `$T` slots come from fistp/fild casts and EH new.

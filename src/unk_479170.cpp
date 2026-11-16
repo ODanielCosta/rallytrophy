@@ -279,15 +279,8 @@ static const float C1_SLIP2_LO = 4.0f, C1_SLIP2_HI = 35.0f;   // 0x4e219c, 0x4e2
     __asm fstp dword ptr [eax+8] \
     __asm fstp dword ptr [eax+4]
 
-// NONMATCHING: RALLYTROPHY 0x4799f0
-// 2026-11-16 FPU-study pass: yv local, plain float j1 + double j2, velocity.y store twice, x via p->velocity.x, size store after the z jitter: 266 -> 20 differing bytes at equal size 1382. Only the ebp-0x10/-0x14 slot swap (slip float vs n1 home) is left; 10 declaration/first-use orders of n1..n3/slip did not move it.
-// 2026-11-16 r18: int r = t2 above the n1 clamp (slot swap fixed) and slipLong into a local: 51 -> 31 insns. The SpawnCore2-style volatile jitter locals reach 24 but add new volatile, not taken; left: j2 kept on the x87 stack in the original.
-// 1376 vs 1382 bytes; same instruction mix. Open: the original keeps the float/int scratch slot
-// at ebp-0x10 above the n1 home slot (ebp-0x14), here they come the other way round (no declaration
-// order or block scope changes it); and a few schedule differences (pool head store, x/y velocity
-// jitter adds with a CSE'd velocity.x, epilogue pop order).
-// Tried 2026-10-30 night: split alpha sum, `t2 = n3 + n2`, `Vec3 local` copied before the pool-pop stores (77->64 insns); decl order of r/t2/n1, local/age placement, yv split and `j + v` jitter forms no better. Still open: float scratch slot ebp-0x10 vs n1 home ebp-0x14 swapped, original pops pool before loading s_car, 1377 vs 1382 bytes.
-// Tried 2026-10-31 re-pass: SpawnCore3/4 pool-pop recipe applied (pop, int copy of age, unk0/lifetime, then position copy; 125->99 diff lines); SpawnCore2 volatile j1/yv jitter form and slipLong in dead age slot made it worse (101/137), n1/slip decl-order sweeps worse (123). Still open: n1 home ebp-0x14 vs scratch ebp-0x10 swapped, j1 not in its own slot, slipLong push order.
+// FUNCTION: RALLYTROPHY 0x4799f0
+// Matched 2026-11-16 (slot study): slip/speed/lat are ONE float scratch `v` (as in SpawnCore2). Three separate floats get a lower count each, so the n1 home sorted below them instead of above.
 // Spawn core 1: emits one particle with a probability from the slips and the body speed.
 float CarEmitterB::SpawnCore1(float scale, float age)
 {
@@ -297,26 +290,26 @@ float CarEmitterB::SpawnCore1(float scale, float age)
     int n1 = 0;
     int n2 = 0;
     int n3 = 0;
-    float slip = (float)fabs(s_car->slipLong);
-    if (slip < C1_SLIP_HI) {
-        if (slip > C1_SLIP_LO) {
-            n1 = FloatToInt((slip - C1_SLIP_LO) * kSlip * 256.0f);
+    float sv = (float)fabs(s_car->slipLong);
+    if (sv < C1_SLIP_HI) {
+        if (sv > C1_SLIP_LO) {
+            n1 = FloatToInt((sv - C1_SLIP_LO) * kSlip * 256.0f);
         }
     } else {
         n1 = 256;
     }
-    float speed = s_body->vel.Length();
-    if (speed < C1_SPEED_HI) {
-        if (speed > C1_SPEED_LO) {
-            n2 = FloatToInt((speed - C1_SPEED_LO) * kSpeed * 256.0f);
+    sv = s_body->vel.Length();
+    if (sv < C1_SPEED_HI) {
+        if (sv > C1_SPEED_LO) {
+            n2 = FloatToInt((sv - C1_SPEED_LO) * kSpeed * 256.0f);
         }
     } else {
         n2 = 256;
     }
-    float lat = (float)fabs(s_car->slipLat);
-    if (lat < C1_SLIP2_HI) {
-        if (lat > C1_SLIP2_LO) {
-            n3 = FloatToInt((lat - C1_SLIP2_LO) * kSlip2 * 256.0f);
+    sv = (float)fabs(s_car->slipLat);
+    if (sv < C1_SLIP2_HI) {
+        if (sv > C1_SLIP2_LO) {
+            n3 = FloatToInt((sv - C1_SLIP2_LO) * kSlip2 * 256.0f);
         }
     } else {
         n3 = 256;
