@@ -1755,6 +1755,7 @@ struct AiVelocity {
 
 // NONMATCHING: RALLYTROPHY 0x49f1f0
 // 485 vs 522 bytes, 354 differing bytes; logic complete. The original copies the two velocities into locals in a mixed fld/integer
+// 2026-11-16 L3: q1/q2 in y*y+z*z+x*x order (60 -> 58 insns, 495 bytes); direct sqrt(expr), named x*x temps, ac/bc copies, per-field/ref velocity copies (A-K) no better.
 // 2026-11-16 r23: Sub via S414Vec3 into a POD offset, x*x+z*z order (62 -> 60 insns, 351 bytes); float-local/field-wise/ref velocity copies (e1-e5,f1-f3,g1-g4) all 61-89 insns, no gain.
 // Tried 2026-10-31 re-pass (16 variants): named x*x temps (a, b, both) with z*z+y*y+xx and y*y+z*z+xx orders, offset.y=0 after/volatile/double dz, field-wise or reordered copies, reference-to-velocity (all 61-82 insns vs 62 baseline). Original orders: speed z*z+y*y+x*x, q y*y+z*z+x*x, a.x*a.x kept in st(0), b.x*b.x spilled to [esp+0x14], b.y/b.z kept in FPU after speed2; no source form found.
 // Tried 2026-10-30 night: const refs, component float copies, q-first sqrt(q), reordered Length/q, __forceinline by-value Len/Sq helpers (all 66-86 insns vs 62 baseline); original keeps x1 in FPU with x1*x1 reuse and spills copies at [esp+0x10..0x38], not reproduced.
@@ -1777,8 +1778,8 @@ int AIDriver::FUN_0049f1f0(Player* other)
     float speed1 = a.Length();
     float speed2 = b.Length();
     float ratio = speed1 / speed2;
-    float q1 = a.x * a.x + a.y * a.y + a.z * a.z;
-    float q2 = b.x * b.x + b.y * b.y + b.z * b.z;
+    float q1 = a.y * a.y + a.z * a.z + a.x * a.x;
+    float q2 = b.y * b.y + b.z * b.z + b.x * b.x;
     if (q1 * 2.5f > q2 || other->local && distance < 12.0f && q1 * 1.5f > q2) {
         result = 1;
     }
