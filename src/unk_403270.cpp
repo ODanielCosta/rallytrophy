@@ -333,9 +333,6 @@ struct GhostTrack {                                   // car body +0x1c874
 struct GhostLog { void Read(ReplayFile* f); };        // car body +0x1bed0, 0x401b00
 class CarBody { public: void FUN_0046be50(int mode); };
 
-static __forceinline void FSet(float& d, float v) { d = v; }
-static __forceinline float FId(float v) { return v; }
-
 // NONMATCHING: RALLYTROPHY 0x403ca0
 // Calling convention (thiscall on the header, bool result), object sizes, constructor arguments, the PathText
 // string calls and block order follow the target. Direct singleton field stores before taking the `race` alias
