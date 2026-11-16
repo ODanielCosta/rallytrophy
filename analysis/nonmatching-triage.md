@@ -151,7 +151,7 @@ Instruction-multiset view: 41 functions are pure register/scheduling permutation
 | 0x4ab910 | src/unk_4ab910.cpp | FUN_004ab910 | other | 1556 | 1556 | 893 | 4 | `mov    ebx,DWORD PTR [edi]` | `xor    ebp,ebp` |  |
 | 0x4abf30 | src/unk_4ab910.cpp | FUN_004abf30 | size | 2030 | 2034 | 587 | 7 | `mov    edi,DWORD PTR ds:0x0` | `mov    esi,DWORD PTR ds:0x0` |  |
 | 0x4ac920 | src/unk_4ab910.cpp | FUN_004ac920 | size | 1085 | 1080 | 886 | 2 | `je     0x4acd4f` | `je     0x4acd54` |  |
-| 0x4ad1d0 | src/unk_4acd60.cpp | FUN_004ad1d0 | size | 2917 | 3131 | 2402 | 116 | `mov    BYTE PTR [ebp-0x4],0x2` | `mov    BYTE PTR [ebp-0x4],0x3` | eh 0,2,3,3,2,3,2,3,3,2,3,2,3,2,2 vs 0,3,4,4,4,3,4,3,4,3,3 |
+| 0x4ad1d0 | src/unk_4acd60.cpp | FUN_004ad1d0 | size | 2971 | 3131 | 2403 | 71 | `mov    BYTE PTR [ebp-0x4],0x2` | `mov    BYTE PTR [ebp-0x4],0x3` | eh 0,2,3,3,2,3,2,3,3,2,3,2,3,2,2 vs 0,3,4,4,4,3,4,3,4,3,3 |
 | 0x4ae1f0 | src/unk_4ade80.cpp | ModelCacheState::Reload | order+registers | 699 | 699 | 18 | 0 | `mov    DWORD PTR [esp+0x30],ecx` | `cmp    eax,DWORD PTR [esp+0x34]` |  |
 | 0x4ae4b0 | src/unk_4ae4b0.cpp | ModelCacheUpload::UploadVertices | other | 1115 | 1115 | 2 | 2 | `mov    ebx,ecx` | `lea    ebx,[ecx]` |  |
 | 0x4af950 | src/unk_4af960.cpp | BmfReader::BmfReader | order | 1227 | 1227 | 29 | 0 | `mov    DWORD PTR [esi+0x60],ebx` | `push   edx` |  |
