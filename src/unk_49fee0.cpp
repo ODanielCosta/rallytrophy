@@ -102,6 +102,7 @@ static inline SubPod* SubP(const Vec3& a, const Vec3& b, SubPod* out)
 // 2026-11-04 (ws-I): EH map now exact (states 4,5,6,7,8,6,9,10 as the original). Cause: the out-of-line Sub (0x414330) returns a plain struct (SubPod, no unwind state) read through the returned pointer; rel/r3/v4 are three function-scope Vec3 declared before ownVel (states 0-2), dir/diff in-loop, `other` is re-derived from the Car pointer (oc->body) at every use. Left: this in esi vs edi, frame 0xc4 vs 0xc0.
 // Tried 2026-10-30 night: ~25 variants; 215->170 insns by declaring rel/diff Vec3 outside the loop (assigned per pass) and copying forward into dir field by field; original still has frame 0xc0 (ours 0xd8), EH state 4 before the loop and this in edi/i in ecx with the dir inverse sharing i's slot.
 // Tried 2026-11-01: ~18 more variants (dir/r3/v4/otherFwd hoisted out of the loop, extra dummy Vec3, int i, double length, result=0); only hoisting otherFwd up to after 'other' helped, 170->168; still frame 0xd8 vs 0xc0 and EH state 3 vs 4 at loop entry.
+// 2026-11-15 (r15): 206 -> 142 insns differ, 1146 -> 1142 bytes: `diff` is the out-of-line Sub result (plain SubPod t0, no volatile y read) copied into a Vec3 diff (x,0,z); oc->body cached in a local after the Subs; this now in edi as the original. Left: frame/slots (0xe4 vs 0xc0), ownVel/ownFwd store schedule, ob base +0x1a8 vs original +0x1b0.
 // Logic complete (1110 vs 1149 bytes). The original has four Vec3 objects (EH state 4) alive before the loop and
 // reads the results of the out-of-line Vec3 +/- (0x419f00/0x414330) straight from the returned pointers; the
 // build's temporaries, EH state numbers and register allocation (original: this in edi) differ.
@@ -129,15 +130,17 @@ void AIDriver::FUN_0049ffa0()
         SubPod t1, t2, t3;
         SubPod* q = SubP(((AiBody*)oc->body)->position, ownBody->position, &t1);
         rel.x = q->x; rel.y = 0; rel.z = q->z;
-        Vec3 diff = ((AiBody*)oc->body)->position - ownBody->position;
-        diff.y = 0.0f;
+        SubPod t0;
+        SubPod* dq = SubP(((AiBody*)oc->body)->position, ownBody->position, &t0);
+        Vec3 diff(dq->x, 0, dq->z);
         q = SubP(((AiBody*)oc->body)->position + *(Vec3*)&((AiBody*)oc->body)->vx, ownBody->position + *(Vec3*)&ownBody->vx, &t2);
         r3.x = q->x; r3.y = 0; r3.z = q->z;
         q = SubP(((AiBody*)oc->body)->position + *(Vec3*)&((AiBody*)oc->body)->vx, ownBody->position, &t3);
         v4.x = q->x; v4.y = 0; v4.z = q->z;
-        Vec3 otherFwd(((AiBody*)oc->body)->Forward());
+        AiBody* ocb = (AiBody*)oc->body;
+        Vec3 otherFwd(ocb->Forward());
         float along = diff.z * forward.z;
-        along = *(volatile float*)&diff.y * forward.y + along;
+        along = diff.y * forward.y + along;
         along = diff.x * forward.x + along;
         float ownSpeed = 0;
         if (ownBody->vx * ownBody->vx + ownBody->vy * ownBody->vy + ownBody->vz * ownBody->vz > 0.0f) {
@@ -147,10 +150,10 @@ void AIDriver::FUN_0049ffa0()
         }
         unk568 = ownSpeed;
         float otherSpeed = 0;
-        if (((AiBody*)oc->body)->vx * ((AiBody*)oc->body)->vx + ((AiBody*)oc->body)->vy * ((AiBody*)oc->body)->vy + ((AiBody*)oc->body)->vz * ((AiBody*)oc->body)->vz > 0.0f) {
-            otherSpeed = otherFwd.y * ((AiBody*)oc->body)->vy;
-            otherSpeed = otherFwd.z * ((AiBody*)oc->body)->vz + otherSpeed;
-            otherSpeed = otherFwd.x * ((AiBody*)oc->body)->vx + otherSpeed;
+        if (ocb->vx * ocb->vx + ocb->vy * ocb->vy + ocb->vz * ocb->vz > 0.0f) {
+            otherSpeed = otherFwd.y * ocb->vy;
+            otherSpeed = otherFwd.z * ocb->vz + otherSpeed;
+            otherSpeed = otherFwd.x * ocb->vx + otherSpeed;
         }
         if (along > 0.0f) {
             float distance = (float)sqrt(rel.z * rel.z + rel.x * rel.x);
@@ -158,18 +161,18 @@ void AIDriver::FUN_0049ffa0()
                 if (ownSpeed > otherSpeed || unk164 == 1) {
                     unkbc = 1;
                     ob->valid = 1;
-                    ob->unk0.x = ((AiBody*)oc->body)->position.x;
-                    ob->unk0.y = ((AiBody*)oc->body)->position.y;
-                    ob->unk0.z = ((AiBody*)oc->body)->position.z;
+                    ob->unk0.x = ocb->position.x;
+                    ob->unk0.y = ocb->position.y;
+                    ob->unk0.z = ocb->position.z;
                     ob->unk0.y = 0;
                     ob->leftDone = ob->rightDone = ob->side = 0;
                     ::FUN_004a1390(ob, (AiBody*)oc->body);
-                    ob->unk4c.x = ((AiBody*)oc->body)->Forward().x;
-                    ob->unk4c.z = ((AiBody*)oc->body)->Forward().z;
-                    ob->unk4c.y = ((AiBody*)oc->body)->Forward().y;
-                    ob->unk40.x = ((AiBody*)oc->body)->vx;
-                    ob->unk40.y = ((AiBody*)oc->body)->vy;
-                    ob->unk40.z = ((AiBody*)oc->body)->vz;
+                    ob->unk4c.x = ocb->Forward().x;
+                    ob->unk4c.z = ocb->Forward().z;
+                    ob->unk4c.y = ocb->Forward().y;
+                    ob->unk40.x = ocb->vx;
+                    ob->unk40.y = ocb->vy;
+                    ob->unk40.z = ocb->vz;
                     unk554++;
                 } else {
                     ob->valid = 0;
