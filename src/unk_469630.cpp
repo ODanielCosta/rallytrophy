@@ -199,14 +199,8 @@ void Car::FUN_00469a00(int a, int b)
     }
 }
 
-// NONMATCHING: RALLYTROPHY 0x469a20
-// 1009 bytes, 2 insns differ (142 -> 3 -> 2; state-0 store fixed by a volatile body pointer read `bb`). Remaining: the `lea edx,[ebp-0x4c]` for the Forward40()*k temp lands after the float push, and the loop's
-// surface-pointer slot store comes before `lea ebx,[esi+0x28]`.
-// 2026-11-13: plain `float kk = ...` (no volatile) fixes the Forward40()*kk `lea edx` placement: 17 -> 6 differing bytes, 1 insn pair left (loop: the surface-cursor slot store [ebp+0x10] comes before `lea ebx,[esi+0x28]`, original after). Tried since: decl order of i/w/surf/type/effect, wheel[i].contact test, `effect > 0`, i outside the for, `!= 4`; all 6 or worse.
-// Tried 2026-10-31: fewer uses of `effect` (Spawn(effect - 1)) lets the compiler keep c in edi (frame 0x40), vel2
-// declared after vel's stores matches the EH states, `float thr`/`r` locals give fcomp+fstp, volatile kk gives
-// the double store; permute.py -r 20 found nothing better than 3.
-// Tried 2026-11-01 re-pass: ~20 variants (kk plain copy/volatile read/decl moves, Forward40 named temp, loop wheel/surf/effect reorders, volatile surf) and permute.py -r 40 stay at 2; the hidden-return `lea edx` of Forward40()*kk and the loop slot store order have no handle.
+// FUNCTION: RALLYTROPHY 0x469a20
+// 2026-11-16: wheel and surface walked as two explicit cursors (`i++, sp++, w++`) matches; the wheel loop is the same, cursors replace [i] indexing.
 // Per-frame particle emission of a car: exhaust smoke, spray/debris from the body, and the dust, smoke and
 // spray of each wheel that touches a surface with effects.
 void Car::EmitEffects(float a, float b, float c)
@@ -258,25 +252,21 @@ void Car::EmitEffects(float a, float b, float c)
                 v->debris.SpawnOne(0.0f, b, c);
             }
         }
-        for (int i = 0; i < 4; i++) {
-            EmitWheel* w = &v->wheel[i];
+        EmitWheel* w = v->wheel; int* sp = v->surface;
+        for (int i = 0; i < 4; i++, sp++, w++) {
             if (w->contact) {
-                int surf = v->surface[i];
-                int type = v->surfaces->dust[surf];
-                int effect = v->surfaces->smoke[surf];
-                if (type) {
-                    v->dust.Spawn(type - 1, b, c, (Car*)w, (CarBody*)v->body);
-                }
+                int type = v->surfaces->dust[*sp];
+                int effect = v->surfaces->smoke[*sp];
+                if (type) { v->dust.Spawn(type - 1, b, c, (Car*)w, (CarBody*)v->body); }
                 if (effect) {
-                                        v->smokeB.Spawn(effect - 1, b, c, (Car*)w, (CarBody*)v->body);
-                    if (v->detail == 2) {
-                        v->spray.Spawn(effect - 1, b, c, (Car*)w, (CarBody*)v->body);
-                    }
+                    v->smokeB.Spawn(effect - 1, b, c, (Car*)w, (CarBody*)v->body);
+                    if (v->detail == 2) { v->spray.Spawn(effect - 1, b, c, (Car*)w, (CarBody*)v->body); }
                 }
             }
         }
     }
 }
+
 
 // FUNCTION: RALLYTROPHY 0x469e20
 void Car::FUN_00469e20()
