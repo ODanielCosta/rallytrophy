@@ -280,6 +280,7 @@ static const float C1_SLIP2_LO = 4.0f, C1_SLIP2_HI = 35.0f;   // 0x4e219c, 0x4e2
     __asm fstp dword ptr [eax+4]
 
 // NONMATCHING: RALLYTROPHY 0x4799f0
+// 2026-11-16 FPU-study pass: yv local, plain float j1 + double j2, velocity.y store twice, x via p->velocity.x, size store after the z jitter: 266 -> 20 differing bytes at equal size 1382. Only the ebp-0x10/-0x14 slot swap (slip float vs n1 home) is left; 10 declaration/first-use orders of n1..n3/slip did not move it.
 // 2026-11-16 r18: int r = t2 above the n1 clamp (slot swap fixed) and slipLong into a local: 51 -> 31 insns. The SpawnCore2-style volatile jitter locals reach 24 but add new volatile, not taken; left: j2 kept on the x87 stack in the original.
 // 1376 vs 1382 bytes; same instruction mix. Open: the original keeps the float/int scratch slot
 // at ebp-0x10 above the n1 home slot (ebp-0x14), here they come the other way round (no declaration
@@ -369,13 +370,15 @@ float CarEmitterB::SpawnCore1(float scale, float age)
     vel->z = v.z;
     float sl = s_car->slipLong;
     *vel -= s_body->Forward() * sl * 0.15f;
-    p->velocity.y *= 0.5f;
+    float yv = p->velocity.y * 0.5f;
+    p->velocity.y = yv;
     float j1 = (float)((rand() & 0x3fff) - 0x1fff) * 9.1552734375e-5f;
-    float j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
-    vel->x = j1 + vel->x; // field re-read like the original (fadd [ebx]); the original also spills j1 to float across the 2nd rand(), which VC6 sinks below this store here
-    p->velocity.y += j2;
-    p->size = 0.2f;
+    double j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
+    p->velocity.x = j1 + p->velocity.x;
+    p->velocity.y = yv + j2;
+    p->velocity.y = yv + j2; // duplicate store pins j1/j2 at their definitions (VC6 drops the second store)
     p->velocity.z += (float)((rand() & 0x3fff) - 0x1fff) * 9.1552734375e-5f;
+    p->size = 0.2f;
     p->gravity = (rand() & 0x3ff) * 9.765625145519e-5f + 0.5f;
     p->frame = (rand() & 3) | 0x110;
     p->color = 0xffffffff;
