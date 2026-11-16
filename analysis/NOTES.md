@@ -596,3 +596,14 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   "only the first emitted function clones epilogues" is NOT confirmed: a follow-up sweep found synthetic EH and non-EH
   functions cloning at every return in any position, and moving LoadRelay / FUN_004ad1d0 first changed nothing.
   Function order can matter in a specific file; treat it as a variant to try, not a rule.
+
+## Exit tail-merge rules (2026-11-16 study)
+- Default is to clone every `if (t) return 0;` exit (with epilogue/dtors); distance, function size, pop count alone
+  never trigger merging.
+- A trailing return identical to the test exits (`if (c) {...return 1;} return 0;`, else-return, flat trailing
+  `return 0`) merges ALL of them into it. Early-return form `if (!c) return 0; {...}` keeps them cloned.
+- Exits with vector-dtor calls clone in a fixed pattern: first 2-3 and last 3 get own exits, the middle ones jump to the
+  exit three tests earlier; distinct copies cap at ~6 (one dtor array) / 5 (two).
+- `if (a || (read, b)) { delete f; return 0; }` lets later delete[] exits tail-merge into it; split into two plain ifs
+  to keep them cloned (LoadRelay 119 -> 75).
+- Unexplained: some dtor-call counts (k=3,6,9) merge everything, k=5 clones everything; int vs x87 compare can flip it.

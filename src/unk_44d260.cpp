@@ -479,7 +479,12 @@ int SlotStore::LoadRelay()
     int magic0;
     int magic1;
     file->Read(&magic0, 4);
-    if (magic0 != 0x63777472 || (file->Read(&magic1, 4), magic1 != 0x20020109)) {
+    if (magic0 != 0x63777472) {
+        delete file;
+        return false;
+    }
+    file->Read(&magic1, 4);
+    if (magic1 != 0x20020109) {
         delete file;
         return false;
     }

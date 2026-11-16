@@ -367,7 +367,8 @@ int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
     delta.y = worldA.y - worldB.y;
     delta.z = worldA.z - worldB.z;
     float radius = boxA[9] + boxB[9];
-    if (delta.z * delta.z + delta.y * delta.y + delta.x * delta.x <= radius * radius) {
+    if (delta.z * delta.z + delta.y * delta.y + delta.x * delta.x > radius * radius) return 0;
+    {
         Vec3 axisA[3];
         Vec3 axisB[3];
         axisA[0].x = matrixA[0];
