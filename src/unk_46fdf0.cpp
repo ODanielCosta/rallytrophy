@@ -647,6 +647,7 @@ struct Quad4 { float a, b, c, d; };
 // 2026-11-13 pass: 260 -> 122 insns differ (3374 -> 3335 vs 3336 bytes): corners' d built per component, 'half' as ScenePoint operator+ (0x419f00), scale calls via ScenePoint (0x40b0c0), sprite colour as a 16-byte Quad4 struct copy, plane-0 sum single expression, 680 centre stores moved before the 640 inverse chain; remaining: corner stores (original loads each lo/hi once and copies registers), x87 fld operand order in plane sums, tail interleave of matrix/const/sprite stores, prologue push edi.
 // 2026-11-13 round 2: 122 -> 40 insns differ (3336 = original size): corner stores chained per component pair, hi copy after the plane-2 sum, `d2 <= r*r` compare (fcompp), light row 1 copied through a float pointer, 640/680 constants/centre stores re-slotted, mesh-> stores direct; remaining: fld operand order in plane sums/first dot, prologue push edi / epilogue pop esi placement, tail chain interleave (centre stores vs 640.m[12]).
 // 2026-11-14 round 11: 40 -> 36 insns differ: tail statement order after the cross asm searched by hill climbing (all stores independent, the scheduler only sees ties); 680/640 constants hoisted among the copies. Remaining: fld operand order in the three plane sums and first dot (commutative operand swaps and parens change nothing), prologue push edi / epilogue pop placement, 640.m[12] chain start.
+// 2026-11-16 operand-order study (study/FINDINGS.md): plane-1 sum as a z,y,x statement chain 36 -> 34 insns differ; fld-vs-memory operand order of the plane sums / first dot is a VC6 tie-break that no source form moved.
 // Prepares the shadow plane for the frame: clip planes from the camera, the light-space matrices and the casters' volume.
 // original: FUN_00470940
 void ParallelShadow::Prepare(RenderDevice* device, void* unused, DrawContext* context, Camera* camera, int unused2)
@@ -702,7 +703,10 @@ void ParallelShadow::Prepare(RenderDevice* device, void* unused, DrawContext* co
             c.z = camera->position.z;
             c += *(Vec3*)&(*(ScenePoint*)up * (camera->boxMin[1] - 0.01f));
         }
-        DAT_0050951c = DAT_00509510.z * c.z + DAT_00509510.y * c.y + c.x * DAT_00509510.x;
+        float s1 = c.z * DAT_00509510.z;
+        s1 += c.y * DAT_00509510.y;
+        s1 += c.x * DAT_00509510.x;
+        DAT_0050951c = s1;
 
         Vec3* right = &camera->right;
         float dz = dir.z; float rt = dz * right->z;

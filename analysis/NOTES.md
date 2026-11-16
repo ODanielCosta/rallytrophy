@@ -663,3 +663,13 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
 - `int r=0; ... if(c) r=2; return r;` with an early `return r` and no calls between uses puts the entry zero in eax
   and inlines the early epilogue (ColBody::Collide's original shape); calls between uses push it to edx.
 - The original re-materialises zero (split ranges), so only the first range's weight decides the register.
+
+## x87 commutative operand choice (2026-11-16 study)
+- For one product, source operand order never decides the fld (except two locals / two global-pointer derefs,
+  where the RIGHT source operand is fld'd).
+- The operand with the larger address tree gets the fld; a constant offset (p[1], p->f) outweighs one extra
+  indirection, two indirections outweigh *p. So only the x term (offset 0) flips in many dot products.
+- Equal trees: lower-numbered param wins; a global beats a stack local/param; a plain-copy float local reverses that.
+- A pointer already shared in a register counts as a one-node tree and loses to an operand with an offset.
+- A hidden tie-break exists (an extra unused param or an alias local flips some terms); renames change nothing.
+- One-expression sums emit the written last term first; statement chains keep source order (ParallelShadow plane sum).
