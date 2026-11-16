@@ -1487,6 +1487,7 @@ void Car::FUN_0045b900(int dt)
 // forces, rigid body integration and the collision with the stage (restoring the pose when the body hit).
 // Tried 2026-10-31: 24 variants (PassFloat removal/order, volatile posp/rotp, gravity local, radius-sum helpers, Vec3 local order/vel field copy, const-ref f, centre volatile stores); best is field-wise vel copy plus wp declared with wp2 (270->257 insns); EH states, radius-sum FPU stack and Xform temp slots still differ.
 // Tried 2026-10-31 re-pass (257->246 insns): the original sums wheel radii as (r3+r2+r1)+r0 from four loaded locals (the draft summed r0..r3 in a different rounding order); also tried prologue int-copy of dt, Vec3 decl orders, torque field-wise add, volatile/pointer n counter loops (no gain). Still differs: n/loop counters and posp/rotp spilled to frame in original, EH state 3 persistent Vec3s, Xform temp slots.
+// Pass 2026-11-16 (245->242 insns, 1964->1986 of 2002): drag built as Vec3 drag(drag0.x*k, drag0.y*k, drag0.z*k) from a copy (k stays in a register as the original); tried PassFloat/volatile centre stores, arm field-wise, expression k, volatile n/i: no gain.
 void Car::PhysicsStep(float dt)
 {
     W5_Body* b = V->body;
@@ -1534,11 +1535,9 @@ void Car::PhysicsStep(float dt)
     }
     {
         W5_Xform((const float*)&V->dragPoint, rotp, (float*)&wp, (const float*)posp);
-        Vec3 drag = *(Vec3*)&b->rot[4];
+        Vec3 drag0 = *(Vec3*)&b->rot[4];
         float k = -(e * V->dragScale * speed2);
-        drag.x = drag.x * k;
-        drag.y = drag.y * k;
-        drag.z = drag.z * k;
+        Vec3 drag(drag0.x * k, drag0.y * k, drag0.z * k);
         force += drag;
         Vec3 arm(wp.x - b->centre[0], wp.y - b->centre[1], wp.z - b->centre[2]);
         torque += FUN_004203e0(drag, arm);
