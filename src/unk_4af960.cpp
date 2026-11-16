@@ -66,6 +66,7 @@ struct BmfDirString {
 // path assign between the b and c zero stores; every statement order and a call-after-stores form were tried.
 // Tried 2026-10-30 night: volatile barriers on a/b/c stores, hoisted strlen local, enabled-before-c, permute -r 20; stuck at 3 insns (push edx/mov ecx,ebp/state-7 store land before the a stores instead of between b and c).
 // Tried 2026-10-31 re-pass: volatile on single b/a/c stores (field cast, volatile Vector3*, volatile float* run) -> 6-10 insns worse; strlen hoisted to local before a / after b (3, unchanged), AssignText moved after c or before c (4-7 worse); permute -r 40 best stays 3 insns; original pushes strlen then does a,b stores, then push dir/state-7/c stores, which no statement order reproduces.
+// Tried 2026-11-16 round 32 (no gain, 3 insns/29 bytes): ctor init `: path(dir)` (+18 bytes, 89 insns), strlen local before/after a,b, comma-expression args, `BmfString&` alias, Set3/split/chained c stores, enabled/textures/materials moves, DAT store after a,b, float z local, memset a,b, Bal(1) before c.
 BmfReader::BmfReader(const char* filename, const char* dir, BmfTextures* cache, List<Sprite*>* mats, int flags)
 {
     DAT_0057b95c = flags;
