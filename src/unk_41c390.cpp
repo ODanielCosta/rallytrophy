@@ -2,6 +2,7 @@
 #include <string>
 #include "unk_481390.h"
 #include "unk_41c390.h"
+#include "scene_object.h"
 
 extern float DAT_004e138c;
 extern double DAT_004e1438; // 0.9999
@@ -124,6 +125,7 @@ struct QuatTmp {
 
 // NONMATCHING: RALLYTROPHY 0x41c540
 // NONMATCHING: logic complete; improved 116->74 insns (QuatTmp dq with dtor gives the 2nd EH state, off+pos at the end, 0.5f literal). Tried 2026-10-31: forceinline Quat* helper (gives ecx addressing but forwards q fields and shrinks code), v224 stores, k chain; still differs: original reloads q fields via ecx with no store forwarding and runs the v224 += dv and += off passes unfused.
+// 2026-11-16 pass: 41 -> 4 insns differ (437 -> 159 bytes, size 987 exact): ScenePoint operator*/+ (out-of-line calls now match), v224 += off via a local Vec3* so the two passes stay unfused, pos copy after the 2nd Xform as DWORD moves, q products/adds through Quat* qp, normalize through a float* into q; remaining: lea ecx,&q sits right before the first q product in the original (ours hoisted after the v224 pass) and the dq EH state store (mov byte,2) follows the first product there.
 // Tried 2026-11-01 re-pass: Quat* qp=&q for the q+=dq adds (74->41 insns, ecx addressing now there), pos via Vec3* pp, views, qp for products/normalize, v224 unfusing via volatile/temps, pos copy after Xform; still differs: original does v224+=dv and +=off as two unfused passes and uses ecx for the dq products and normalize but esi for the n sum; any qp use in those places moves the lea or fuses the passes.
 void PhysBody::FUN_0041c540()
 {
@@ -134,48 +136,43 @@ void PhysBody::FUN_0041c540()
     v224[1] = *(DWORD*)&pos.y;
     v224[2] = *(DWORD*)&pos.z;
     Vec3* V = (Vec3*)v224;
-    const Vec3* dv = Addr(*(Vec3*)v1cc * dt);
-    V->x = V->x + dv->x; // volatile: keep the two passes unfused (original rounds each)
-    V->y = dv->y + V->y;
-    V->z = dv->z + V->z;
-    V->x = off.x + V->x;
-    V->y = off.y + V->y;
-    V->z = off.z + V->z;
-    float P = w.y * q.w + w.x * q.z - w.z * q.x;
-    float t1 = w.y * q.x + w.z * q.w - w.x * q.y;
-    float t2 = -(w.x * q.x) - w.y * q.y - w.z * q.z;
-    float D = w.z * q.y + w.x * q.w - w.y * q.z;
+    *V += *(Vec3*)&(*(ScenePoint*)v1cc * dt);
+    { Vec3* W = (Vec3*)v224; W->x = off.x + W->x; W->y = off.y + W->y; W->z = off.z + W->z; }
+    Quat* qp = &q;
+    float P = w.y * qp->w + w.x * qp->z - w.z * qp->x;
+    float t1 = w.y * qp->x + w.z * qp->w - w.x * qp->y;
+    float t2 = -(w.x * qp->x) - w.y * qp->y - w.z * qp->z;
+    float D = w.z * qp->y + w.x * qp->w - w.y * qp->z;
     float k;
     QuatTmp dq;
     dq.x = (k = dt * 0.5f) * D;
     dq.y = P * k;
     dq.z = t1 * k;
     dq.w = t2 * k;
-    Quat* qp = &q;
     qp->x = dq.x + qp->x;
     qp->y = dq.y + qp->y;
     qp->z = dq.z + qp->z;
     qp->w = dq.w + qp->w;
-    Quat* qv = (Quat*)&q;
-    float n3 = qv->w, n2 = qv->z, n1 = qv->y, n0 = qv->x;
+    float n3 = q.w, n2 = q.z, n1 = q.y, n0 = q.x;
     float n = n3 * n3 + n2 * n2 + n1 * n1 + n0 * n0;
     if (n < DAT_004e1438 || n > DAT_004e1430) {
         float s = DAT_004e1348 / (float)sqrt(n);
-        q.x = s * q.x;
-        q.y = s * q.y;
-        q.z = s * q.z;
-        q.w = s * q.w;
+        float* f = &q.x;
+        f[0] = s * q.x;
+        f[1] = s * f[1];
+        f[2] = s * f[2];
+        f[3] = s * f[3];
     }
     q.ToMatrix(m);
     Vec3* pp = &pos;
-    pp->x = *(float*)&v224[0];
-    pp->y = *(float*)&v224[1];
-    pp->z = *(float*)&v224[2];
     Xform(&off.x, &a, m);
+    *(DWORD*)&pp->x = v224[0];
+    *(DWORD*)&pp->y = v224[1];
+    *(DWORD*)&pp->z = v224[2];
     pp->x -= off.x;
     pp->y -= off.y;
     pp->z -= off.z;
-    const DWORD* r = (const DWORD*)Addr(off + pos);
+    const DWORD* r = (const DWORD*)&(*(ScenePoint*)&off + *(ScenePoint*)&pos);
     v224[0] = r[0];
     v224[1] = r[1];
     v224[2] = r[2];
