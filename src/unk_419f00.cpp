@@ -132,6 +132,7 @@ struct ColVec {
 };
 
 // NONMATCHING: RALLYTROPHY 0x41b270
+// 2026-11-16 (Kimi, 2 rounds, 24 candidates): end-pointer, centre-pointer and index induction, counter recomputed from pointers, aggregate loop state, inline-helper body, scope destructors, first-loop local reuse, counter types and guard forms. Best was 6 insns at 695 bytes; nothing beat 1 insn.
 // Tried 2026-10-31 re-pass (11->1 insn): vertex loop as plain `for (k = n; k != 0; k--)` (fixes je/setup), Dot arg v[0] re-derived from tr+0x28,
 // Length as local c=z,b=y,a=x via `ColVec* q`, e1 from `float* p1 = &v[1]->x` (reproduces the dead add eax,4); only `dec ebx` still sits
 // before the two [ebp+8]/[ebp+0xc] pointer spills instead of after. Tried while/do/--i/i>0/unsigned/volatile c,tr,i/pointer-arith c++/tr++ order, permute -r 40 (no MATCH, best 1).
