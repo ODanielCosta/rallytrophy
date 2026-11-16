@@ -67,6 +67,7 @@ ConfigKey SoundKeys[25] = {
 // Tried 2026-10-30 night: store order/split, comma-in-arg, stores before SetVolume, volatile loop/priority stores (162->154 bytes only, kept out); the loop-byte store sinks between the two float pushes in the original but lands before or after both here.
 // Tried 2026-10-31 re-pass: permute.py -r 40 (best stayed 13 insns, 156 bytes; no MATCH), comma-in-arg on the loop store (store order flips, still after both pushes); first loop store still lands after the two float pushes in INIT_SLOT/crash SetRange blocks.
 // Tried 2026-11-16 (round 22, ~35 variants, no gain: 162 bytes / 13 insns): comma-in-arg on either/both stores, comma in the this expression, inline float/this helpers that store and return, SoundSource&/* locals (change size), stores moved around SetVolume/priority/surface, bool local. The orig's push;store;push;mov ecx;store interleave occurs in our first loop (this = lea ecx,[edi-9]) but never in slot/crash blocks (this = mov ecx,ebp): scheduler places the stores last there whatever the source order.
+// Tried 2026-11-16 (round 23): full flag-store helpers, split flag helpers and whole slot/crash init helpers; baseline remains best (162 bytes / 13 insns), full init is worse (525 bytes / 78 insns).
 // Same size (2361) and instruction stream; only the scheduling of the is3D/loop byte stores differs in the
 // six SetRange blocks of the slot and crash sources (the original places the first store between the two
 // float pushes, this build after them). The first loop, strings, EH states and registers all match.
