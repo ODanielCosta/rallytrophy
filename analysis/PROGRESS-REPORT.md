@@ -15,12 +15,12 @@ _Updated 2026-11-15 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1921 / 2084 (92.18%) | 426,325 / 742,276 (57.43%) |
-| Written, not yet exact | 163 | 315,951 |
+| Byte-exact | 1923 / 2084 (92.27%) | 428,065 / 742,276 (57.67%) |
+| Written, not yet exact | 161 | 314,211 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   █████████████████░░░░░░░░░░░░░ 57.43% of code bytes
+exact   █████████████████░░░░░░░░░░░░░ 57.67% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -34,7 +34,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Language / text table | `0x404d50`–`0x405580` | 13 / 13 / 13 | 100.0% | 100.0% | `████████████` |
 | Config files | `0x405580`–`0x409690` | 34 / 34 / 34 | 100.0% | 100.0% | `████████████` |
 | Stage scene and collision | `0x409690`–`0x420490` | 173 / 201 / 201 | 27.2% | 100.0% | `████████████` |
-| StageTable/control/credits screens | `0x420490`–`0x4266c0` | 32 / 39 / 39 | 31.9% | 100.0% | `████████████` |
+| StageTable/control/credits screens | `0x420490`–`0x4266c0` | 33 / 39 / 39 | 36.9% | 100.0% | `████████████` |
 | Mode select screen | `0x4266c0`–`0x427600` | 9 / 9 / 9 | 100.0% | 100.0% | `████████████` |
 | Game settings screen | `0x427600`–`0x4295c0` | 11 / 11 / 11 | 100.0% | 100.0% | `████████████` |
 | Graphics options screen | `0x4295c0`–`0x42c2b0` | 12 / 12 / 12 | 100.0% | 100.0% | `████████████` |
@@ -50,7 +50,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Race options screen | `0x43f9e0`–`0x441370` | 10 / 10 / 10 | 100.0% | 100.0% | `████████████` |
 | Track-selection screen | `0x441370`–`0x445e80` | 23 / 25 / 25 | 47.6% | 100.0% | `████████████` |
 | Service-area screen | `0x445e80`–`0x44b930` | 18 / 22 / 22 | 58.1% | 100.0% | `████████████` |
-| Replay menu | `0x44b930`–`0x44d260` | 10 / 12 / 12 | 49.8% | 100.0% | `████████████` |
+| Replay menu | `0x44b930`–`0x44d260` | 11 / 12 / 12 | 59.7% | 100.0% | `████████████` |
 | Save-game files | `0x44d260`–`0x44ea60` | 6 / 9 / 9 | 34.2% | 100.0% | `████████████` |
 | Slot menu | `0x44ea60`–`0x450ee0` | 11 / 13 / 13 | 55.8% | 100.0% | `████████████` |
 | Sound menu | `0x450ee0`–`0x452380` | 9 / 9 / 9 | 100.0% | 100.0% | `████████████` |

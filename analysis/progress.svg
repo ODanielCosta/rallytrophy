@@ -120,8 +120,7 @@
 <rect x="243.0" y="120" width="4.3" height="36" fill="#e3b341"/>
 <rect x="247.4" y="120" width="0.6" height="36" fill="#3fb950"/>
 <rect x="247.5" y="120" width="0.6" height="36" fill="#3fb950"/>
-<rect x="247.7" y="120" width="1.7" height="36" fill="#e3b341"/>
-<rect x="249.4" y="120" width="1.5" height="36" fill="#3fb950"/>
+<rect x="247.7" y="120" width="3.2" height="36" fill="#3fb950"/>
 <rect x="250.9" y="120" width="5.9" height="36" fill="#3fb950"/>
 <rect x="256.9" y="120" width="21.8" height="36" fill="#3fb950"/>
 <rect x="278.7" y="120" width="15.4" height="36" fill="#3fb950"/>
@@ -165,9 +164,7 @@
 <rect x="475.4" y="120" width="4.6" height="36" fill="#3fb950"/>
 <rect x="480.1" y="120" width="4.8" height="36" fill="#3fb950"/>
 <rect x="484.9" y="120" width="3.8" height="36" fill="#e3b341"/>
-<rect x="488.8" y="120" width="0.6" height="36" fill="#3fb950"/>
-<rect x="488.9" y="120" width="1.0" height="36" fill="#e3b341"/>
-<rect x="489.8" y="120" width="1.7" height="36" fill="#3fb950"/>
+<rect x="488.8" y="120" width="2.7" height="36" fill="#3fb950"/>
 <rect x="491.5" y="120" width="6.1" height="36" fill="#e3b341"/>
 <rect x="497.6" y="120" width="2.8" height="36" fill="#3fb950"/>
 <rect x="500.4" y="120" width="5.1" height="36" fill="#e3b341"/>
@@ -628,9 +625,9 @@
 <text x="1018" y="318" fill="#e6edf3">27% exact / 100% written</text>
 <text x="260" y="344" text-anchor="end" fill="#e6edf3">5. StageTable/control/credits screens</text>
 <rect x="270" y="330" width="740" height="18" rx="2" fill="#484f58"/>
-<rect x="270" y="330" width="236.1" height="18" fill="#3fb950"/>
-<rect x="506.1" y="330" width="503.9" height="18" fill="#e3b341"/>
-<text x="1018" y="344" fill="#e6edf3">32% exact / 100% written</text>
+<rect x="270" y="330" width="272.9" height="18" fill="#3fb950"/>
+<rect x="542.9" y="330" width="467.1" height="18" fill="#e3b341"/>
+<text x="1018" y="344" fill="#e6edf3">37% exact / 100% written</text>
 <text x="260" y="370" text-anchor="end" fill="#e6edf3">6. Mode select screen</text>
 <rect x="270" y="356" width="740" height="18" rx="2" fill="#484f58"/>
 <rect x="270" y="356" width="740.0" height="18" fill="#3fb950"/>
@@ -699,9 +696,9 @@
 <text x="1018" y="734" fill="#e6edf3">58% exact / 100% written</text>
 <text x="260" y="760" text-anchor="end" fill="#e6edf3">21. Replay menu</text>
 <rect x="270" y="746" width="740" height="18" rx="2" fill="#484f58"/>
-<rect x="270" y="746" width="368.3" height="18" fill="#3fb950"/>
-<rect x="638.3" y="746" width="371.7" height="18" fill="#e3b341"/>
-<text x="1018" y="760" fill="#e6edf3">50% exact / 100% written</text>
+<rect x="270" y="746" width="442.0" height="18" fill="#3fb950"/>
+<rect x="712.0" y="746" width="298.0" height="18" fill="#e3b341"/>
+<text x="1018" y="760" fill="#e6edf3">60% exact / 100% written</text>
 <text x="260" y="786" text-anchor="end" fill="#e6edf3">22. Save-game files</text>
 <rect x="270" y="772" width="740" height="18" rx="2" fill="#484f58"/>
 <rect x="270" y="772" width="253.3" height="18" fill="#3fb950"/>
