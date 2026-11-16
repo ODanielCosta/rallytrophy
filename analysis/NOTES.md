@@ -652,3 +652,14 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   wins); if the parameter is used later, the local gets a fresh slot.
 - Disjoint lifetimes share slots even in one scope (float+double share an 8-byte slot). A call result held in a
   register gets no slot; a float held across a call always spills; `$T` slots come from fistp/fild casts and EH new.
+
+## Zero-constant register (2026-11-16 study; no match yet)
+- A constant 0 gets a register only after enough zero STORES: 4 stores trigger `xor reg,reg`, 3 do not; push 0 /
+  mov eax,0 args never trigger it but use the register once it exists. Int/short/pointer zero stores share it.
+- Once it exists, `test r,r` for p==0 / h>0 becomes `cmp r,zero`; the zero is hoisted to the dominator of its uses.
+- Zero (Z stores) beats a parameter pointer with K simple uses when Z >= 2K+3 (thiscall needs more); ties go to the
+  earlier-defined. First-use order and 0/NULL/(T*)0/!p spelling do not matter.
+- A byte zero store forces the zero into ebx (xor bl,bl) and the other zeros share ebx; a 16-bit zero uses esi.
+- `int r=0; ... if(c) r=2; return r;` with an early `return r` and no calls between uses puts the entry zero in eax
+  and inlines the early epilogue (ColBody::Collide's original shape); calls between uses push it to edx.
+- The original re-materialises zero (split ranges), so only the first range's weight decides the register.
