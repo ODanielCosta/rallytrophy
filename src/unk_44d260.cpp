@@ -435,6 +435,7 @@ fail:
 // Tried 2026-10-31: 132 insns now (was 142: per-use car->snapshot[2] and a local CarSnapshot* per buffer block, dropped the bogus Close on bad headers). No source form stopped the failure-exit tail merge (return 0 vs false, nested else, goto, cipher/race decl positions, race copies per branch); int return (xor eax,eax) is right per the callers but changing the header affects other files.
 // Tried 2026-11-04 (ws-X): reading the player stats temp through a volatile int* keeps VC6 from turning the 10-dword copy loop into rep movs like the original (norm 229->208, 132->128 insns). Epilogue duplication of the done/stage failure exits is robust against: operator delete/scalar delete, alias pointers, inline helper returns, casts, decl order of race/player/cipher (toy tests: identical exits always cross-jump when the epilogue has >=4 pops; only differing code before the epilogue unmerges them). Per-block CarSnapshot* s / size temps: worse (138-150 insns).
 // Tried 2026-11-01 re-pass: 13 variants (int return via header + return 0, result local, volatile zero return, folded return exprs size-size/done&0/stage-stage, volatile level/DAT reads, store-order swap of level/stage, volatile loop stores, separate loop pointer); int return alone is 132 insns too and the three failure epilogues still merge into one tail (volatile zero return unmerges the tail but adds a spilled return slot, 129 insns, 1302 bytes); original also has 0x10 more below the cipher temp, not explained; 132 insns, too far for permute.
+// 2026-11-16 r25: `in += 0x28` before the AI stats copy-out, `s` alias hoisted above the size test in buffer blocks 1/2, player stats loop through `int t = vt[k]` (128 -> 119 insns, 1270 -> 1281 bytes; failure exits still merge, 3 separate epilogues = the 40 byte gap).
 bool SlotStore::LoadRelay()
 {
     DAT_00501472 = 0;
@@ -496,7 +497,7 @@ bool SlotStore::LoadRelay()
         }
     } else {
         CarSnapView* car = (CarSnapView*)player->car;
-                car->snapshot[2].Clear();
+        car->snapshot[2].Clear();
         car->snapshot[2] = *(CarSnapshot*)in;
         in += 0x8c;
         if (car->snapshot[2].size[0]) {
@@ -505,33 +506,37 @@ bool SlotStore::LoadRelay()
             memcpy(s->buffer[0], in, s->size[0] * 4);
             in += s->size[0] * 4;
         }
-        if (car->snapshot[2].size[1]) {
+        {
             CarSnapshot* s = &car->snapshot[2];
-            s->buffer[1] = new BYTE[s->size[1] * 4];
-            memcpy(s->buffer[1], in, s->size[1] * 4);
-            in += s->size[1] * 4;
+            if (s->size[1]) {
+                s->buffer[1] = new BYTE[s->size[1] * 4];
+                memcpy(s->buffer[1], in, s->size[1] * 4);
+                in += s->size[1] * 4;
+            }
         }
-        if (car->snapshot[2].size[2]) {
+        {
             CarSnapshot* s = &car->snapshot[2];
-            s->buffer[2] = new BYTE[s->size[2] * 4];
-            memcpy(s->buffer[2], in, s->size[2] * 4);
-            in += s->size[2] * 4;
+            if (s->size[2]) {
+                s->buffer[2] = new BYTE[s->size[2] * 4];
+                memcpy(s->buffer[2], in, s->size[2] * 4);
+                in += s->size[2] * 4;
+            }
         }
         ((Car*)car)->FUN_0046be50(2);
         int tmp[10];
         memcpy(tmp, in, 0x28);
         in += 0x28;
         volatile int* vt = tmp;
-        for (int k = 0; k < 10; k++) player->unk1a28[k] = vt[k];
+        for (int k = 0; k < 10; k++) { int t = vt[k]; player->unk1a28[k] = t; }
         int used = FB3_BODY(this)->stage - 1;
         player->unk1a50 = used;
         for (int i = 0; i < 0x13; i++) {
             Player* ai = new Player(PLAYER_AI, i + 1);
             FB3_Stats stats;
             memcpy(&stats, in, 0x28);
+            in += 0x28;
             memcpy(ai->unk1a28, &stats, 0x28);
             ai->unk1a50 = used;
-            in += 0x28;
             race->AddPlayer(ai);
         }
     }
