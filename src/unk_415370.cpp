@@ -109,6 +109,7 @@ static inline int Bal(int a) { return a; }
 // Tried 2026-10-30 night: AssignB uses out-of-line Eos, surface loop is 15 passes with length()>=2 (orig cmp 2/jb, count 0xf), event loop bound re-reads this+0x1600, V2 copies direct (449->387 insns); still differs: orig keeps ev/off in frame slots with i in ebx (ours strength-reduces to a pointer in ebx), name/count in memory, and strlen n in esi in AssignB.
 // Tried 2026-11-01 re-pass: 10 discarded Bal(1) at function end (387->345 insns, 3217 vs 3209 bytes; 1-9 and 11+ worse, at start 645); zero-reg int z, volatile name/k/ev/off, fx as LoadSoundsPath (worse 424), loop shapes; still differs: orig has this in esi and zero in ebx (ours swapped), no stack i (i in ebx), frame 0x98 vs 0x9c, n in esi in AssignB.
 // Pass 2026-11-13: surface loop indexes this+0x160c+k*0x2c / this+0x23c8+k (V2* pm, no running pointer; bias and size 3224->3205), event loop `e = ev + i` with `off` kept for the last store, V2 copy via inline operator= (pair-first loads) with the Bal(1) padding removed (needs 0): 343 -> 303 insns differ, 3212 vs 3209 bytes, register-normalised diff lines 364->125; remaining: this in ebx / zero in esi (orig swapped), fmul placement between GetVector2 calls, ev/off slots.
+// Pass 2026-11-15 (r16): event `e` computed after the LoadSample call as ev-slot + off (re-read this+0x15fc), last store via FLD+off (not via e): 303 -> 116 insns, 3209/3209 bytes, this now in esi; remaining: surface pm base ebx = this+0x1620 vs original this+0x1610 (shifting pm by +-1/2 V2, SurfSlot indexing worse), fmul placement in slots 1-4, i/off frame-slot store order.
 void StageSoundLoader::LoadSounds()
 {
     FLD(int, 0x15f8) = 0;
@@ -144,8 +145,8 @@ void StageSoundLoader::LoadSounds()
             Event1Delay[5] = Event1File[5];
             path.AssignOut("data/soundfx/", strlen("data/soundfx/"));
             path.AppendCString(cfg.GetString(Event1File));
-            AmbientSound* e = ev + i;
             Sample* smp = DAT_0056b0b0->LoadSample(path.c_str());
+            AmbientSound* e = (AmbientSound*)(FLD(char*, 0x15fc) + off);
             *(Sample**)((unsigned char*)e + 0x70) = smp;
             e->SetSample(smp);
             *(V2*)&e->minTime = *(V2*)&cfg.GetVector2(Event1Delay);
