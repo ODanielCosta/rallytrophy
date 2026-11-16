@@ -303,6 +303,7 @@ void SingleRace::Update(int dt)
 // FPU registers.
 // Tried 2026-10-30 night: member-wise copies of position/a/b, named la plus a progress temp in branch 2 (149 -> 91 insns), next/prev inline, declaration hoisting, permuter; still differs: stack slot order (next/before/closing), branch 2 evaluates b.Length() before a.Length() and stores them, and lea/test scheduling after FUN_00414dc0.
 // Re-pass 2026-11-01 (91 -> 47 insns): doubles la/lb keep both lengths on the FPU, span reuses the dead next slot (float& alias), duplicate FUN_00414fb0(1) call removed, branch 3 subtracts b before a.Length(); still differs: stack slot order of stage/i/closing/before/d2 and i/eax register swap, declaration order has no effect.
+// Pass 2026-11-16 (r21, 47 insns unchanged): no source gain; i stays in eax (orig ecx), tried int/unsigned i, unused j/k removal, ++i, while loop, != bound, prev/next/a/b statement orders (96-98 bytes but 48-55 insns), swapped 1a1c/1a50 stores, hoisted stageCount.
 // Estimates the stage time of every player who is still driving: the distance along
 // the stage is interpolated between the nearest checkpoints.
 void SingleRace::Slot6()
