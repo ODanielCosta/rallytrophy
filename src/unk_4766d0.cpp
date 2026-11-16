@@ -18,6 +18,7 @@ extern "C" void fun_004c1998();
 // approach the target quad layout; FPU/store scheduling still differs.
 // Tried 2026-10-30 night: ~25 variants (volatile/plain vertices+color, guard placement, store/zero-reg order, u1/v1 hoist, tail store reorder); only the tail store order helped (49->45); the quad loop interleaves FPU stores across vertices and the 8-byte size gap is unexplained.
 // Tried 2026-10-31 re-pass: cursor pointers declared reverse (v2,u2,v,u,normal,color) fixes the lea/register order; vx load hoisted above the guard (45->39); ~14 more variants (plain color, volatile u/v/u2, u1/v1 hoist, u0/v0 swap, for-loop) no better; original defers u/v fstp across vertices with pending 0x2c adds folded into disp (e.g. [edx-0x2c]).
+// 2026-11-16: per-vertex store order found by random-permutation hill climb (size now exact 924, 344 -> 187 bytes, 34 -> 32 insns differ).
 // 2026-11-11: counts, owner and array pointers through this->mesh (no volatile reloads) and the tail stores in the
 // original order (unk70[2] and viewCount right after the unk60 block): 357 -> 344 bytes differ; the head now matches
 // up to the quad loop, whose FPU/store interleaving is the remaining difference.
@@ -80,21 +81,21 @@ WindowRain::WindowRain(int count)
             *u2 = 0.0f;
             *v2 = 0.0f;
             normal += 11; color += 11; u += 11; v += 11; u2 += 11; v2 += 11;
+            *u = u1;
             normal[0] = 0.0f;
             normal[1] = 0.0f;
             normal[2] = -1.0f;
-            *color = 0xffffffff;
-            *u = u1;
             *v = v1;
+            *color = 0xffffffff;
             *u2 = 0.0f;
             *v2 = 0.0f;
             normal += 11; color += 11; u += 11; v += 11; u2 += 11; v2 += 11;
-            normal[0] = 0.0f;
-            normal[1] = 0.0f;
-            normal[2] = -1.0f;
             *color = 0xffffffff;
             *u = u0;
             *v = v1;
+            normal[0] = 0.0f;
+            normal[1] = 0.0f;
+            normal[2] = -1.0f;
             *u2 = 0.0f;
             *v2 = 0.0f;
             normal += 11; color += 11; u += 11; v += 11; u2 += 11; v2 += 11;
