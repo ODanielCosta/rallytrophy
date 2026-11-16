@@ -38,17 +38,26 @@ struct GridCell {
 class StageGrid {
 public:
     void Build();                                  // 0x40fcc0
+    void FillCells();                              // 0x40f390
     BYTE pad0[0x68];
     int alloc68;
     SceneNode** objFirst;                          // 0x6c
     SceneNode** objLast;                           // 0x70
-    BYTE pad74[0x134 - 0x74];
+    BYTE pad74[0x130 - 0x74];
+    float radius;                                  // 0x130
     int alloc134;
     GridNodeRef** nodeFirst;                       // 0x138
     GridNodeRef** nodeLast;                        // 0x13c
     BYTE pad140[4];
     GridPtrVec allRefs;                            // 0x144
-    BYTE pad154[0xa04 - 0x154];
+    BYTE pad154[0x188 - 0x154];
+    float cellW;                                   // 0x188
+    BYTE unk18c[4];
+    float cellH;                                   // 0x190
+    int cols;                                      // 0x194
+    int rows;                                      // 0x198
+    BYTE* cells;                                   // 0x19c
+    BYTE pad1a0[0xa04 - 0x1a0];
     int count48;                                   // 0xa04
     BYTE* records48;                               // 0xa08
     BYTE pad_a0c[0x1364 - 0xa0c];

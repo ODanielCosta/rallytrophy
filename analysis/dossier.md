@@ -7,7 +7,7 @@
 | 6 | 0x4bb3a0 | src/unk_4bb3a0.cpp | TraceNodeSweep | 1635 | 65 | 0x0/0x0 | 7 states (1 top-level): FUN_00402c90 | 1,0,2,3,4,6,3 vs 0,1,0,2,3,4,6,3 | 5 | call ModelObject::MeshAtExact | call TraceMeshOwner::At | 1 |
 | 6 | 0x433bc0 | src/unk_4303e0.cpp | GameG8::FUN_00433bc0 | 1848 | 14 | 0x88c/0x88c | 3 states (1 top-level): SingleRace::~SingleRace, operator_delete | 1,0,2,0,0,0,1 vs 1,0,2,0,0,0,1,1 | 12 | call GameScreen2DD4::Run | call Screen2DD4::FUN_00426770 | 1 |
 | 6 | 0x45bc20 | src/unk_45ad10.cpp | Car::PhysicsStep | 2002 | 59 | 0x0/0x0 | 9 states (1 top-level): FUN_00402c90 | 0,4,3,5,7,3,8,3 vs 0,5,3,6,7,3,8,3 | 11 | call ??DScenePoint@@QBE?AU0@M@Z | call ??DVec3@@QBE?AV0@M@Z | 9 |
-| 6 | 0x418b90 | src/unk_418b90.cpp | SweepQuery::Cast | 2054 | 50 | 0xb8/0xb8 | 13 states (1 top-level): FUN_00402c90 | 5,7,11,7,12 vs 7,11,7,12 | 4 | call ??DScenePoint@@QBE?AU0@M@Z | call ??DVec3@@QBE?AV0@M@Z | 1 |
+| 6 | 0x418b90 | src/unk_418570.cpp | SweepQuery::Cast | 2054 | 50 | 0xb8/0xb8 | 13 states (1 top-level): FUN_00402c90 | 5,7,11,7,12 vs 7,11,7,12 | 4 | call ??DScenePoint@@QBE?AU0@M@Z | call ??DVec3@@QBE?AV0@M@Z | 1 |
 | 6 | 0x41a890 | src/unk_41a890.cpp | ColModel::ColModel | 2298 | 37 | 0x0/0x0 | 9 states (9 top-level): FUN_00402c90, operator_delete | -1,1,-1,2,-1,3,-1,4,-1,5,-1,6,-1,7,-1,8,-1 vs -1,-1,2,-1,3,-1,4,-1,5,-1,6,-1,7,-1,8,-1 | 3 | call TriangleCircumcircle::Calculate | call SceneSphere::SetTriple | 1 |
 | 6 | 0x48bd10 | src/unk_4856e0.cpp | RaceMode::NameMenu | 2766 | 27 | 0x14/0x14 | 2 states (1 top-level): FUN_00402c90 | 0,1,1,0 vs 0,0,1,0,0,1,1,1,0,0,1 | 31 | call ModelResourceArrayOwner::DrawResourceCellsExact | call OverlayIma | 0 |
 | 6 | 0x4ad1d0 | src/unk_4acd60.cpp | FUN_004ad1d0 | 3131 | 249 | 0x0/0x0 | 7 states (1 top-level): 0x4def8e: push   0x402c90; push   0x3; push   0xc; lea    ea | 0,2,3,3,2,3,2,3,3,2,3,2,3,2,2 vs 0,2,3,3,3,2,3,2,3,2,2 | 6 | call ehvec_dtor |  | 1 |
@@ -123,7 +123,7 @@
 | 3 | 0x43a6e0 | src/unk_43a390.cpp | Screen1378::Frame | 1685 | 0 | 0x5c/0x5c | 8 states (1 top-level): FUN_00402c90 |  | 23 | call Pair::Assign | call HitPoint::HitPoint | 2 |
 | 3 | 0x422fc0 | src/unk_420490.cpp | StageScreen::LoadLayout | 1700 | 4 | 0x44/0x44 | 18 states (1 top-level): ??1MenuLabel@@QAE@XZ, Config::~Config, FUN_00402c90, operato |  | 35 | call ?_Tidy@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@st | 0 |
 | 3 | 0x42d710 | src/unk_42c2b0.cpp | GameScreen1E9C::BuildRects | 1704 | 2 | 0x24/0x24 | 18 states (1 top-level): FUN_00402c90, operator_delete |  | 33 | call Pair::Assign | call H4c_Point::H4c_Point | 0 |
-| 3 | 0x40fcc0 | src/unk_40fcc0.cpp | StageGrid::Build | 1716 | 41 | 0x0/0x0 | 3 states (1 top-level): FUN_00402c90, operator_delete |  | 33 | call ModelObject::FUN_004a6d30 | call ModelObj::Refresh | 0 |
+| 3 | 0x40fcc0 | src/unk_40f390.cpp | StageGrid::Build | 1716 | 41 | 0x0/0x0 | 3 states (1 top-level): FUN_00402c90, operator_delete |  | 33 | call ModelObject::FUN_004a6d30 | call ModelObj::Refresh | 0 |
 | 3 | 0x4751b0 | src/unk_474c50.cpp | SnowFall::Update | 1741 | 6 | 0x0/0x0 | 18 states (1 top-level): FUN_00402c90 |  | 20 | call ??DScenePoint@@QBE?AU0@M@Z | call ??DVec3@@QBE?AV0@M@Z | 2 |
 | 3 | 0x4b9d30 | src/unk_4b9d30.cpp | ShadowUpdater::Update | 1750 | 81 | 0x0/0x0 | 9 states (1 top-level): FUN_00402c90 |  | 5 | call ViewMat::SetInverseOf | call Mat4Local::SetInverseOf | 1 |
 | 3 | 0x46f360 | src/unk_46eec0.cpp | CityLight::Render | 1767 | 43 | 0x0/0x0 | 5 states (1 top-level): 0x4dc018: push   0x402c90; push   0x4; push   0x2c; lea    e |  | 2 | call ??DScenePoint@@QBE?AU0@M@Z | call ??DVec3@@QBE?AV0@M@Z | 20 |
@@ -183,7 +183,7 @@
 | 3 | 0x4418d0 | src/unk_441370.cpp | TrackSelectMenu::Setup | 4683 | 27 | 0x150/0x150 | 21 states (3 top-level): ??1MenuLabel@@QAE@XZ, Config::~Config, operator_delete |  | 92 | call ?assign@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@s | 3 |
 | 3 | 0x453940 | src/unk_452b20.cpp | Car::FUN_00453940 | 5036 | 37 | 0x0/0x0 | 11 states (1 top-level): FUN_00402c90 |  | 25 | call FUN_004c1404 | call _floor | 12 |
 | 3 | 0x493650 | src/unk_491fb0.cpp | RaceSession::FUN_00493650 | 5672 | 55 | 0x0/0x0 | 4 states (1 top-level): FUN_00402c90, Timer::~Timer, operator_delete |  | 49 | call RaceMode::Lock | call Car::FUN_0048e660 | 0 |
-| 3 | 0x411600 | src/unk_411600.cpp | StageConfigLoader::LoadConfig | 8628 | 115 | 0x0/0x0 | 6 states (1 top-level): ??1MenuLabel@@QAE@XZ, Config::~Config, FUN_00402c90 |  | 40 | call ?_Grow@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@st | 1 |
+| 3 | 0x411600 | src/unk_411170.cpp | StageConfigLoader::LoadConfig | 8628 | 115 | 0x0/0x0 | 6 states (1 top-level): ??1MenuLabel@@QAE@XZ, Config::~Config, FUN_00402c90 |  | 40 | call ?_Grow@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@st | 1 |
 | 3 | 0x45e480 | src/unk_45e480.cpp | ??0CarObject@@QAE@PAVCarTextureCache@@HHHHHI@Z | 13705 | 82 | 0x0/0x0 | 124 states (1 top-level): 0x4daad0: push   0x46c420; push   0x4; push   0x330; mov     |  | 253 | call Config::Config | call MeshHandleList::MeshHandleList | 1 |
 | 1 | 0x4578c0 | src/unk_4563e0.cpp | ViewManager::FUN_004578c0 | 588 | 15 | 0x28/0x10 | none |  vs 0 | 0 |  | 6 |
 | 1 | 0x45ad40 | src/unk_45ad10.cpp | Car::UpdateSteering | 1404 | 13 | 0x20/0x1c | none |  | 0 |  | 8 |

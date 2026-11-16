@@ -612,3 +612,8 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   TU it cloned an epilogue; any emitted function before it (even a trivial extern one) made it share the epilogue as
   the original does. When a function at the start of a .cpp differs only in epilogue cloning, check whether the
   original's TU actually started earlier (address-contiguous neighbours) and merge files accordingly.
+- TU-boundary sweep (2026-11-16): of 29 NONMATCHING functions first in their .cpp with an address-contiguous
+  neighbour in another .cpp, real merges helped three, by small amounts: StageGrid::Build (into unk_40f390.cpp,
+  StageGrid unified in unk_40fcc0.h), StageConfigLoader::LoadConfig (into unk_411170.cpp) and SweepQuery::Cast (into
+  unk_418570.cpp, at its address position). Plain concatenations elsewhere changed nothing; neighbours separated
+  by an atexit `_$E` stub are genuine TU ends.
