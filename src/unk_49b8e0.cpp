@@ -1750,6 +1750,7 @@ struct AiVelocity {
 
 // NONMATCHING: RALLYTROPHY 0x49f1f0
 // 485 vs 522 bytes, 354 differing bytes; logic complete. The original copies the two velocities into locals in a mixed fld/integer
+// 2026-11-16 r23: Sub via S414Vec3 into a POD offset, x*x+z*z order (62 -> 60 insns, 351 bytes); float-local/field-wise/ref velocity copies (e1-e5,f1-f3,g1-g4) all 61-89 insns, no gain.
 // Tried 2026-10-31 re-pass (16 variants): named x*x temps (a, b, both) with z*z+y*y+xx and y*y+z*z+xx orders, offset.y=0 after/volatile/double dz, field-wise or reordered copies, reference-to-velocity (all 61-82 insns vs 62 baseline). Original orders: speed z*z+y*y+x*x, q y*y+z*z+x*x, a.x*a.x kept in st(0), b.x*b.x spilled to [esp+0x14], b.y/b.z kept in FPU after speed2; no source form found.
 // Tried 2026-10-30 night: const refs, component float copies, q-first sqrt(q), reordered Length/q, __forceinline by-value Len/Sq helpers (all 66-86 insns vs 62 baseline); original keeps x1 in FPU with x1*x1 reuse and spills copies at [esp+0x10..0x38], not reproduced.
 // pattern (x1 stays in the FPU, x1*x1 and x2*x2 are reused for the squared speeds) that plain struct copies and a
@@ -1758,9 +1759,10 @@ int AIDriver::FUN_0049f1f0(Player* other)
 {
     int result = 0;
     Car* theirs = other->car;
-    Vec3 offset = ((CarBodyV*)theirs->body)->position - ((CarBodyV*)player->car->body)->position;
+    AiVelocity offset;
+    ((S414Vec3*)&((CarBodyV*)theirs->body)->position)->Sub(&offset.x, (float*)&((CarBodyV*)player->car->body)->position);
     offset.y = 0;
-    float distance = (float)sqrt(offset.z * offset.z + offset.x * offset.x);
+    float distance = (float)sqrt(offset.x * offset.x + offset.z * offset.z);
     float closeness = 15.0f - distance;
     if (closeness < DAT_004e1348) {
         closeness = 1.0f;
