@@ -1030,6 +1030,7 @@ void ServiceMenu::DrawInfo()
 // Tried 2026-10-31: buf[16]->buf[40] matches the original frame size 0x90 (279->229); 720 decl-order permutations of uv/pos/color/buf/i/unused, x/y swap, separate j counter, color.value=-1, volatile z did not beat it; still differs: uv/pos/color/i slot order (original: i low, uv/pos above, Color above them) and -1 held in ebp.
 // Tried 2026-11-01 re-pass: ~20 variants (tune loop as do-while over int* tp with volatile k=5 like DrawRepair, k/row/i merged into one local, y/x and k/row/dummy decl orders, buf[32]/[40]); the code already equals the original apart from stack offsets (loops, -1 in ebp, calls identical) and decl order never moves scalar slots; original frame has x/y at 0x18/0x14 with a hole at 0x10 and row/k shared at 0x1c below uv/pos, ours puts x/y at 0x10/0x14 and the counter above pos (229 insns differ, all slot offsets); no behaviour bug found (per-entry tune[i] vs tuneOrig[i] already correct).
 // 2026-11-12: the two selector markers as `x = (...) * DAT; y = DAT * 551; stores` (x kept on the FPU stack like the original) and `int row = unk28;` hoisted above the second marker: 229 -> 63 insns differ (3000 vs 3004 bytes). Left: frame 0x98 vs 0x90 (original spills (float)tune[row] into a slot at 0x6c, ours adds slots) and the uv store order in the changed-tune quad.
+// 2026-11-15 round 14: 511 -> 203 differing bytes, size 3000 -> 3004 (exact): x(604) as its own statement before the Print, x(985) - width in one expression, damageBar uv stores after the pos stores. Left: SetScale/color-store interleave and row-spill position near itoa, edx/eax in the tuneSprite else branch.
 // original: FUN_00449860 (page 1, the Tune tab)
 void ServiceMenu::DrawTune()
 {
@@ -1085,15 +1086,15 @@ void ServiceMenu::DrawTune()
             y = DAT_0056aeac * 42.0f + y;
         }
         x = DAT_0056aea8 * 600.0f;
-        uv[0].x = uv[3].x = 0.0f;
-        uv[0].y = uv[1].y = 0.0f;
-        uv[1].x = uv[2].x = 0.779296875f;
-        uv[2].y = uv[3].y = 0.28125f;
         y = DAT_0056aeac * 551.0f;
         pos[0].x = pos[3].x = x;
         pos[0].y = pos[1].y = y;
         pos[1].x = pos[2].x = DAT_0056aea8 * 402.0f + x;
         pos[2].y = pos[3].y = DAT_0056aeac * 22.0f + y;
+        uv[0].x = uv[3].x = 0.0f;
+        uv[0].y = uv[1].y = 0.0f;
+        uv[1].x = uv[2].x = 0.779296875f;
+        uv[2].y = uv[3].y = 0.28125f;
         DAT_0056b0ac->vf35(&damageBar);
         ((RaceDeviceSlots*)DAT_0056b0ac)->DrawQuad((Vec2*)pos, (Vec2*)uv, color, 1.0f, 1.0f);
         pos[0].x = pos[3].x = x - DAT_0056aea8;
@@ -1162,7 +1163,8 @@ void ServiceMenu::DrawTune()
         x = DAT_0056aea8 * 804.0f;
         y = DAT_0056aeac * 192.0f;
         lil->Print(DAT_0056b0ac, x, y, FUN_00405380(0x73), 0, 1.0f, 1.0f);
-        lil->Print(DAT_0056b0ac, DAT_0056aea8 * 604.0f, y, FUN_00405380(0x77), 0, 1.0f, 1.0f);
+        x = DAT_0056aea8 * 604.0f;
+        lil->Print(DAT_0056b0ac, x, y, FUN_00405380(0x77), 0, 1.0f, 1.0f);
         lil->color = DAT_00508c04;
         int cost = tuneTime[row];
         lil->SetScale(DAT_0056aea8 * 1.5f, DAT_0056aeac * 1.5f);
@@ -1172,8 +1174,7 @@ void ServiceMenu::DrawTune()
         x = x - lil->GetWidth(buf, 0);
         lil->Print(DAT_0056b0ac, x, y, buf, 0, 1.0f, 1.0f);
         itoa(timeLeft, buf, 10);
-        x = DAT_0056aea8 * 985.0f;
-        x = x - lil->GetWidth(buf, 0);
+        x = DAT_0056aea8 * 985.0f - lil->GetWidth(buf, 0);
         if (timeLeft < cost && tune[row] == tuneOrig[row]) {
             lil->SetColor(ColorArg(0xFFD14A4F));
         } else {
