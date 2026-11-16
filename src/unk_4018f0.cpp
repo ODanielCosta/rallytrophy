@@ -158,7 +158,8 @@ static __forceinline int RoundF(float v)
     return r;
 }
 
-// NONMATCHING: RALLYTROPHY 0x4021b0 (union mirrors the target reuse of the spline double slot high dword for an index; 836 vs 824 bytes, 564 differing bytes; remaining frame/register layout differs)
+// NONMATCHING: RALLYTROPHY 0x4021b0 (824 vs 824 bytes, 105 differing bytes, 73 insns differ; remaining diff is idx/frames esi/ebx swap and its knock-ons)
+// Tried 2026-11-15: volatile tail replaced by e2[] reads of a second e->dst alias (blocks store forwarding); a before d; operand order `x >= frames`; offsets computed in the loop body; float temp fr0 for the first fraction (314 -> 105 bytes, 116 -> 73 insns). Statement-order/decl/temp-local variants of idx/frames did not move the register swap.
 // Tried 2026-10-30 night: plain double/int locals, cached frames, volatile stores, b-load sinking; best is union word only for the first RoundF + separate idx local + volatile reads of d[3..5] (177->151); still differs in register assignment (idx/frames swap esi/ebx), spilled offset slots and an extra 12-byte frame.
 // Tried 2026-11-01 re-pass: normalize tail via volatile loads into locals z,y,x (151->116 insns); 13 more variants (offset placement, decl order, count local, clamp form, self ptr) all stay at 116; remaining diff is this/idx/frames register assignment (esi/edi/ebx) and offset-hoist order after the count test.
 void MeshSet::Interp(float t)
@@ -176,7 +177,8 @@ void MeshSet::Interp(float t)
     float f;
     int idx, prev, nxt, nxt2;
     indexSpline.spline = (frames - 1) * t;
-    f = (float)(indexSpline.spline - floor(indexSpline.spline));
+    float fr0 = (float)(indexSpline.spline - floor(indexSpline.spline));
+    f = fr0;
     if (*(int*)&f < 0)
         f = 0.0f;
     else if (*(int*)&f > 0x3f800000)
@@ -187,7 +189,7 @@ void MeshSet::Interp(float t)
     if (loop != 0) {
         indexSpline.spline = frames * t;
         idx = RoundF((float)floor(indexSpline.spline));
-        if (idx == frames) {
+        if (frames == idx) {
             f = DAT_004e134c;
             idx = 0;
         } else {
@@ -198,15 +200,15 @@ void MeshSet::Interp(float t)
         nxt2 = idx + 2;
         if (prev < 0)
             prev = frames - 1;
-        if (frames <= nxt)
+        if (nxt >= frames)
             nxt -= frames;
-        if (frames <= nxt2)
+        if (nxt2 >= frames)
             nxt2 -= frames;
     } else {
         if (idx < 0)
             idx = 0;
         int last = frames - 1;
-        if (last <= idx) {
+        if (idx >= last) {
             idx = frames - 2;
             f = DAT_004e1348;
         }
@@ -224,14 +226,10 @@ void MeshSet::Interp(float t)
     sp.y = f * f;
     sp.z = f * f * f;
     MeshElem* e = elems;
-    idx *= 12;
-    prev *= 12;
-    nxt *= 12;
-    nxt2 *= 12;
-    int oc = idx, op = prev, on = nxt, on2 = nxt2;
     for (int k = count; k > 0; k--, e++) {
-        float* d = e->dst;
+        int oc = idx * 12, op = prev * 12, on = nxt * 12, on2 = nxt2 * 12;
         char* a = (char*)e->a;
+        float* d = e->dst;
         d[0] = sp.Spline(*(float*)(a + op), *(float*)(a + oc), *(float*)(a + on), *(float*)(a + on2));
         d[1] = sp.Spline(*(float*)(a + 4 + op), *(float*)(a + 4 + oc), *(float*)(a + 4 + on), *(float*)(a + 4 + on2));
         d[2] = sp.Spline(*(float*)(a + 8 + op), *(float*)(a + 8 + oc), *(float*)(a + 8 + on), *(float*)(a + 8 + on2));
@@ -239,15 +237,11 @@ void MeshSet::Interp(float t)
         d[3] = sp.Spline(*(float*)(b + op), *(float*)(b + oc), *(float*)(b + on), *(float*)(b + on2));
         d[4] = sp.Spline(*(float*)(b + 4 + op), *(float*)(b + 4 + oc), *(float*)(b + 4 + on), *(float*)(b + 4 + on2));
         d[5] = sp.Spline(*(float*)(b + 8 + op), *(float*)(b + 8 + oc), *(float*)(b + 8 + on), *(float*)(b + 8 + on2));
-        volatile float* vd = d;
-        float z = vd[5], y = vd[4], x = vd[3];
-        float q = z * z + y * y + x * x;
+        float* e2 = e->dst; float q = e2[5]*e2[5] + e2[4]*e2[4] + e2[3]*e2[3];
         int bits = *(int*)&q;
         int r = DAT_00573bc0[(bits >> 12) & 0xfff] + 0x3f800000 + (-(int)((bits * 2 + 0x81000001U) & 0xfe000000) >> 2);
         r &= 0x7fffffff;
         float inv = *(float*)&r;
-        d[3] = inv * x;
-        d[4] = inv * y;
-        d[5] = inv * z;
+        e2[3] *= inv; e2[4] *= inv; e2[5] *= inv;
     }
 }
