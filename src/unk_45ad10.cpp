@@ -1052,6 +1052,7 @@ struct W7_Car {
 // blocks, wheel-matrix stack slots, and the target's hoisted 1.0f register. Evidence: ev_44efd80de74fa57abbe051afd7c89aabb5cbbfca52bc9ff6c566f2d37ba828ec.
 // Tried 2026-10-30 night: hand-inlined Toe/Camber using the dt param slot as the ref temp (matches orig [ebp+8]) with base/spring1 copied to locals, and reloading wheel damage per use (114->73 insns differ); still differs: orig keeps x and spring0/base on the FPU stack across the steer math (slot/frame 0x20 vs 0x1c), a/x/y declaration order and wheel-ptr hoisting had no effect.
 // Tried 2026-11-01 re-pass: loads of spring0/toeBase into locals (all-operands-first fld) plus reusing tb as the y accumulator (y stored in the toe-base slot) 73->53 insns differ; still differs: orig interleaves the tb/sp1 int spills with the flds, frame 0x20 vs 0x1c, and wheel-matrix temp slots.
+// Round 17 (2026-11-15): rear block mirrors front (cb, sp2 int spills, then s3/cb0 fld; sp1 loaded before tb) 53 -> 41 insns, size 1404 = orig; left: frame 0x20 vs 0x1c (orig keeps sp1 slot reserved, l1 at -0x10, a1 at -0xc; declaration/scope/ref-local variants did not move it).
 void Car::UpdateSteering(float dt)
 {
     W3_CarView* v = (W3_CarView*)this;
@@ -1079,8 +1080,8 @@ void Car::UpdateSteering(float dt)
     }
 
     float x;
-    float tb = v->toeBase;
     float sp1 = v->spring[1].value;
+    float tb = v->toeBase;
     float s0 = v->spring[0].value; float tb0 = v->toeBase;
     dt = v->frontRef[v->tuning];
     if (s0 < dt) x = (dt - s0) * v->frontIn[v->tuning] * v->toeIn + tb0;
@@ -1155,12 +1156,13 @@ void Car::UpdateSteering(float dt)
         v->wheel[3].row1[1] = r->y;
         v->wheel[3].row1[2] = r->z;
     } else {
-        float sp2 = v->spring[2].value;
         float cb = v->camberBase;
+        float sp2 = v->spring[2].value;
+        float s3 = v->spring[3].value; float cb0 = v->camberBase;
         float x2, y2;
         dt = v->rearRef[v->tuning];
-        if (v->spring[3].value < dt) x2 = (dt - v->spring[3].value) * v->rearIn[v->tuning] * v->camberIn + cb;
-        else x2 = (v->spring[3].value - dt) * v->rearOut[v->tuning] * v->camberOut + cb;
+        if (s3 < dt) x2 = (dt - s3) * v->rearIn[v->tuning] * v->camberIn + cb0;
+        else x2 = (s3 - dt) * v->rearOut[v->tuning] * v->camberOut + cb0;
         if (sp2 < dt) y2 = (dt - sp2) * v->rearIn[v->tuning] * v->camberIn + cb;
         else y2 = (sp2 - dt) * v->rearOut[v->tuning] * v->camberOut + cb;
         W3_Wheel* w3 = &v->wheel[3];
