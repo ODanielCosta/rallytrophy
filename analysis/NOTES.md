@@ -707,3 +707,10 @@ With /Oa, measured in synthetic reductions:
   Two related forms:
   - Accumulators move integer instructions earlier inside x87 code: `float s = b; s -= a; s *= inv;` instead of `(b - a) * inv` (FUN_00491c10, 2 -> 1 insn).
   - Writing the constant first, `ny = 0.85f; ny *= oldY`, moved a lea after the fmul (TrackSelectMenu::Run, 4 -> 3 insns).
+
+## Scratch registers and lea operand order (2026-11-16 study, ~45 synthetic compiles; no residual fixed)
+- **`lea r,[a+b]`.** The base is whichever operand is defined LATER in the IL. Source spelling never matters: `len+ptr`, `&ptr[len]`, casts and `ptr-(0-len)` all compile identically. A member of a stack object that is reloaded after a call counts as a fresh, late definition, so it becomes the base. Copying it into a local before the other operand flips the order in synthetic tests. In Car::LoadDriver that local takes a callee-saved register and wrecks the function (984 insns).
+- **A temp loaded as `[r+off]` reuses r when r dies at that load.** If r stays live, the temp takes edx instead, and an independent two-load chain is not hoisted above a following shl/sub/lea multiply. This is exactly the ReplayMenu::DrawField split (ours reuses the dying register, the original keeps it live). No code-free way to keep `rec` live was found.
+- **An independent load chain is hoisted above a multiply only when a scratch register is free.** The heavier subtree goes first, whatever the source order.
+- **First temps.** Pointer temps take eax, then ecx. A value later needed in cl or eax is allocated there. Inside an EH frame, a result instead reuses the register of an operand that is dying. These are weak rules. Synthetic tests reproduce StageScreen::LoadLayout's original shape, but no source lever reproduces it in the real function.
+- **Disproved:** the lea base is not chosen by register number, by listing order, or by source operand order.
