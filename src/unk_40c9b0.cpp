@@ -215,6 +215,7 @@ static inline const char* NameOf(void* p)    // object name (std::string at +0x1
 // Tried 2026-10-30 night: idx/p in dead param slot a, StBody sized 0x284 (header), int copies of sign pos, dead c[] kept via volatile stores (2957->2656 diff lines); still differs: frame 0x250 vs 0x258 (lodMask is a byte at [ebp-0x44] in the original), start-store scheduling, body->pos copy addressing, sign tail merge.
 // Tried 2026-11-01 re-pass: now 8636 vs 8656 bytes, 1115 insns differ; swapping idx/p scratch slot a->c (alloc byte stays at [ebp+0xb], original [ebp+0x13]) and moving/reordering the i/n/num declarations (10 variants) change nothing or worsen; original has i at [ebp-0x3c] below num[8] (-0x28) and the colModel string (-0x38) while ours puts i/n at -0x20/-0x24 above them, and num at -0x3c - slot assignment is not driven by declaration position; Bal sweeps pointless (call sequence already identical).
 // Pass 2026-11-13: 1034 -> 972 insns differ, 8616 -> 8644 bytes (orig 8656): StVirt::Prepare takes 1 (push 1 at all three sites), PushBack args copied to a local, mf1.v38 loop as i++ then progress with repeated VEC(0x38)[i], net->stage read before idx*0x5e8 and idx = a, S414Vec3 struct copies for bounds[0..5] and s->body->pos; open: s/body reloaded from memory in the original (ours caches in esi/edi), label reloaded from this+0x1364 each time (using it helps bytes, not insns), p in edi in the v48/mf3.v28 loops, frame 0x258 vs 0x250.
+// Pass 2026-11-16 (inline-budget check): 972 -> 967 insns differ, 8644 -> 8648 bytes. Not an inlining difference: the original has no inline push_back here (17 insert calls, ours 18; the missing one is the checkpoint tail, which the original cross-jumps into the sign_ tail via `jmp 0x40dc02`). Checkpoint test now `== 0` with the plain-object block as else (original layout: checkpoint falls through, plain is out of line). Shared-s single push (-67 bytes, 1000 insns) and (void*&)s pushes (s in memory like the original, 1033 insns) were worse; open: sign_ s at [ebp+0xc] with new-temp at [ebp-0x3c], cross-jump of the two sign tails.
 // original: FUN_0040c9b0
 Stage::Stage(int a, int b, int c, int d)
 {
@@ -455,11 +456,7 @@ Stage::Stage(int a, int b, int c, int d)
                 s->Sync();
                 VEC(0x88).PushBack(s);
                 i++;
-            } else if (_strnicmp(NameOf(p), "checkpoint", 10) != 0) {
-                if ((IV(p, 0xc) & lodMask) == 0)
-                    VEC(0x68).PushBack(p);
-                i++;
-            } else {                                   // the tail is written in both sign branches; VC6 merges it
+            } else if (_strnicmp(NameOf(p), "checkpoint", 10) == 0) {
                 StSign* s = new StSign;
                 ((int*)s->pos)[0] = IV(p, 0x14);
                 ((int*)s->pos)[1] = IV(p, 0x18);
@@ -474,6 +471,10 @@ Stage::Stage(int a, int b, int c, int d)
                 s->f4c = 1.45f;
                 s->Sync();
                 VEC(0x88).PushBack(s);
+                i++;
+            } else {
+                if ((IV(p, 0xc) & lodMask) == 0)
+                    VEC(0x68).PushBack(p);
                 i++;
             }
         }

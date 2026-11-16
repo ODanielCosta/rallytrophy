@@ -577,3 +577,9 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   `std::vector<T>& items = member;` also costs budget, so its position matters.
 - BuildRects (8 sites, twin 3-5) and LoadLayout (14 sites, twin exactly 4, keep its Bal(1)) both MATCH this way.
   inline_depth/inline_recursion pragmas do not help; Bal() padding only raises the count.
+- Limits (2026-11-16): the rule is for runs of real `push_back` on one vector. StageScreen::LoadLayout 0x422fc0 (7
+  push_back + one hand-expanded 8th site) did not fit: twinning a prefix made the next real site expand too (2-3
+  out-of-line size() calls before `new`); the original's shape sits between k=0 and k=7, so the hand expansion stays.
+  Stage::Stage has only out-of-line inserts (17 vs our 18: the original cross-jumps two identical sign_ tails).
+- Float copies: when the original copies a 3-float vector with fld/fstp, use the float copy helper (G_Copy) rather than
+  an int-bits copy (G_Copy3); that alone matched Car::FUN_00452eb0.
