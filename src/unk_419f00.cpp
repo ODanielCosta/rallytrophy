@@ -136,6 +136,7 @@ struct ColVec {
 // Length as local c=z,b=y,a=x via `ColVec* q`, e1 from `float* p1 = &v[1]->x` (reproduces the dead add eax,4); only `dec ebx` still sits
 // before the two [ebp+8]/[ebp+0xc] pointer spills instead of after. Tried while/do/--i/i>0/unsigned/volatile c,tr,i/pointer-arith c++/tr++ order, permute -r 40 (no MATCH, best 1).
 // 2026-11-14 pass (~30 more variants, still 1 insn): i-- inside for-comma/body-top/while/early --i, c++ before tr++, tr++/c++ folded into the call, comma increments, reusing n/k/i, m/t as loop vars, do-while (size 687), if-break loop (worse). idiom.py found no source form for dec-after-spills.
+// 2026-11-16 pass (~25 more, all 1 insn or worse): m/t reused as loop pointers (86+ insns), counter as while/if-break/do-while-guard/i-- in body, ptr-arith forms, unsigned i, nTris cached, c/t order: dec stays before the spills.
 void ColModel::Transform(float* m, float* t)
 {
     float M[16] = { m[0], m[1], m[2], 0.0f, m[4], m[5], m[6], 0.0f, m[8], m[9], m[10], 0.0f, t[0], t[1], t[2], 1.0f };
