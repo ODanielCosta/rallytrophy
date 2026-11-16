@@ -565,3 +565,15 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
 - `?:` as a call argument -> two calls in an if/else; an index expression into its own statement first; an early
   `return` turned into a nesting `if` around the tail; an element pointer recomputed from the member slot after a call.
 - A global known to hold 1.0f (DAT_004e1348) may be an immediate `1.0f` in the original; check the data before using it.
+
+## Inline budget for vector push_back (2026-11-16, synthetic study + 2 matches)
+- With N `push_back`s on one vector in a function, only the LAST site is expanded inline; earlier ones stay
+  `call insert(P,1,X)`. How fully the last one expands depends on R = the number of real push_back sites:
+  R=3 none of the growth-arm size() calls out of line, R=5 one before `new` and one after `delete`, R=6 2/1,
+  R=7-8 3/1, R>=9 the last site is not expanded either. Extern calls, non-inline wrappers and discarded inlines cost 0.
+- To lower R without changing behaviour, route the first k sites through a layout-compatible twin class with a
+  declared-only `insert(P, unsigned, const T&)` (`((Twin&)v).insert(((Twin&)v).end(), 1, x)`) - same thiscall to
+  the same out-of-line insert, budget cost 0 (precedent: H2c_Vector in unk_427600.cpp). A local
+  `std::vector<T>& items = member;` also costs budget, so its position matters.
+- BuildRects (8 sites, twin 3-5) and LoadLayout (14 sites, twin exactly 4, keep its Bal(1)) both MATCH this way.
+  inline_depth/inline_recursion pragmas do not help; Bal() padding only raises the count.
