@@ -531,6 +531,7 @@ ParallelShadow::~ParallelShadow()
 // filled by the software rasteriser through a system-memory copy.
 // Tried 2026-10-30 night: passing size directly instead of w/h locals in CreateRenderTarget (no change, same 8 insns); original hoists the push ebx/ecx/ecx arg pushes into the middle of the field-store run, which no source reorder tried reproduces.
 // Tried 2026-10-31 pass 2: all 2x128 volatile-group subsets per arm (best 7 insns with only unk70 volatile, 136 bytes), volatile factory/self/size/tex, zero-flag local, ok-var, w/h order and h=w chains, late tex/factory; permute.py -r 40 found nothing below 8. Original interleaves the arg pushes (0,h | w | tex) and vtable load between store groups; ours always clusters them at the call or hoists the whole setup too early.
+// Tried 2026-11-16 (round 22): comma-expression stores inside the CreateRenderTarget args, all 56 monotone placements of 5 store groups over the 4 args (with and without volatile unk60/unk70): all score identically (the scheduler ignores source position); sp-> pointer alias, helper-free no-volatile (12 insns), w/h assigned in-arm, factory local late, size direct, swapped unk18/unk24: no gain. Stays 131 bytes / 8 insns.
 void ParallelShadow::Create(ShadowEngine* engine, int size)
 {
     ShadowFactory* factory = engine->factory;
