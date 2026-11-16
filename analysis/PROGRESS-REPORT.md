@@ -15,12 +15,12 @@ _Updated 2026-11-16 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1936 / 2084 (92.90%) | 447,106 / 742,276 (60.23%) |
-| Written, not yet exact | 148 | 295,170 |
+| Byte-exact | 1938 / 2084 (92.99%) | 448,712 / 742,276 (60.45%) |
+| Written, not yet exact | 146 | 293,564 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   ██████████████████░░░░░░░░░░░░ 60.23% of code bytes
+exact   ██████████████████░░░░░░░░░░░░ 60.45% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -97,7 +97,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Car particle emitter | `0x47c460`–`0x47ef80` | 24 / 24 / 24 | 100.0% | 100.0% | `████████████` |
 | GameSpy SDK (third-party; out of scope) | `0x47ef80`–`0x4807d0` | 33 / 33 / 33 | 100.0% | 100.0% | `████████████` |
 | Single-player race mode | `0x4807d0`–`0x481390` | 12 / 13 / 13 | 63.2% | 100.0% | `████████████` |
-| Network race mode | `0x481390`–`0x4843e0` | 50 / 53 / 53 | 73.9% | 100.0% | `████████████` |
+| Network race mode | `0x481390`–`0x4843e0` | 51 / 53 / 53 | 78.0% | 100.0% | `████████████` |
 | Networking / DirectPlay | `0x4843e0`–`0x4856e0` | 19 / 19 / 19 | 100.0% | 100.0% | `████████████` |
 | Race-mode base class | `0x4856e0`–`0x48f130` | 117 / 124 / 124 | 64.1% | 100.0% | `████████████` |
 | Replay race mode | `0x48f130`–`0x48f670` | 11 / 11 / 11 | 100.0% | 100.0% | `████████████` |
@@ -115,7 +115,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Static-initialiser-only files | `0x4a16a0`–`0x4a1760` | 8 / 8 / 8 | 100.0% | 100.0% | `████████████` |
 | WinMain / setup | `0x4a1760`–`0x4a4b10` | 45 / 45 / 45 | 100.0% | 100.0% | `████████████` |
 | File / archive I/O | `0x4a4b10`–`0x4a6600` | 28 / 28 / 28 | 100.0% | 100.0% | `████████████` |
-| Engine image/font/model files | `0x4a9b60`–`0x4b2830` | 60 / 73 / 73 | 43.5% | 100.0% | `████████████` |
+| Engine image/font/model files | `0x4a9b60`–`0x4b2830` | 61 / 73 / 73 | 47.0% | 100.0% | `████████████` |
 | Scene-object base | `0x4b2830`–`0x4b3050` | 14 / 14 / 14 | 100.0% | 100.0% | `████████████` |
 | Collision geometry | `0x4b3050`–`0x4b44e0` | 5 / 6 / 6 | 71.1% | 100.0% | `████████████` |
 | Bounding-sphere geometry | `0x4b47e0`–`0x4b5110` | 11 / 11 / 11 | 100.0% | 100.0% | `████████████` |
