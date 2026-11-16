@@ -3809,6 +3809,7 @@ public:
 // Inlining depth 2: depth 1 kept the by-value RallyInfo name/description copies out of line (nested copy ctor = depth 2).
 #pragma inline_depth(2)
 // NONMATCHING: RALLYTROPHY 0x443790
+// 2026-11-16 (F2): still 4 insns / 10 bytes. Tried oldY-first/oldX-first read orders (7-27 insns), colour-first/last, m_selected cached, y/i hoists, cond swap, text alias after DrawRallyV, tools/reorder.py (49 orders): none beat 4 insns.
 // 2026-11-15 (reg_D, ~100 compiles): colour store hoisted above the scale reads and nx/ny written as `float nx = oldX; nx *= 0.85f;` (oldX block first, then oldY): 8 -> 4 insns (36 -> 10 bytes). Left: scaleX/scaleY load order, one lea slot, and the esi/ebp reload order after the DrawRallyV call; loop-head forms (y order, i forms, cond order) do not move it.
 // 2026-11-14 (r11): 19 more orderings of the name-print colour/scaleX/scaleY block (local col, nx/ny order, *=, 0.85f*x): none beat 8 insns / 36 bytes; compiler hoists the colour store regardless of source position.
 // 2026-11-13 (idiom/calls/sizegap): 95 -> 8 insns differ, size gap closed (5296/5296). inline_depth(2) lets the by-value copy's
