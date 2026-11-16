@@ -128,13 +128,8 @@ void WheelSpray::Update(float dt)
     }
 }
 
-// NONMATCHING: RALLYTROPHY 0x477690
-// Tried 2026-10-30 night: reordering atlasU/atlasV blocks, split stores, volatile on atlas temps/stores/col, depth copy; none beat 1 insn differing (depth push load still scheduled before the first atlas fadd).
-// Tried 2026-10-31 re-pass: ~30 more variants (volatile depth/dd, volatile casts on u/v/color/position stores, atlas decl/order/chain forms, int-copy of depth, local texture/this/device copies, depth sum order) and permute.py -r 40 (best stayed 1 insn); depth load still hoisted above the first atlas fadd.
-// Tried 2026-11-14 round 12: idiom.py hit (v[2].v = v[3].v = v[1].v + const, CarEmitterB::Render) and ~12 direct/const-first/dual-store/named forms: best stays 1 insn; direct forms worse (2-4).
-// 1227 bytes, same size and layout; named atlas accumulators reproduce the target's constant-first x87 adds.
-// Four bytes differ: the depth argument load is scheduled before the first add instead of after it.
-// Evidence: ev_6e2034557ea54db46de9b42321c77c445cd8efd3f0dbae384e3a4b07d011fb93.
+// FUNCTION: RALLYTROPHY 0x477690
+// Atlas sums are double locals (stored back as float): the x87 add then schedules the depth argument load after it, as the original does (float locals put the load one slot early).
 // Draws every visible live particle as a rotated camera-facing quad.
 void WheelSpray::Render(RenderDevice* device, Camera* camera)
 {
@@ -207,12 +202,12 @@ void WheelSpray::Render(RenderDevice* device, Camera* camera)
             int row = p->frame >> 4;
             v[0].u = v[3].u = DAT_00561b78[col * 2] + DAT_00561c38[row * 2];
             v[0].v = v[1].v = DAT_00561b78[col * 2 + 1] + DAT_00561c38[row * 2 + 1];
-            float atlasU = kAtlasStep;
+            double atlasU = kAtlasStep;
             atlasU += v[3].u;
-            v[1].u = v[2].u = atlasU;
-            float atlasV = kAtlasStep;
+            v[1].u = v[2].u = (float)atlasU;
+            double atlasV = kAtlasStep;
             atlasV += v[1].v;
-            v[2].v = v[3].v = atlasV;
+            v[2].v = v[3].v = (float)atlasV;
             device->DrawQuad(v, texture, depth);
         }
     }

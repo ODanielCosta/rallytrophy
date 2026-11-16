@@ -629,3 +629,14 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   the mixed copy (multiply-used component fld'd and kept, others int-copied). A 2-float struct temp gives
   int copy-in, fld/fadd/fstp temp, int copy-out.
 - Statement chains spill per step only on a local struct member; on float locals or fused they stay on the FPU.
+
+## Int ops in x87 gaps (2026-11-16 study; matched WheelSpray::Render)
+- Independent int instructions fill x87 stall gaps (after fld/fsub/fadd/fmul), ~1-2 per gap; a load takes one gap and
+  the store using it the next. Source (param/local/global/member) does not matter; stores through a pointer are not
+  a barrier.
+- How far an int climbs depends non-monotonically on the block's instruction count; extra independent int stores
+  before a chain move the landing one gap earlier.
+- fcos/fsin take exactly one int ahead of them.
+- A `double` local (stored to memory only through a `(float)` cast store) moves the following int one slot LATER
+  without changing the x87 ops - the lever that matched WheelSpray (atlasU/atlasV). No lever found to move an int
+  EARLIER (FUN_00491c10, LoadCarIni's push-before-fcos).
