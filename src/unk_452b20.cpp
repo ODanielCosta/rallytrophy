@@ -1394,6 +1394,7 @@ struct LoadDriverStr {
 // Tried 2026-10-30 night: n = len+m / m+len / casts / this->len, copy(len+ptr)/&ptr[len]/temp dst, early len copy in AppendA/AppendB, permute.py -r 20; none changed the lea operand order (the compiler canonicalises the commutative add), so the original source form is still unknown.
 // Tried 2026-10-31 re-pass: n=m;n+=len / n=len;n+=m (worse, 15), volatile len, local copy of len (much worse), &ptr[len], separate ptr local, permute.py -r 40 (best stayed 10); the lea operand order is still not controllable from source.
 // Tried 2026-11-16: AppendInl-style forms in AppendA/AppendB (tot local m+len / len+m / len-(0-m), dst local, &ptr[len], early len copy, tot before the 0<m test): all stay at 10 bytes (tot-before-test 50).
+// Tried 2026-11-16 (class layout): LoadDriverStr base-struct / nested ptr+len struct / union len / alloc sub-struct, local path as std::string subclass or reordered declaration, real std::string::append at the AppendB sites (399 bytes worse, same lea flip): all stay at 10 bytes.
 // Car::LoadDriver(dir): loads <dir>driver.bmf and co_driver.bmf (driver / co-driver body and head objects and their
 // pivots), then the optional arm and transmission models.
 void Car::LoadDriver(const char* dir)
