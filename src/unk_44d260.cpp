@@ -469,6 +469,7 @@ fail:
 // Tried 2026-11-04 (ws-X): reading the player stats temp through a volatile int* keeps VC6 from turning the 10-dword copy loop into rep movs like the original (norm 229->208, 132->128 insns). Epilogue duplication of the done/stage failure exits is robust against: operator delete/scalar delete, alias pointers, inline helper returns, casts, decl order of race/player/cipher (toy tests: identical exits always cross-jump when the epilogue has >=4 pops; only differing code before the epilogue unmerges them). Per-block CarSnapshot* s / size temps: worse (138-150 insns).
 // Tried 2026-11-01 re-pass: 13 variants (int return via header + return 0, result local, volatile zero return, folded return exprs size-size/done&0/stage-stage, volatile level/DAT reads, store-order swap of level/stage, volatile loop stores, separate loop pointer); int return alone is 132 insns too and the three failure epilogues still merge into one tail (volatile zero return unmerges the tail but adds a spilled return slot, 129 insns, 1302 bytes); original also has 0x10 more below the cipher temp, not explained; 132 insns, too far for permute.
 // 2026-11-16 r25: `in += 0x28` before the AI stats copy-out, `s` alias hoisted above the size test in buffer blocks 1/2, player stats loop through `int t = vt[k]` (128 -> 119 insns, 1270 -> 1281 bytes; failure exits still merge, 3 separate epilogues = the 40 byte gap).
+// 2026-11-16 r28: block 0 as `int n = s->size[0]` (test/new/memcpy) with `in += s->size[0] * 4` reloaded, `int u8 = unk8c` before the flags store, level/stage stores hoisted (DAT_00501464 = 1; DAT_0050132c = ...->level before the rally/stage loads): 75 -> 31 insns, 1317 -> 1320 bytes. Left: tail level load uses eax not ecx (mov eax,1 order) and the frame is 4 bytes smaller (0x50 vs 0x54).
 int SlotStore::LoadRelay()
 {
     DAT_00501472 = 0;
@@ -503,10 +504,9 @@ int SlotStore::LoadRelay()
         delete[] buffer;
         return false;
     }
-    int level = FB3_BODY(this)->level;
-    int rally = FB3_BODY(this)->rally;
     DAT_00501464 = 1;
-    DAT_0050132c = level;
+    DAT_0050132c = FB3_BODY(this)->level;
+    int rally = FB3_BODY(this)->rally;
     int stage = FB3_BODY(this)->stage;
     if (((StageTable*)((char*)DAT_0056b0c8 + 0x3aec))->FUN_00443620(rally) < stage) {
         delete[] buffer;
@@ -521,7 +521,8 @@ int SlotStore::LoadRelay()
     strcpy(DAT_00501338[0], FB3_BODY(this)->name);
     player->unk20 = kind;
     DAT_005013ec[0] = kind;
-    player->unk24 = FB3_BODY(this)->unk8c;
+    int u8 = FB3_BODY(this)->unk8c;
+    player->unk24 = u8;
     player->unk2c = FB3_BODY(this)->flags & 0xff;
     player->FUN_00491130();
     race->AddPlayer(player);
@@ -538,11 +539,14 @@ int SlotStore::LoadRelay()
         car->snapshot[2].Clear();
         car->snapshot[2] = *(CarSnapshot*)in;
         in += 0x8c;
-        if (car->snapshot[2].size[0]) {
+        {
             CarSnapshot* s = &car->snapshot[2];
-            s->buffer[0] = new BYTE[s->size[0] * 4];
-            memcpy(s->buffer[0], in, s->size[0] * 4);
-            in += s->size[0] * 4;
+            int n = s->size[0];
+            if (n) {
+                s->buffer[0] = new BYTE[n * 4];
+                memcpy(s->buffer[0], in, n * 4);
+                in += s->size[0] * 4;
+            }
         }
         {
             CarSnapshot* s = &car->snapshot[2];
