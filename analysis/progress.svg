@@ -249,8 +249,8 @@
 <rect x="750.7" y="120" width="1.8" height="36" fill="#e3b341"/>
 <rect x="752.5" y="120" width="9.9" height="36" fill="#3fb950"/>
 <rect x="762.5" y="120" width="1.8" height="36" fill="#3fb950"/>
-<rect x="764.3" y="120" width="4.2" height="36" fill="#e3b341"/>
-<rect x="768.5" y="120" width="7.1" height="36" fill="#3fb950"/>
+<rect x="764.3" y="120" width="2.1" height="36" fill="#e3b341"/>
+<rect x="766.4" y="120" width="9.2" height="36" fill="#3fb950"/>
 <rect x="775.6" y="120" width="3.2" height="36" fill="#e3b341"/>
 <rect x="778.8" y="120" width="29.8" height="36" fill="#3fb950"/>
 <rect x="808.6" y="120" width="1.6" height="36" fill="#e3b341"/>
@@ -880,9 +880,9 @@
 <text x="1018" y="1800" fill="#e6edf3">100% exact / 100% written</text>
 <text x="260" y="1826" text-anchor="end" fill="#e6edf3">62. Car emitter B</text>
 <rect x="270" y="1812" width="740" height="18" rx="2" fill="#484f58"/>
-<rect x="270" y="1812" width="511.1" height="18" fill="#3fb950"/>
-<rect x="781.1" y="1812" width="228.9" height="18" fill="#e3b341"/>
-<text x="1018" y="1826" fill="#e6edf3">69% exact / 100% written</text>
+<rect x="270" y="1812" width="625.3" height="18" fill="#3fb950"/>
+<rect x="895.3" y="1812" width="114.7" height="18" fill="#e3b341"/>
+<text x="1018" y="1826" fill="#e6edf3">85% exact / 100% written</text>
 <text x="260" y="1852" text-anchor="end" fill="#e6edf3">63. Car emitter C</text>
 <rect x="270" y="1838" width="740" height="18" rx="2" fill="#484f58"/>
 <rect x="270" y="1838" width="327.8" height="18" fill="#3fb950"/>

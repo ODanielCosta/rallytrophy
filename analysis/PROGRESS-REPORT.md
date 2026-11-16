@@ -15,12 +15,12 @@ _Updated 2026-11-16 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1932 / 2084 (92.71%) | 442,112 / 742,276 (59.56%) |
-| Written, not yet exact | 152 | 300,164 |
+| Byte-exact | 1933 / 2084 (92.75%) | 443,488 / 742,276 (59.75%) |
+| Written, not yet exact | 151 | 298,788 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   ██████████████████░░░░░░░░░░░░ 59.56% of code bytes
+exact   ██████████████████░░░░░░░░░░░░ 59.75% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -91,7 +91,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Exhaust smoke | `0x478020`–`0x478870` | 12 / 12 / 12 | 100.0% | 100.0% | `████████████` |
 | Particle pool | `0x478870`–`0x478be0` | 6 / 6 / 6 | 100.0% | 100.0% | `████████████` |
 | Effect base and sprite tables | `0x478be0`–`0x479170` | 31 / 31 / 31 | 100.0% | 100.0% | `████████████` |
-| Car emitter B | `0x479170`–`0x47b4c0` | 11 / 13 / 13 | 69.1% | 100.0% | `████████████` |
+| Car emitter B | `0x479170`–`0x47b4c0` | 12 / 13 / 13 | 84.5% | 100.0% | `████████████` |
 | Car emitter C | `0x47b4c0`–`0x47c3d0` | 8 / 9 / 9 | 44.3% | 100.0% | `████████████` |
 | Emitter constants | `0x47c3d0`–`0x47c460` | 6 / 6 / 6 | 100.0% | 100.0% | `████████████` |
 | Car particle emitter | `0x47c460`–`0x47ef80` | 24 / 24 / 24 | 100.0% | 100.0% | `████████████` |
