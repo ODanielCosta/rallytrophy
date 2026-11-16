@@ -327,6 +327,7 @@ void Car::FUN_004691e0(int cockpit)
 // 2026-11-15 tie-break study: 27 more (a/b def order, one/two consts, register hints, loop forms, tail order); none better, const locals grow to 547. Original ranks b>1>2/o>a (a lands in edx); ours a>b>1>2.
 // 2026-11-16 const-weight pass: 13 more (cond order, o first/hoisted m,o, a/b load order, advance order, early next, b->data in test, for(;;) break, unk98 first) none better; same 18 bytes/17 insns.
 // 2026-11-16 weight pass 2: 16 more (a pre-loop test, a split a0/a, do-while, early next, b break-in-loop, cond via break either order, o declared outside, b->data in test); none better (a2 while(b){if(!a)break;} gives 16 insns but 20 bytes).
+// 2026-11-16 pass 3 (~45 compiles): kept while(b){if(!a)break;} (16 insns, 20 bytes, same size; was 17/18). Also none better: flat int stores for quads, shared a/b decls, early next, chained 1/2 stores, for(;;) breaks, a-first/b-first orders. Original ranks b>1>2>a; a stays above 2.
 void Car::FUN_004693a0(int mode)
 {
     CarModelView* v = (CarModelView*)this;
@@ -336,7 +337,8 @@ void Car::FUN_004693a0(int mode)
     if (mode) {
         ModelNode* b = v->nodes2;
         ModelNode* a = v->nodes1;
-        while (a && b) {
+        while (b) {
+            if (!a) break;
             ModelMaterial* m = a->data;
             m->quad40.a = 1.0f;
             m->quad40.b = 1.0f;
