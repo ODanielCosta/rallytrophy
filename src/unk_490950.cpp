@@ -479,6 +479,7 @@ int Player::FUN_00491f70()
 #define K127 (1.0f / 127)
 
 // NONMATCHING: RALLYTROPHY 0x491c10
+// 2026-11-16 (F7): accumulator form (float s0=b0; s0-=a0; s0*=inv) for s0,s1 moves the copyFrom mov/test one slot earlier: 2 -> 1 insn differ (9 bytes); a third slot is not reachable (~270 accumulator/double combos).
 // Tried 2026-10-30 night: bool/int copy of copyFrom, inline slopes (worse), ternary offset temps (worse), volatile copy (worse); the mov ecx,[esp+30h]/test still sits after the fsub/fmul pair instead of before them.
 // Tried 2026-10-31 re-pass: volatile copyFrom read at 8 positions (best case moves mov+test one slot too early, 2 insns), split slope decls, plain int copy; permute.py -r 40 found nothing better than the (2,8) baseline.
 // 2026-11-16 (round 32): ~45 more variants (copyFrom copy local at every statement boundary incl. const/!!/unsigned/const param, slopes inline/declared per store, product order, two-if split, goto): all stay at 2 insns; the test position never moves.
@@ -498,7 +499,11 @@ void FUN_00491c10(SampleBuffer* buffer, PlayerSample* from, PlayerSample* to, in
     float b2 = to->value[2] * K255;
     float b3 = to->value[3] * K255;
     float b4 = (to->value[4] - 128) * K127;
-    float s0 = (b0 - a0) * inv, s1 = (b1 - a1) * inv, s2 = (b2 - a2) * inv, s3 = (b3 - a3) * inv, s4 = (b4 - a4) * inv;
+    float s0 = b0; s0 -= a0; s0 *= inv;
+    float s1 = b1; s1 -= a1; s1 *= inv;
+    float s2 = (b2 - a2) * inv;
+    float s3 = (b3 - a3) * inv;
+    float s4 = (b4 - a4) * inv;
     buffer->line[0].slope = s0;
     buffer->line[1].slope = s1;
     buffer->line[2].slope = s2;
