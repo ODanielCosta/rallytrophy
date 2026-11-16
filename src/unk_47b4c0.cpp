@@ -204,6 +204,7 @@ extern float DAT_00561d78[];
 // Tried 2026-10-30 night: dropped the alias local for GetViewMatrix (224->170 insns), ~20 variants (camera/device locals, nearZ/farZ hoists, scale=DAT_004e1348, depth term order); still differs: original keeps device in edi/camera in esi before the virtual calls, scale lives on the FPU stack into 0.03f/scale (fld 1.0 / fdiv st,st(1)) and k in the dead camera param slot [ebp+0xc].
 // Tried 2026-11-01 re-pass: 0.03125f is the global DAT_004e225c (fld K; fadd v, 170->166 insns, applied); ~25 more variants (volatile or address-taken view/viewB, camera/device locals, nearZ/farZ hoists, double k) did not move edi=device/esi=camera or the memory-resident view pointers; the register allocation follows use counts and no source form changed it.
 // Tried 2026-11-13: ScenePoint (not Vec3) for all point locals/temps so the five out-of-line operator* calls are the original's (??DScenePoint), ScenePoint::operator+= added; scale = DAT_004e1348 in the else arm (218 -> 173 insns differ, size 2115 vs 2113). Still differs: device/camera registers (edi/esi at the top), k in the dead camera slot [ebp+0xc], scale kept on the FPU stack (fld/fst), lens copy load schedule, depth term order.
+// Tried 2026-11-15 (round 16): removed the stale `Camera* volatile cvol`, else-arm `scale = 1.0f` (immediate store like the original, was DAT_004e1348), `view[2] * pos->x` for the last depth term, farZ read before nearZ (173 -> 161 insns, 2107 vs 2113). Reading `camera->hasLens` into a local before the GetViewMatrix call puts camera in esi and device in edi like the original (rest of the frame then nearly matches, 167 insns by raw offsets) but is an extra early read; not kept. No form found for scale on the FPU stack (fld/fst, fdiv st,st(1)); ternary scale, k=0.03f*(1/scale), decl-order moves, struct/array view pointers did nothing.
 // Draws every live particle as a streak (a quad stretched along its screen-space velocity).
 void CarEmitterC::Render(RenderDevice* device, Camera* camera)
 {
@@ -230,7 +231,6 @@ void CarEmitterC::Render(RenderDevice* device, Camera* camera)
     v[3].normal.z = 0;
     const float* view = (const float*)device->GetViewMatrix();
     const float* viewB = device->GetMatrixB();
-    Camera* volatile cvol = camera; (void)cvol;
     ViewMat cam;
     float scale;
     if (camera->hasLens) {
@@ -268,16 +268,16 @@ void CarEmitterC::Render(RenderDevice* device, Camera* camera)
         scale = camera->lensScale;
     } else {
         cam = *(const ViewMat*)view;
-        scale = DAT_004e1348;
+        scale = 1.0f;
     }
     float k = 0.03f / scale;
-    int nearZ = camera->nearBits;
     int farZ = camera->farBits;
+    int nearZ = camera->nearBits;
     for (; p; p = p->next) {
         const Vec3* pos = &p->position;
         float depth = p->position.z * view[10];
         depth = p->position.y * view[6] + depth;
-        depth = p->position.x * view[2] + depth;
+        depth = view[2] * pos->x + depth;
         depth += view[14];
         if (*(int*)&depth > nearZ && *(int*)&depth < farZ) {
             ScenePoint w1, w2, pt;
