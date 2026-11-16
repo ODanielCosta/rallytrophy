@@ -469,7 +469,7 @@ fail:
 // Tried 2026-11-04 (ws-X): reading the player stats temp through a volatile int* keeps VC6 from turning the 10-dword copy loop into rep movs like the original (norm 229->208, 132->128 insns). Epilogue duplication of the done/stage failure exits is robust against: operator delete/scalar delete, alias pointers, inline helper returns, casts, decl order of race/player/cipher (toy tests: identical exits always cross-jump when the epilogue has >=4 pops; only differing code before the epilogue unmerges them). Per-block CarSnapshot* s / size temps: worse (138-150 insns).
 // Tried 2026-11-01 re-pass: 13 variants (int return via header + return 0, result local, volatile zero return, folded return exprs size-size/done&0/stage-stage, volatile level/DAT reads, store-order swap of level/stage, volatile loop stores, separate loop pointer); int return alone is 132 insns too and the three failure epilogues still merge into one tail (volatile zero return unmerges the tail but adds a spilled return slot, 129 insns, 1302 bytes); original also has 0x10 more below the cipher temp, not explained; 132 insns, too far for permute.
 // 2026-11-16 r25: `in += 0x28` before the AI stats copy-out, `s` alias hoisted above the size test in buffer blocks 1/2, player stats loop through `int t = vt[k]` (128 -> 119 insns, 1270 -> 1281 bytes; failure exits still merge, 3 separate epilogues = the 40 byte gap).
-bool SlotStore::LoadRelay()
+int SlotStore::LoadRelay()
 {
     DAT_00501472 = 0;
     if (!File::Exists("savegame/relay.sav")) {

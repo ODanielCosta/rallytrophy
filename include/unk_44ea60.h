@@ -22,7 +22,7 @@ struct SlotRecord {
 class SlotStore {
 public:
     void GetSlotInfo(int index, SlotRecord* record); // 0x44e6a0
-    bool LoadRelay();                  // 0x44deb0: savegame/relay.sav -> body at +0x6c, rebuilds the race
+    int LoadRelay();                   // 0x44deb0: savegame/relay.sav -> body at +0x6c, rebuilds the race
     void SaveRelay(char level, char advance); // 0x44e3e0
     void SaveStats();                  // 0x44e650
 };
