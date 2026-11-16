@@ -324,6 +324,7 @@ void Car::FUN_004691e0(int cockpit)
 // Same size (543); restore branch and damaged-loop stores follow the target order. 18 register-assignment bytes remain.
 // Tried 2026-10-30 night: ~25 variants (a/b decl order, loop forms while/for/swapped cond, o declared late/hoisted/inlined, const locals for 1/2, volatile barriers); always 16-17 insns differ, original puts a=edx,b=esi,2=ebp,1=edi,o=ebp but we get a=esi,b=edi,2=edx,1=ebp.
 // Tried 2026-10-31 re-pass: 16 more (o decl early/late, for/while, b&&a cond, advance order, unk98 store moved, volatile on unk24/nodes1, two/one int locals) all 16-17 insns differ, pure regalloc a/b/2/1 rotation; permute.py -r 40 found no MATCH.
+// 2026-11-15 tie-break study: 27 more (a/b def order, one/two consts, register hints, loop forms, tail order); none better, const locals grow to 547. Original ranks b>1>2/o>a (a lands in edx); ours a>b>1>2.
 void Car::FUN_004693a0(int mode)
 {
     CarModelView* v = (CarModelView*)this;

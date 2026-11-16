@@ -337,6 +337,7 @@ void ReplayMenu::BuildRects()
 // Named offsets, factored multiplication, an inline rally accessor, and a volatile Game* all emit worse or unchanged code.
 // Tried 2026-10-30 night: rally in a local, offset local, reordered sum, int* base, records[k].rally, permute.py -r 20; all stay at 4 insns (esi reused for rally, Game load hoisted above the multiply; original keeps rec in esi and uses edx).
 // Tried 2026-10-31 re-pass: local Game* before the sum, subtract-assign vs v=v-x, pre-multiplied offset, volatile rally/flag/value reads at earlier sites, permute.py -r 40; all 4 insns (volatile on rally or Game* breaks the function to 51 insns); esi still reused for rally.
+// 2026-11-15 tie-break study: 29 more variants (rally/Game locals, g early, offset forms, ternary, split value read); all 13 bytes. Cause is scheduling: the Game load is hoisted above the multiply so edx is busy and rally takes the free esi; no source lever found.
 // original: FUN_0044c580
 void ReplayMenu::DrawField(int k)
 {
