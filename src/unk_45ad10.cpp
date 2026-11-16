@@ -1483,6 +1483,7 @@ void Car::FUN_0045b900(int dt)
 // sequence without changing the total mismatch count; hoisting wp2 to match the persistent Vec3 lifetime helps.
 // Remaining differences include EH state numbers (target: 3 persistent Vec3 locals), transform argument slots,
 // the radius-sum FPU stack, and post-collision centre-of-mass update order. Evidence: ev_c92c59602c67fd58248c61d5b8be6532014a74b970e4fb2582dd1e42d5e74d32.
+// Pass 2026-11-16b (1594->1450 differing bytes, 242->240 insns, 1986->1989 of 2002): centre[2] update reads cz into a float local first (int copy-in, fld/fadd/fstp-to-member as the original's centre[1..2] shape). Tried: 2-float YZ struct temp (1451 bytes but 2013 size), delayed centre.x store via local/double/duplicate store (R1/R2: no effect), dup store on cz, double cz, cy+cz locals: all worse.
 // One physics step of dt seconds: gravity, aerodynamic drag and downforce, suspension, brakes, drivetrain, tyre
 // forces, rigid body integration and the collision with the stage (restoring the pose when the body hit).
 // Tried 2026-10-31: 24 variants (PassFloat removal/order, volatile posp/rotp, gravity local, radius-sum helpers, Vec3 local order/vel field copy, const-ref f, centre volatile stores); best is field-wise vel copy plus wp declared with wp2 (270->257 insns); EH states, radius-sum FPU stack and Xform temp slots still differ.
@@ -1596,9 +1597,10 @@ void Car::PhysicsStep(float dt)
             delta.y *= 0.05f;
             delta.z *= 0.05f;
             *posp += delta;
+            float cz = b->centre[2];
             b->centre[0] += delta.x;
             b->centre[1] += delta.y;
-            b->centre[2] += delta.z;
+            b->centre[2] = cz + delta.z;
         }
     } else {
         b->FUN_0041c220(V->stepA, V->stepB);
