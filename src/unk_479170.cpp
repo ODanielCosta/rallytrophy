@@ -407,7 +407,8 @@ static const float C3_grav = 0.000683593738f;                     // 0x4e2244
 static const float C3_jit = 3.0517578125e-5f;                     // 0x4e2248
 static const float C3_mixB = 0.00253906241f, C3_mixA = 0.00134765625f; // 0x4e224c, 0x4e2250
 
-// NONMATCHING: RALLYTROPHY 0x479f60
+// FUNCTION: RALLYTROPHY 0x479f60
+// Matched 2026-11-16 (FPU study): plain float j1, double j2, and the velocity.y store written twice so j1/j2 are evaluated at their definitions.
 // 1368 vs 1376 bytes. Frame, SEH states, statics, ramps, TRANSFORM_POINT block, the three Vec3 calls and the
 // rand chain match. Open: n2/total land in esi/edi swapped (original total=esi, n2=edi), so the mix terms are
 // emitted r-first; the y-velocity temp lives at [ebp-0x20] (original reuses [ebp-0x14]) and the x jitter is not
@@ -502,12 +503,11 @@ float CarEmitterB::SpawnCore2(float a, float b)
     p->velocity -= s_body->Forward() * slip * 0.15f;
     float yv = p->velocity.y + 0.1f;
     p->velocity.y = yv;
-    float j1;
-    *(volatile float*)&j1 = (float)((rand() & 0x3fff) - 0x1fff) * C_jit;
-    float j2;
-    *(volatile float*)&j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
+    float j1 = (float)((rand() & 0x3fff) - 0x1fff) * C_jit;
+    double j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
     p->velocity.x = j1 + p->velocity.x;
     p->velocity.y = yv + j2;
+    p->velocity.y = yv + j2;   // duplicate store pins j1/j2 at their definitions (VC6 drops the second store)
     p->velocity.z = (float)((rand() & 0x3fff) - 0x1fff) * C_jit + p->velocity.z;
     p->size = 0.2f;
     p->gravity = (float)(rand() & 0x3ff) * C_spinScale + 0.3f;
