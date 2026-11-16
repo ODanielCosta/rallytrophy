@@ -15,12 +15,12 @@ _Updated 2026-11-16 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1938 / 2084 (92.99%) | 448,712 / 742,276 (60.45%) |
-| Written, not yet exact | 146 | 293,564 |
+| Byte-exact | 1939 / 2084 (93.04%) | 448,769 / 742,276 (60.46%) |
+| Written, not yet exact | 145 | 293,507 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   ██████████████████░░░░░░░░░░░░ 60.45% of code bytes
+exact   ██████████████████░░░░░░░░░░░░ 60.46% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -123,7 +123,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Keyboard/mouse input hooks | `0x4b6ac0`–`0x4b7390` | 13 / 13 / 13 | 100.0% | 100.0% | `████████████` |
 | Timer / string / registry helpers | `0x4b7390`–`0x4b7790` | 15 / 15 / 15 | 100.0% | 100.0% | `████████████` |
 | View object | `0x4b77b0`–`0x4b7a40` | 7 / 7 / 7 | 100.0% | 100.0% | `████████████` |
-| Draw context, mesh, shadow and sky | `0x4b7a40`–`0x4bbdf0` | 48 / 54 / 54 | 68.9% | 100.0% | `████████████` |
+| Draw context, mesh, shadow and sky | `0x4b7a40`–`0x4bbdf0` | 49 / 54 / 54 | 69.2% | 100.0% | `████████████` |
 | Renderer plugin loader | `0x4bbdf0`–`0x4bc210` | 5 / 5 / 5 | 100.0% | 100.0% | `████████████` |
 | Command line | `0x4bc210`–`0x4bc360` | 3 / 3 / 3 | 100.0% | 100.0% | `████████████` |
 | Draw queue and vector helpers | `0x4bc360`–`0x4bcfc7` | 10 / 10 / 10 | 100.0% | 100.0% | `████████████` |
