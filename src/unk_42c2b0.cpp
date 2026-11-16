@@ -574,6 +574,7 @@ static float H4c_trim = 20.0f;     // 0x4e1654
 // last push_back is inlined in the original (inline size math); ours emits an extra out-of-line size() call (+7 bytes)
 // Tried 2026-10-30 night: ~35 variants (last-block statement orders, insert(end(),1,x) forms, local/ref temps, inline_depth/recursion/auto_inline pragmas) plus permute -r 20; none beats 13 insns/1711 bytes; original inlines vector::insert(P,1,X) only at the last site with size() CSE-d in the max() branch, ours re-calls size() there (inliner budget).
 // Tried 2026-10-31 re-pass: local `r=&m_items` pointer for all/each single push_back site (size 1709 vs 1704 but 30 insns differ, worse); permute -r 40 (16 rounds, ~240 candidates) baseline 13 never beaten; the extra call is size() re-evaluated in the max() branch of the last site.
+// Tried 2026-11-15 (r17): local V:std::vector subclass with a hand-copied insert (size() in a local) -> not inlined, 1345 bytes; no ~H4c_Point -> EH states lost (1673); insert(end(),x)/(end(),1,..) forms, const-ref/temp rects, inline_depth 1-4/255 (depth 4 = 1697 but _Allocate inlined + ebx/ebp swap): none beats 13 insns. Real residual is 1 extra `call size()` (2 insns) in the max() branch of the last insert.
 void GameScreen1E9C::BuildRects()
 {
     H4c_Point a;
