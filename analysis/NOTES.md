@@ -691,3 +691,12 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   9 entries (drag function-scope, wp2 in the speed2 block, f before arm2) - the map-exact variant scores worse
   on insns, so not adopted; ColModel 0x41a890 entry 8 is the first Sub's P3 temporary (map-exact form re-allocates
   the whole function, not adopted).
+
+## Store placement outside loops (2026-11-16 study, ~85 compiles; matched SceneEntry::SceneEntry)
+
+With /Oa, measured in synthetic reductions:
+- A store written before a block-ending compare is scheduled after the compare, just before the jump, whenever its value and address are already in registers. Aliasing has no effect: same base, other base, global, parameter and through-pointer cases all sink. Disambiguation is not the lever.
+- The exception: a store whose base is a single-use reload from the stack (`mov edx,[t]` used only for that store) stays at its source position. If that base is used again, the store sinks.
+- A store sinks only until its value register is reused. A value in ecx is pinned ahead of `mov ecx,this`; a value in eax can follow it. Stores cross `add esp,N` and `mov ecx,this`, but never a call. A late store before a call is therefore usually a register choice, not a scheduling choice (StageScreen::LoadLayout).
+- A member initialised inside a nested sub-object's inline constructor is emitted in source order, so it lands first. The same member in the outer constructor's flat initialiser list sinks below the following dword zero stores and lets both allocator bytes share `dl`. A wrapper struct is not codegen-neutral; flattening it matched SceneEntry::SceneEntry.
+- Inlined list PopHead (ModelCacheState::Reload): the `m_head` store sinks when `prev` is hoisted before the branch and stays early when `prev` is read in each arm. That flips the other inline site too, so it produced no net gain.
