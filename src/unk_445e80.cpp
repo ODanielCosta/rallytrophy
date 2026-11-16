@@ -191,7 +191,8 @@ static float SMI_TITLEY = 142.0f; // 0x4f9f88
 static float SMI_RALLYY = 630.0f; // 0x4f9f90
 extern int DAT_004f9ca8[];             // tab text ids {120, 121, 122, 124, 23, 30}
 
-// NONMATCHING: RALLYTROPHY 0x445e80
+// FUNCTION: RALLYTROPHY 0x445e80
+// Matched 2026-11-16: colour quads written through float pointers, constant store order found by tools/reorder.py.
 // Same size (1603), 1 instruction differs (7 bytes): the store of tuneSelectors.unk98 (0x3e4) lands two slots before the
 // original's. original: FUN_00445e80
 // 2026-11-16: the two colour quads written through float pointers (SMA_C/SMA_D: `float* c = s.unk60; c[0..3]`) instead of
@@ -223,9 +224,9 @@ ServiceMenu::ServiceMenu()
     damageBar.unk18 = 5;
     damageBar.unk1c = 6;
     damageBar.unk24 = 2;
-    tuneSelectors.unk98 = 15;
     damageBar.unk20 = 2;
     tuneSelectors.unk9c = 2;
+    tuneSelectors.unk98 = 15;
     SMA_C(tuneSelectors)
     SMA_D(tuneSelectors)
     tuneSelectors.unk18 = 5;
