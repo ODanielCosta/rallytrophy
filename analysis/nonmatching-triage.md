@@ -22,7 +22,7 @@ Instruction-multiset view: 44 functions are pure register/scheduling permutation
 | 0x40a680 | src/unk_409690.cpp | SceneXform::SceneXform | order | 300 | 300 | 28 | 0 | `mov    DWORD PTR [esi],edi` | `mov    DWORD PTR [esi+0x48],eax` |  |
 | 0x40a850 | src/unk_40a850.cpp | U40A850Prop::Fn | size | 2088 | 2098 | 1475 | 54 | `xor    eax,eax` | `mov    DWORD PTR [ebp-0x84],esi` |  |
 | 0x40c9b0 | src/unk_40c9b0.cpp | Stage::Stage | size | 8648 | 8656 | 5273 | 130 | `sub    esp,0x258` | `sub    esp,0x250` | eh 11,12,30,31,32,33,34,35,37,38,44,45,46,47,48,49,51,52,53,54,55,56,57,58,59,60,59,61,59,62,64,65,64,59,66,67,68,67,69,59,70,59,71,72,73,72,78,72,75,77,79,72,80,72,71,59,58,57,56,55,54,53,52,51 vs 11,12,30,31,32,33,34,35,37,38,44,45,46,47,48,49,51,52,53,54,55,56,57,58,59,60,59,61,59,62,59,63,59,64,59,65,59,66,59,67,68,69,68,74,68,70,71,70,72,73,72,75,68,76,68,67,59,58,57,56,55,54,53,52,51 |
-| 0x40f390 | src/unk_40f390.cpp | StageGrid::FillCells | size | 2402 | 2340 | 2188 | 158 | `sub    esp,0x78` | `sub    esp,0x7c` |  |
+| 0x40f390 | src/unk_40f390.cpp | StageGrid::FillCells | size | 2378 | 2340 | 2141 | 83 | `sub    esp,0x78` | `sub    esp,0x7c` |  |
 | 0x40fcc0 | src/unk_40f390.cpp | StageGrid::Build | size | 1709 | 1716 | 1176 | 6 | `mov    DWORD PTR [ebp-0x1c],edi` | `mov    DWORD PTR [ebp-0x20],edi` |  |
 | 0x410720 | src/unk_410720.cpp | StageScene::LoadEffect | size | 2111 | 2128 | 954 | 10 | `mov    eax,DWORD PTR [esi+0xa8]` | `push   edi` |  |
 | 0x411600 | src/unk_411170.cpp | StageConfigLoader::LoadConfig | size | 8615 | 8628 | 487 | 84 | `mov    ecx,DWORD PTR [eax]` | `fld    DWORD PTR [ebx+0x1d0]` |  |
@@ -31,7 +31,7 @@ Instruction-multiset view: 44 functions are pure register/scheduling permutation
 | 0x415370 | src/unk_415370.cpp | StageSoundLoader::LoadSounds | other | 3209 | 3209 | 248 | 16 | `jle    0x4156d6` | `mov    DWORD PTR [ebp-0x2c],ebx` |  |
 | 0x416260 | src/unk_416260.cpp | StageSoundLoader::LoadSoundFiles | size | 1837 | 1822 | 814 | 26 | `mov    ebp,ecx` | `mov    ebx,ecx` |  |
 | 0x416f30 | src/unk_416f30.cpp | PropStage::Load | size | 1280 | 1270 | 636 | 17 | `jne    0x41740d` | `jne    0x417417` |  |
-| 0x417540 | src/unk_417540.cpp | Stage::FUN_00417540 | size | 2292 | 2332 | 1929 | 107 | `sub    esp,0x90` | `sub    esp,0xac` |  |
+| 0x417540 | src/unk_417540.cpp | Stage::FUN_00417540 | size | 2346 | 2332 | 1897 | 81 | `sub    esp,0x90` | `sub    esp,0x98` |  |
 | 0x417ee0 | src/unk_416f30.cpp | ?Ins@PropVec@@QAEXPAUStageProp@@IABU2@@Z | size | 804 | 818 | 391 | 30 | `mov    ecx,edi` | `mov    edx,edi` |  |
 | 0x418b90 | src/unk_418570.cpp | SweepQuery::Cast | size | 2138 | 2054 | 1793 | 47 | `jmp    0x41937e` | `jmp    0x4193d2` |  |
 | 0x4193a0 | src/unk_418570.cpp | TriCollector::Closest | size | 962 | 974 | 901 | 12 | `push   esi` | `mov    ebp,DWORD PTR [esp+0x7c]` | eh 2,4,4 vs 2,2 |
@@ -81,7 +81,7 @@ Instruction-multiset view: 44 functions are pure register/scheduling permutation
 | 0x458b30 | src/unk_458700.cpp | CarInput::FUN_00458b30 | size | 1394 | 1393 | 985 | 2 | `je     0x458f5a` | `je     0x458f5b` |  |
 | 0x459910 | src/unk_459890.cpp | Car::ProcessContacts | size | 3715 | 3722 | 3035 | 33 | `mov    eax,DWORD PTR [esi+0x1f114]` | `mov    DWORD PTR [ebp-0x14],esi` |  |
 | 0x45ad40 | src/unk_45ad10.cpp | Car::UpdateSteering | other | 1404 | 1404 | 91 | 4 | `sub    esp,0x20` | `sub    esp,0x1c` |  |
-| 0x45bc20 | src/unk_45ad10.cpp | Car::PhysicsStep | size | 1964 | 2002 | 1454 | 59 | `sub    esp,0x8c` | `sub    esp,0x84` | eh 0,4,3,5,7,3,8,3 vs 0,5,3,6,7,3,8,3 |
+| 0x45bc20 | src/unk_45ad10.cpp | Car::PhysicsStep | size | 1986 | 2002 | 1594 | 56 | `sub    esp,0x8c` | `sub    esp,0x90` | eh 0,4,3,5,7,3,8,3 vs 0,6,3,7,8,3,9,3 |
 | 0x45c400 | src/unk_45ad10.cpp | Car::ApplySuspensionForces | size | 754 | 756 | 644 | 5 | `lea    edx,[ebp-0x7c]` | `push   ebx` |  |
 | 0x45c700 | src/unk_45ad10.cpp | Car::UpdateWheelContact | size | 1132 | 1144 | 669 | 34 | `lea    ecx,[ebp-0x68]` | `lea    ecx,[edi+0x1e0c]` |  |
 | 0x45cc30 | src/unk_45ad10.cpp | Car::FUN_0045cc30 | size | 3631 | 3623 | 1025 | 40 | `mov    eax,0x3ca3d70a` | `mov    DWORD PTR [ebx+0x1410],esi` |  |
@@ -139,7 +139,7 @@ Instruction-multiset view: 44 functions are pure register/scheduling permutation
 | 0x492e40 | src/unk_491fb0.cpp | RaceSession::RunAttract | size | 2036 | 2050 | 264 | 9 | `mov    eax,DWORD PTR [esi+0x2c]` | `mov    ecx,DWORD PTR [esi+0x2c]` |  |
 | 0x493650 | src/unk_491fb0.cpp | RaceSession::FUN_00493650 | size | 5676 | 5672 | 2886 | 61 | `mov    ecx,DWORD PTR [esi+0x10]` | `push   edi` |  |
 | 0x49bb80 | src/unk_49b8e0.cpp | AIDriver::Init | order | 962 | 962 | 82 | 0 | `mov    DWORD PTR [ebp+0x558],ebx` | `mov    DWORD PTR [ebp+0x190],eax` |  |
-| 0x49c130 | src/unk_49b8e0.cpp | AIDriver::FUN_0049c130 | size | 3819 | 3877 | 2899 | 89 | `mov    DWORD PTR [esp+0x64],eax` | `mov    DWORD PTR [esp+0x68],eax` |  |
+| 0x49c130 | src/unk_49b8e0.cpp | AIDriver::FUN_0049c130 | size | 3839 | 3877 | 2901 | 72 | `mov    DWORD PTR [esp+0x64],eax` | `mov    DWORD PTR [esp+0x68],eax` |  |
 | 0x49d970 | src/unk_49b8e0.cpp | AIDriver::FUN_0049d970 | size | 2600 | 2631 | 2113 | 28 | `mov    DWORD PTR [esp+0xa0],ecx` | `mov    DWORD PTR [esp+0x70],ecx` |  |
 | 0x49e3d0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049e3d0 | size | 3537 | 3592 | 2797 | 101 | `mov    DWORD PTR [esi+0x28],0x0` | `mov    DWORD PTR [esp+0x74],eax` |  |
 | 0x49f1f0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049f1f0 | size | 485 | 522 | 351 | 15 | `mov    ebx,ecx` | `push   esi` |  |
