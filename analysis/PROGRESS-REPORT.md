@@ -15,12 +15,12 @@ _Updated 2026-11-16 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1926 / 2084 (92.42%) | 435,314 / 742,276 (58.65%) |
-| Written, not yet exact | 158 | 306,962 |
+| Byte-exact | 1927 / 2084 (92.47%) | 436,554 / 742,276 (58.81%) |
+| Written, not yet exact | 157 | 305,722 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   ██████████████████░░░░░░░░░░░░ 58.65% of code bytes
+exact   ██████████████████░░░░░░░░░░░░ 58.81% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -97,7 +97,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Car particle emitter | `0x47c460`–`0x47ef80` | 24 / 24 / 24 | 100.0% | 100.0% | `████████████` |
 | GameSpy SDK (third-party; out of scope) | `0x47ef80`–`0x4807d0` | 33 / 33 / 33 | 100.0% | 100.0% | `████████████` |
 | Single-player race mode | `0x4807d0`–`0x481390` | 12 / 13 / 13 | 63.2% | 100.0% | `████████████` |
-| Network race mode | `0x481390`–`0x4843e0` | 49 / 53 / 53 | 63.6% | 100.0% | `████████████` |
+| Network race mode | `0x481390`–`0x4843e0` | 50 / 53 / 53 | 73.9% | 100.0% | `████████████` |
 | Networking / DirectPlay | `0x4843e0`–`0x4856e0` | 19 / 19 / 19 | 100.0% | 100.0% | `████████████` |
 | Race-mode base class | `0x4856e0`–`0x48f130` | 117 / 124 / 124 | 64.1% | 100.0% | `████████████` |
 | Replay race mode | `0x48f130`–`0x48f670` | 11 / 11 / 11 | 100.0% | 100.0% | `████████████` |
