@@ -109,13 +109,14 @@ public:
     ~FB2_Path()
     {
         if (ptr == 0) {
-        } else if (((unsigned char*)ptr)[-1] == 0 || ((unsigned char*)ptr)[-1] == 255) {
+        } else if (Rc() == 0 || Rc() == 255) {
             alloc.deallocate(ptr - 1, reserve + 2);
         } else {
-            --((unsigned char*)ptr)[-1];
+            --Rc();
         }
         ptr = 0, len = 0, reserve = 0;
     }
+    unsigned char& Rc() { return ((unsigned char*)ptr)[-1]; }
     void Tidy(bool built);             // 0x402700
     void Assign(const char* s, unsigned int n); // 0x404ba0
     void Append(const char* s, unsigned int n); // 0x403ba0
@@ -272,6 +273,7 @@ void SaveGame::SaveSlot(int slot)
 // Tried 2026-10-31: dropped a bogus FUN_00491130 call from the last (non-arcade AI) loop - the original has none there (146->143 insns); ~40 variants of the itoa buffer (decl order, block/for/if scope, int[3], struct, static) never move it into the low temp region (it stays at the frame top, +12 bytes, offsets of everything shift); static buffer proves that is the whole frame delta. Return-path/goto restructuring did not help.
 // Tried 2026-11-01: copying index/value into named temps (value first) before the two race->unk28/2c stores and routing the 10-dword stats copy through a named int temp improved 143->122 insns differ; ~25 more variants (buffer decl placement, direct path.Add(itoa), volatile n/remaining, tail-copy temps, id temps, loop-index/cursor hoists, magic2 inverted return) no better; still open: itoa buffer +12 frame bytes, shared _Tidy exit for magic2 failure.
 // 2026-11-11: itoa buffer as `char number[2]` at function scope (SaveSlot form) fixes the frame (2085 -> 2076 bytes, 122 -> 63 insns); the three failed checks sharing one `fail: return 0` inside the third (as the original lays it out) 2076 -> 2071, 59 insns. Left: the original fail exit calls _Tidy(true) instead of the inline destructor, and the stats copy register swap.
+// 2026-11-16 r26: dtor refcount byte through a `Rc()` accessor (PathText form) makes the success-exit expansion identical (59 -> 50 insns, 2071 -> 2073 bytes); only the failure exit (original calls out-of-line _Tidy(true), here expanded) remains. Rejected: Tidy defined inline (ctor/fail/success all expanded), inline Assign/Append bodies to burn budget (all expanded, 2257), inline_depth(1/2) around the class, empty dtor + explicit Tidy/Free (EH states shift; dtor-less leaks on unwind), twin Tidy(true) dtor + explicit success Free (193 insns), fail label at end, three separate returns (69).
 int SaveGame::LoadSlot(int slot)
 {
     int magic1, magic2;
