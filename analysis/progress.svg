@@ -160,8 +160,8 @@
 <rect x="475.4" y="120" width="4.6" height="36" fill="#3fb950"/>
 <rect x="480.1" y="120" width="4.8" height="36" fill="#3fb950"/>
 <rect x="484.9" y="120" width="3.8" height="36" fill="#e3b341"/>
-<rect x="488.8" y="120" width="2.7" height="36" fill="#3fb950"/>
-<rect x="491.5" y="120" width="6.1" height="36" fill="#e3b341"/>
+<rect x="488.8" y="120" width="5.8" height="36" fill="#3fb950"/>
+<rect x="494.6" y="120" width="2.9" height="36" fill="#e3b341"/>
 <rect x="497.6" y="120" width="2.8" height="36" fill="#3fb950"/>
 <rect x="500.4" y="120" width="5.1" height="36" fill="#e3b341"/>
 <rect x="505.5" y="120" width="6.6" height="36" fill="#3fb950"/>
@@ -235,9 +235,7 @@
 <rect x="715.2" y="120" width="4.8" height="36" fill="#e3b341"/>
 <rect x="720.0" y="120" width="5.1" height="36" fill="#3fb950"/>
 <rect x="725.2" y="120" width="5.0" height="36" fill="#e3b341"/>
-<rect x="730.2" y="120" width="0.6" height="36" fill="#3fb950"/>
-<rect x="730.3" y="120" width="1.0" height="36" fill="#e3b341"/>
-<rect x="731.3" y="120" width="0.9" height="36" fill="#3fb950"/>
+<rect x="730.2" y="120" width="2.0" height="36" fill="#3fb950"/>
 <rect x="732.2" y="120" width="1.5" height="36" fill="#e3b341"/>
 <rect x="733.7" y="120" width="2.8" height="36" fill="#3fb950"/>
 <rect x="736.4" y="120" width="2.6" height="36" fill="#e3b341"/>
@@ -696,9 +694,9 @@
 <text x="1018" y="760" fill="#e6edf3">60% exact / 100% written</text>
 <text x="260" y="786" text-anchor="end" fill="#e6edf3">22. Save-game files</text>
 <rect x="270" y="772" width="740" height="18" rx="2" fill="#484f58"/>
-<rect x="270" y="772" width="253.3" height="18" fill="#3fb950"/>
-<rect x="523.3" y="772" width="486.7" height="18" fill="#e3b341"/>
-<text x="1018" y="786" fill="#e6edf3">34% exact / 100% written</text>
+<rect x="270" y="772" width="503.2" height="18" fill="#3fb950"/>
+<rect x="773.2" y="772" width="236.8" height="18" fill="#e3b341"/>
+<text x="1018" y="786" fill="#e6edf3">68% exact / 100% written</text>
 <text x="260" y="812" text-anchor="end" fill="#e6edf3">23. Slot menu</text>
 <rect x="270" y="798" width="740" height="18" rx="2" fill="#484f58"/>
 <rect x="270" y="798" width="412.7" height="18" fill="#3fb950"/>
@@ -845,9 +843,9 @@
 <text x="1018" y="1592" fill="#e6edf3">38% exact / 100% written</text>
 <text x="260" y="1618" text-anchor="end" fill="#e6edf3">54. Skid marks</text>
 <rect x="270" y="1604" width="740" height="18" rx="2" fill="#484f58"/>
-<rect x="270" y="1604" width="273.0" height="18" fill="#3fb950"/>
-<rect x="543.0" y="1604" width="467.0" height="18" fill="#e3b341"/>
-<text x="1018" y="1618" fill="#e6edf3">37% exact / 100% written</text>
+<rect x="270" y="1604" width="467.9" height="18" fill="#3fb950"/>
+<rect x="737.9" y="1604" width="272.1" height="18" fill="#e3b341"/>
+<text x="1018" y="1618" fill="#e6edf3">63% exact / 100% written</text>
 <text x="260" y="1644" text-anchor="end" fill="#e6edf3">55. Snowfall</text>
 <rect x="270" y="1630" width="740" height="18" rx="2" fill="#484f58"/>
 <rect x="270" y="1630" width="328.3" height="18" fill="#3fb950"/>
