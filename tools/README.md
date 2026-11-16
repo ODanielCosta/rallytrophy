@@ -25,6 +25,16 @@ They expect locally supplied game files and toolchain components; see
   `build/permute/<addr>/best.cpp`, ranking by aligned instructions first.
   Apply it only on MATCH: mutations can
   reorder dependent statements.
+- [`reorder.py`](reorder.py): safe statement-order hill climber. Takes runs of consecutive simple statements
+  (expression statements, declarations with initialisers, same indent, no control flow), builds a conservative
+  dependency graph (identifier reads/writes; `->`/`.`/`[]` memory accesses commute only on the same base with
+  different constant fields/literal indices, or on distinct named objects; calls, `__asm`, `volatile` pairs and
+  unparsable lvalues never move; `--pure NAME,..` declares side-effect-free helpers) and hill-climbs over the
+  dependency-respecting orders with `try_variants.py`. Every order it tries preserves behaviour, so unlike
+  `permute.py` any improvement can be kept. `--lines A-B` (file line numbers) restricts the search;
+  `--selftest` checks the dependency analysis. Writes `build/reorder/<addr>/best.cpp` and `best.diff`.
+  Limits: operator overloads and macros that look like lvalues are not modelled (macros count as calls), faulting
+  order (null deref, division) is ignored, and distinct named objects are assumed not to alias.
 - [`declorder.py`](declorder.py): permute groups of local declarations that sit directly above an inline-asm
   transform macro (their stack slots follow declaration order) and keep the best order per group.
 - [`flag_sweep.py`](flag_sweep.py): score every NONMATCHING function in the
