@@ -3310,6 +3310,7 @@ public:
 // their place to Player+0x1a58/0x1a5c and draws title, rows (rank, country, name, time) and the prompt.
 // Tried 2026-10-30 night: volatile store of DAT_00565490=0 (keeps the original's early dead store, 183->171) and volatile-read copies of x184/x510 before the row loop (->165); plain/int copies, decl-order swaps, buffer size gave no gain; original frame 0xa0 vs 0xbc-ish still differs in float slot order (sx at +0x1c, sy +0x18).
 // Tried 2026-11-01 re-pass: 25 variants, none below 165 insns differ (result in the dead recompute slot at esp+0xb8 as the original does with mov [esp+0xb8],ebx early: 174-186; count/unfinished decl order, volatile stageCount, int copies of x184/x510, sx/sy order, scaleX/scaleY split, pressed/result first, volatile-copied x234/x894/y: 165-209); original frame is 0x14 larger (extra dword copies before the loop), too far for permute.
+// Pass 2026-11-16 (r19): x184/x510 volatile copies moved next to y/x234 and Slot32 after x894 (154 -> 117 insns differ); 36 statement orders tried, 1Y2XZS best.
 // Returns 1 when the continue key was pressed and the results are final.
 int RaceMode::FUN_0048a070(int recompute)
 {
@@ -3386,15 +3387,16 @@ draw:
     float x510 = sx * 510.0f;
     text->Print(DAT_0056b0ac, x510, y76, FUN_00405380(0x61), 0, 1.0f, 1.0f);
     text->Print(DAT_0056b0ac, sx * 794.0f, y76, FUN_00405380(0xfb), 0, 1.0f, 1.0f);
+    float cx184 = *(volatile float*)&x184;
     float y = sy * 116.0f;
+    float cx510 = *(volatile float*)&x510;
     float x234 = sx * 234.0f;
-    ((RaceDeviceSlots*)DAT_0056b0ac)->Slot32(3);
     float x894 = sx * 894.0f;
+    ((RaceDeviceSlots*)DAT_0056b0ac)->Slot32(3);
     int refTime;
     if (DAT_00565490) {
         refTime = DAT_00565494[0]->FUN_00491f70();
     }
-    float cx184 = *(volatile float*)&x184, cx510 = *(volatile float*)&x510;
     int i = 0;
     if (DAT_00565490 > 0) {
         Player* local = m_localPlayer;
