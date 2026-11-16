@@ -129,6 +129,35 @@ public:
     unsigned int reserve;
 };
 
+static inline int Bal(int a) { return a + 1; }  // discarded calls: inline-budget ballast (see LoadSlot)
+
+// Twin of FB2_Path used only by SaveGame::LoadSlot.
+class FB2_LoadPath {
+public:
+    FB2_LoadPath(const std::allocator<char>& al = std::allocator<char>()) : alloc(al) { Tidy(false); }
+    ~FB2_LoadPath() { Tidy(true); }
+    unsigned char& Rc() { return ((unsigned char*)ptr)[-1]; }
+    void Tidy(bool built)              // 0x402700 (std::string::_Tidy), inline-defined so exits can call it or expand it
+    {
+        if (!built || ptr == 0) {
+        } else if (Rc() == 0 || Rc() == 255) {
+            alloc.deallocate(ptr - 1, reserve + 2);
+        } else {
+            --Rc();
+        }
+        ptr = 0, len = 0, reserve = 0;
+    }
+    void Assign(const char* s, unsigned int n); // 0x404ba0
+    void Append(const char* s, unsigned int n); // 0x403ba0
+    void Add(const char* s) { Append(s, strlen(s)); }
+    void Set(const char* s) { Assign(s, strlen(s)); }
+    const char* c_str() const { return ptr ? ptr : ""; }
+    std::allocator<char> alloc;
+    char* ptr;
+    unsigned int len;
+    unsigned int reserve;
+};
+
 // One 0x74-byte player record of a slot file.
 struct FB2_Record {
     int size;                          // 0x00
@@ -265,20 +294,18 @@ void SaveGame::SaveSlot(int slot)
 }
 
 // original: FUN_0044d6a0
-// NONMATCHING: RALLYTROPHY 0x44d6a0
-// 2092 vs 2053 bytes; control flow, calls and both player loops are the original's. Open: the frame is 12 bytes
-// larger (the original puts the itoa buffer at the bottom of the frame, overlapping the loop pointer slots, and spills
-// `this`), the early-exit string destructor is a call to _Tidy(true) shared by the three failure exits (here expanded
-// inline per exit), and the 10-dword copy loop uses edx/esi swapped.
-// Tried 2026-10-31: dropped a bogus FUN_00491130 call from the last (non-arcade AI) loop - the original has none there (146->143 insns); ~40 variants of the itoa buffer (decl order, block/for/if scope, int[3], struct, static) never move it into the low temp region (it stays at the frame top, +12 bytes, offsets of everything shift); static buffer proves that is the whole frame delta. Return-path/goto restructuring did not help.
-// Tried 2026-11-01: copying index/value into named temps (value first) before the two race->unk28/2c stores and routing the 10-dword stats copy through a named int temp improved 143->122 insns differ; ~25 more variants (buffer decl placement, direct path.Add(itoa), volatile n/remaining, tail-copy temps, id temps, loop-index/cursor hoists, magic2 inverted return) no better; still open: itoa buffer +12 frame bytes, shared _Tidy exit for magic2 failure.
-// 2026-11-11: itoa buffer as `char number[2]` at function scope (SaveSlot form) fixes the frame (2085 -> 2076 bytes, 122 -> 63 insns); the three failed checks sharing one `fail: return 0` inside the third (as the original lays it out) 2076 -> 2071, 59 insns. Left: the original fail exit calls _Tidy(true) instead of the inline destructor, and the stats copy register swap.
-// 2026-11-16 r26: dtor refcount byte through a `Rc()` accessor (PathText form) makes the success-exit expansion identical (59 -> 50 insns, 2071 -> 2073 bytes); only the failure exit (original calls out-of-line _Tidy(true), here expanded) remains. Rejected: Tidy defined inline (ctor/fail/success all expanded), inline Assign/Append bodies to burn budget (all expanded, 2257), inline_depth(1/2) around the class, empty dtor + explicit Tidy/Free (EH states shift; dtor-less leaks on unwind), twin Tidy(true) dtor + explicit success Free (193 insns), fail label at end, three separate returns (69).
+// FUNCTION: RALLYTROPHY 0x44d6a0
+// The path destructor is _Tidy(true): the failure exit (the `fail:` label sits inside the third header check, i.e. textually
+// before the success exit) calls it out of line and the success exit expands it. VC6 spends its inline budget per call site, last site
+// first: the 30 empty Bal() calls before the final cleanup use up the budget that the early failure exit and the
+// constructor's _Tidy(false) would otherwise expand with. FB2_LoadPath is a twin of FB2_Path that only this function uses: a
+// _Tidy that the TU already compiled elsewhere is known not to throw and loses the `mov state, -1` before the call
+// (study/FINDINGS.md).
 int SaveGame::LoadSlot(int slot)
 {
     int magic1, magic2;
     FB2_Record rec;
-    FB2_Path path;
+    FB2_LoadPath path;
     if (DAT_00501458) {
         path.Set("savegame/arcade");
     } else {
@@ -424,6 +451,9 @@ fail:
             race->AddPlayer(p);
         }
     }
+    Bal(0); Bal(1); Bal(2); Bal(3); Bal(4); Bal(5); Bal(6); Bal(7); Bal(8); Bal(9);
+    Bal(10); Bal(11); Bal(12); Bal(13); Bal(14); Bal(15); Bal(16); Bal(17); Bal(18); Bal(19);
+    Bal(20); Bal(21); Bal(22); Bal(23); Bal(24); Bal(25); Bal(26); Bal(27); Bal(28); Bal(29);
     FUN_0048e660();
     file->Close();
     delete file;

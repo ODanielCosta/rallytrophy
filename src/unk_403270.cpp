@@ -118,6 +118,73 @@ public:
     size_t reserve;
 };
 
+// Twin of PathText for ReplayHeader::Load alone: the destructor is _Tidy(true) with _Tidy defined inline, so each exit
+// can expand it or call it. A _Tidy that an earlier function of the TU has used loses the `mov state, -1` before the
+// out-of-line call (the target has it), hence a class of its own. See study/FINDINGS.md.
+class ReplayPath {
+public:
+    ReplayPath(const std::allocator<char>& al = std::allocator<char>()) : alloc(al) { Tidy(false); }
+    ReplayPath(const char* s, const std::allocator<char>& al = std::allocator<char>()) : alloc(al)
+    {
+        Tidy(false);
+        size_t n = strlen(s);
+        if (Grow(n, true)) {
+            memcpy(ptr, s, n);
+            Eos(n);
+        }
+    }
+    ~ReplayPath() { Tidy(true); }
+    unsigned char& Refcnt(const char* u) { return ((unsigned char*)u)[-1]; }
+    void Tidy(bool built)
+    {
+        if (!built || ptr == 0) {
+        } else if (Refcnt(ptr) == 0 || Refcnt(ptr) == 255) {
+            alloc.deallocate(ptr - 1, reserve + 2);
+        } else {
+            --Refcnt(ptr);
+        }
+        ptr = 0, len = 0, reserve = 0;
+    }
+    bool Grow(size_t n, bool trim);    // 0x402980
+    void Eos(size_t n);                // 0x402960
+    void Append(const char* s, size_t n); // 0x403ba0
+    void AppendCall(const char* s) { Append(s, strlen(s)); }
+    void AssignGrow(const char* s)     // assign with _Grow and _Eos out of line
+    {
+        size_t n = strlen(s);
+        if (Grow(n, true)) {
+            memcpy(ptr, s, n);
+            Eos(n);
+        }
+    }
+    void AssignInline(const char* s)   // assign with _Eos expanded
+    {
+        size_t n = strlen(s);
+        if (Grow(n, true)) {
+            memcpy(ptr, s, n);
+            len = n, ptr[n] = 0;
+        }
+    }
+    void AppendInline(const char* s)   // append expanded around _Grow and _Eos
+    {
+        size_t n = strlen(s);
+        if (std::string::npos - len <= n)
+            std::_Xlen();
+        if (0 < n) {
+            size_t m = len + n;
+            if (Grow(m, false)) {
+                std::char_traits<char>::copy(ptr + len, s, n);
+                Eos(m);
+            }
+        }
+    }
+    const char* c_str() const { return ptr ? ptr : ""; }
+    std::allocator<char> alloc;
+    char* ptr;
+    size_t len;
+    size_t reserve;
+};
+
 // FUNCTION: RALLYTROPHY 0x403270
 LoadScreen::LoadScreen()
 {
@@ -333,6 +400,7 @@ struct GhostTrack {                                   // car body +0x1c874
 struct GhostLog { void Read(ReplayFile* f); };        // car body +0x1bed0, 0x401b00
 class CarBody { public: void FUN_0046be50(int mode); };
 
+static inline int Bal(int a) { return a + 1; }  // discarded calls: inline-budget ballast
 // NONMATCHING: RALLYTROPHY 0x403ca0
 // Calling convention (thiscall on the header, bool result), object sizes, constructor arguments, the PathText
 // string calls and block order follow the target. Direct singleton field stores before taking the `race` alias
@@ -341,19 +409,30 @@ class CarBody { public: void FUN_0046be50(int mode); };
 // Tried 2026-10-30 night: record is {int hdr; CarRecord} (0x1d4 read, ReadSetup gets +4), global store order, cars/decl-order/pragma/early-return variants; still differs: name sits 4 bytes higher (target's cars/new temp is above PathText), fld/fstp float copy, failure-path out-of-line _Tidy(true).
 // Tried 2026-10-31 re-pass: hoisting cars/f/race/i/num/magic/has/new-temp locals above PathText, nf/nc temp-var forms, volatile cars: the new-temp slot stays at [esp+0x1c] below name (target [esp+0x2c] above it), all unchanged at 79 diff lines; volatile forms worse (164-205); 9 other diffs (fld/fstp float copy, failure-path _Tidy) untouched; too far (>10 insns) for permute.
 // 2026-11-16 round 23: ~35 variants, none better (39 insns/100 bytes). FSet(float&,float) forceinline gives the fld/fstp but reorders loads (51 insns); a PathText twin with ~Tidy(true) matches the failure exit but then the success exit is out of line too (1100 bytes, 44 insns; explicit Free(true) first: 1150); Bal(1) padding, early returns, ok-flag single exit, new-expression if/else forms: no effect or worse.
+// 2026-11-16 round 27 (exit study): the failure exit now calls _Tidy(true) out of line and the success exit expands it, as the target
+// (39 -> 10 insns, 100 -> 27 bytes, size equal). Needed: two plain `return false` exits (the failure exit textually first), ReplayPath (twin
+// with an inline _Tidy), ten discarded Bal() calls before the success cleanup. Left: `mov esi,eax` placement after the Read pushes in the
+// car loop and the fld/fstp float copy.
 bool ReplayHeader::Load(int index)
 {
-    PathText name("savegame/replay");
+    ReplayPath name("savegame/replay");
     char num[2];                                      // the target reserves only two bytes for _itoa
     _itoa(index, num, 10);
     name.AppendCall(num);
     name.AppendCall(".dat");
-    if (FileExists(name.c_str())) {
-        ReplayFile* f = new ReplayFile(name.c_str(), 0x81);
+    ReplayFile* f;
+    if (!FileExists(name.c_str())) return false;
+    {
+        f = new ReplayFile(name.c_str(), 0x81);
         int magic2, magic1;
         f->Read(&magic1, 4);
         f->Read(&magic2, 4);
-        if (magic1 == 0x198bf3ae && magic2 == 0x20020109) {
+        if (magic1 != 0x198bf3ae || magic2 != 0x20020109) {
+            f->Close();
+            delete f;
+            return false;
+        }
+        {
             f->Read(this, 0x70);
             int t6e = raw[0x6e];
             DAT_0050132c = *(int*)(raw + 0x2c);
@@ -409,12 +488,11 @@ bool ReplayHeader::Load(int index)
                     ((GhostLog*)(body + 0x1bed0))->Read(f);
             }
             race->FUN_0048f600(f);
+            Bal(0); Bal(1); Bal(2); Bal(3); Bal(4); Bal(5); Bal(6); Bal(7); Bal(8); Bal(9);  // inline-budget ballast (no code)
+
             f->Close();
             delete f;
             return true;
         }
-        f->Close();
-        delete f;
     }
-    return false;
 }

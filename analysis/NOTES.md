@@ -583,3 +583,15 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   Stage::Stage has only out-of-line inserts (17 vs our 18: the original cross-jumps two identical sign_ tails).
 - Float copies: when the original copies a 3-float vector with fld/fstp, use the float copy helper (G_Copy) rather than
   an int-bits copy (G_Copy3); that alone matched Car::FUN_00452eb0.
+
+## Exit-path cleanup and epilogue cloning (2026-11-16 study, 2 matches)
+- Inline budget is per inline call site, spent from the end of the function backwards: the ctor's Tidy(false) goes
+  out of line first, then the textually earliest exit. To get "failure exit calls _Tidy(true) out of line, success
+  exit inline", the failure `return` must come before the success one, the destructor must be `~T(){ Tidy(true); }`
+  with Tidy defined inline in the class, and discarded `Bal()` calls before the success cleanup spend the budget
+  (Load needs >=10, LoadSlot >=27).
+- The `mov [state],-1` before the out-of-line Tidy call is dropped if the same Tidy was already compiled earlier in
+  the TU; a per-function twin class (ReplayPath, FB2_LoadPath) restores it.
+- VC6 clones the epilogue at each `return` only in the FIRST function emitted in the TU (EH-frame functions tested);
+  any emitted function before it makes the returns share one epilogue. SkidMarks ctor matched by moving SetQuality
+  below it. Function order in a file is therefore a lever.

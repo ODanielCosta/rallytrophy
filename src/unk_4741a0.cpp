@@ -10,13 +10,6 @@
 extern int DAT_00501428; // render quality, 2 = high
 extern float DAT_004e1b9c;
 
-// FUNCTION: RALLYTROPHY 0x474590
-void SkidMarks::SetQuality(int q)
-{
-    quality = q;
-    capacity = 0x80 >> (2 - q);
-}
-
 // std::string layout with _Grow(n, true) expanded inline, as the original constructor has it.
 struct SkStr {
     std::allocator<char> alloc;
@@ -63,19 +56,11 @@ struct SkStr {
     }
 };
 
-// NONMATCHING: RALLYTROPHY 0x4741a0
-// 594 of 696 bytes: initialization matches through the string assignment prefix.
-// The original expands string cleanup with three separate constructor epilogues;
-// VC6 currently emits one cleanup call and merges the return paths.
-// Tried 2026-10-31: SkStr overlay with _Grow(n,true) expanded inline (hand-written, early returns in ctor or helper, bool Grow, return *this, store order, memcpy); body now matches structurally (57->43 insns) but VC6 merges the three return paths into one shared epilogue (jmp) where the original duplicates the epilogue per return.
-// Tried 2026-10-31 re-pass: 17 more variants (volatile on res/len/ptr/st/char stores per arm, per-arm store-order changes, goto-out, volatile read before return, member Assign); all stay 43 insns / 635 bytes, return paths still merge into one epilogue (jmp 0x474406) regardless of per-arm tail differences; SnowFall strided-cursor idioms do not apply (string tail, not mesh loop).
-// Tried 2026-11-11: the real std::string assignment (operator=, assign(s), assign(s, n)) gives 594-600 bytes: VC6
-// then calls _Tidy(true) in the n == 0 arm where the original has it inline, and jumps to one epilogue where the
-// original clones it three times. inline_depth 2-255, inline_recursion, auto_inline, optimize pragmas and /Ob, /Ox
-// flag sets do not change that (inline_depth(4): 640 bytes, other shape). 0x404100 shows the reverse (original
-// jumps, this build clones), also with the real std::string, so the difference is not in the string emulations.
-// Tried 2026-11-13: 12 more variants, all 43 insns/635 bytes (no-return done-flag form, store-order swaps, pragma optimize a/g/t/y; w/s worse). Remaining: epilogue cloned per arm in the original, ours merges; final block stores ptr[n] before len and `mov edi,eax` before `mov esi,src`.
-// Tried 2026-11-16 (round 23, 25 variants): ptr[n]=0 before len=n, trailing return, nested __forceinline/inline helper with the returns, tail duplicated per arm, goto/do-while, condition/store-order/Rc-compare forms: all 43 insns/635 bytes or worse (do-while 617/62 insns, strlen folded 527/128); VC6 always merges the three returns into one epilogue.
+// FUNCTION: RALLYTROPHY 0x4741a0
+// This constructor has to be the first function emitted in the translation unit: the target clones the full epilogue
+// at each `return` of the inlined string assign, and VC6 only does that for the first emitted function (with any
+// function compiled before it the three returns merge into one shared epilogue, jmp 0x474406). SetQuality (0x474590)
+// therefore sits after it in this file. See study/FINDINGS.md.
 SkidMarks::SkidMarks()
 {
     int q = DAT_00501428;
@@ -152,6 +137,13 @@ SkidMarks::SkidMarks()
         st->len = n;
         st->ptr[n] = 0;
     }
+}
+
+// FUNCTION: RALLYTROPHY 0x474590
+void SkidMarks::SetQuality(int q)
+{
+    quality = q;
+    capacity = 0x80 >> (2 - q);
 }
 
 // FUNCTION: RALLYTROPHY 0x474460
