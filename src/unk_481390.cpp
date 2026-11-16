@@ -126,14 +126,8 @@ void NetRace::Slot4(int mode)
     }
 }
 
-// NONMATCHING: RALLYTROPHY 0x481940
-// Pass 2026-11-13: both FUN_0045b2c0 calls merged into one call site after the if/else (continue when unk4c==2): 96 -> 65 insns differ, cached-zero edi gone, size 1244 -> 1231. Remaining: done/step stack slots swapped (done must sit above step with i), orig keeps two arg-push sequences (only push camera/call shared), ebp=1 hoisted one insn early; if/else unk4c, ternary ping/lag, goto-merge, else-first all worse.
-// Tried 2026-11-01: volatile read of unk40 fixes the prologue ebp/counter order (103->96 insns); volatile unk87c, zero local, split loop index, volatile loop index, localBit order did not remove the cached zero in edi (original compares with test, no zero register).
-// Tried 2026-10-30 night: if-not-unk48 else restructure of the first player loop (163->~104 insns, kept); volatile zero stores, split loop index, register hint, counter temps did not help. Still differs: original keeps `started` in ebp and the loop index in memory, ours keeps a cached zero in edi and the index in ebp.
-// 1235 vs 1240 bytes; logic complete. Register allocation differs: this
-// build keeps 0 in edi and the player index in ebp, the original keeps the
-// index in memory and `started` in ebp. Tried other forms of the frame
-// counters.
+// FUNCTION: RALLYTROPHY 0x481940
+// Matched 2026-11-16: two FUN_0045b2c0 call sites (each branch calls and continues), volatile store of unk40.
 // One simulation step of dt ms: clock correction, lag/ping classification of
 // remote players, then the physics in steps of at most 4 ms.
 void NetRace::Update(int dt)
@@ -163,7 +157,7 @@ void NetRace::Update(int dt)
         int elapsed = timeGetTime() - unk878;
         if (elapsed >= 4) {
             dt = elapsed - (elapsed & 3);
-            unk40 = 1;
+            *(volatile int*)&unk40 = 1;
             started = 1;
             *(volatile int*)&unk87c = 0;
         }
@@ -226,6 +220,8 @@ void NetRace::Update(int dt)
                 if (m_players[i]->unk4c == 2) {
                     continue;
                 }
+                car->FUN_0045b2c0(camera, time, dt);
+                continue;
             } else {
                 m_players[i]->unk4c = 0;
             }
