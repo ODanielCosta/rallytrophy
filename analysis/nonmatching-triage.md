@@ -71,7 +71,7 @@ Instruction-multiset view: 38 functions are pure register/scheduling permutation
 | 0x445e80 | src/unk_445e80.cpp | ServiceMenu::ServiceMenu | other | 1603 | 1603 | 483 | 4 | `mov    DWORD PTR [esi+0x8],edi` | `mov    eax,0x3c` |  |
 | 0x4470a0 | src/unk_445e80.cpp | ServiceMenu::Init | other | 2806 | 2806 | 65 | 0 | `lea    eax,[edx+0x1]` | `lea    eax,[esi+esi*4+0x5f]` |  |
 | 0x449860 | src/unk_445e80.cpp | ServiceMenu::DrawTune | other | 3004 | 3004 | 203 | 0 | `sub    esp,0x90` | `sub    esp,0x98` |  |
-| 0x44a420 | src/unk_445e80.cpp | ServiceMenu::DrawRepair | size | 2255 | 2256 | 1063 | 10 | `jle    0x44ac62` | `jle    0x44ac61` |  |
+| 0x44a420 | src/unk_445e80.cpp | ServiceMenu::DrawRepair | size | 2255 | 2256 | 1066 | 10 | `jle    0x44ac62` | `jle    0x44ac61` |  |
 | 0x44c580 | src/unk_44b930.cpp | ReplayMenu::DrawField | order+registers | 2554 | 2554 | 13 | 0 | `mov    edx,DWORD PTR [esi+0x24]` | `mov    esi,DWORD PTR [esi+0x24]` |  |
 | 0x44d6a0 | src/unk_44d260.cpp | SaveGame::LoadSlot | size | 2071 | 2053 | 1317 | 18 | `je     0x44d833` | `je     0x44d846` |  |
 | 0x44deb0 | src/unk_44d260.cpp | SlotStore::LoadRelay | size | 1270 | 1321 | 966 | 40 | `sub    esp,0x48` | `sub    esp,0x44` |  |
@@ -96,7 +96,7 @@ Instruction-multiset view: 38 functions are pure register/scheduling permutation
 | 0x45e480 | src/unk_45e480.cpp | ??0CarObject@@QAE@PAVCarTextureCache@@HHHHHI@Z | size | 13606 | 13705 | 9747 | 74 | `lea    eax,[ebx+0xce8]` | `push   0x34` |  |
 | 0x461a40 | src/unk_45e480.cpp | ??1CarObject@@QAE@XZ | size | 2274 | 2276 | 1712 | 1 | `lea    eax,[esi+0x1bd94]` | `lea    ebp,[esi+0x1bd94]` |  |
 | 0x462350 | src/unk_45e480.cpp | Car::LoadCarIni | size | 4486 | 4484 | 2777 | 1 | `jne    0x462508` | `jne    0x46250a` |  |
-| 0x463940 | src/unk_45e480.cpp | Car::LoadTextures | size | 2924 | 2926 | 1115 | 7 | `xor    edi,edi` | `mov    eax,0x2` |  |
+| 0x463940 | src/unk_45e480.cpp | Car::LoadTextures | size | 2923 | 2926 | 1101 | 5 | `xor    edi,edi` | `mov    eax,0x2` |  |
 | 0x4658a0 | src/unk_4654f0.cpp | Car::FUN_004658a0 | other | 926 | 926 | 145 | 5 | `fstp   DWORD PTR [esi+0x1340]` | `mov    DWORD PTR [esi+0xf8c],eax` |  |
 | 0x465e90 | src/unk_465e90.cpp | Car::FUN_00465e90 | other | 1644 | 1644 | 89 | 10 | `add    esi,0x1698` | `add    esi,0x1694` |  |
 | 0x4666a0 | src/unk_4666a0.cpp | Car::InitSounds | order | 2361 | 2361 | 162 | 0 | `mov    BYTE PTR [esi+0x1bf0e],bl` | `push   0x3dcccccd` |  |
@@ -109,7 +109,7 @@ Instruction-multiset view: 38 functions are pure register/scheduling permutation
 | 0x46d830 | src/unk_46d830.cpp | CarRain::CarRain | size | 1065 | 1048 | 423 | 40 | `mov    DWORD PTR [esi],0x0` | `mov    DWORD PTR [esi+0x290],eax` |  |
 | 0x46ea20 | src/unk_46e880.cpp | CarLight::Render | size | 1125 | 1124 | 323 | 8 | `push   edi` | `mov    esi,ecx` |  |
 | 0x46eec0 | src/unk_46eec0.cpp | CityLight::CityLight | size | 1043 | 1044 | 550 | 0 | `add    esi,0x20` | `mov    DWORD PTR [ebp+0x128],eax` |  |
-| 0x46f360 | src/unk_46eec0.cpp | CityLight::Render | size | 1765 | 1767 | 1201 | 39 | `sub    esp,0x104` | `sub    esp,0x100` |  |
+| 0x46f360 | src/unk_46eec0.cpp | CityLight::Render | size | 1765 | 1767 | 1198 | 35 | `sub    esp,0x104` | `sub    esp,0x100` |  |
 | 0x470610 | src/unk_46fdf0.cpp | ParallelShadow::Create | order | 715 | 715 | 131 | 0 | `push   ebx` | `mov    DWORD PTR [esi+0x174],ebx` |  |
 | 0x470940 | src/unk_46fdf0.cpp | ParallelShadow::Prepare | other | 3336 | 3336 | 396 | 24 | `push   edi` | `mov    BYTE PTR [ebx+0xc],cl` |  |
 | 0x471ab0 | src/unk_46fdf0.cpp | ParallelShadow::ProjectMeshes | size | 1770 | 1788 | 1093 | 51 | `push   ebp` | `push   ebx` |  |
@@ -117,7 +117,7 @@ Instruction-multiset view: 38 functions are pure register/scheduling permutation
 | 0x473470 | src/unk_472c90.cpp | RainEffect::Update | size | 3321 | 3324 | 2629 | 30 | `sub    esp,0x1c8` | `sub    esp,0x1cc` | eh 0,1,6,7,6,8,6,9,6,10,6,11,6,14,1,1,17,18,19,20,21,17,14,23,24,23,25,23,26,23,27,14 vs 0,1,6,7,6,8,6,9,6,10,6,11,6,14,0,0,1,1,17,18,19,20,21,17,14,23,24,23,25,23,26,23,27,14 |
 | 0x4741a0 | src/unk_4741a0.cpp | SkidMarks::SkidMarks | size | 635 | 696 | 203 | 30 | `je     0x4743a1` | `je     0x47438a` |  |
 | 0x4746b0 | src/unk_4741a0.cpp | SkidMarks::AddSegment | size | 966 | 972 | 478 | 20 | `mov    esi,DWORD PTR [edi+0x150]` | `test   edx,edx` |  |
-| 0x4751b0 | src/unk_474c50.cpp | SnowFall::Update | size | 1745 | 1741 | 726 | 6 | `je     0x47586c` | `je     0x475870` |  |
+| 0x4751b0 | src/unk_474c50.cpp | SnowFall::Update | size | 1745 | 1741 | 603 | 6 | `je     0x47586c` | `je     0x475870` |  |
 | 0x475eb0 | src/unk_4758b0.cpp | Sky::Update | size | 1431 | 1441 | 558 | 9 | `push   esi` | `mov    ebx,DWORD PTR [ebp+0xc]` |  |
 | 0x4766d0 | src/unk_4766d0.cpp | WindowRain::WindowRain | size | 916 | 924 | 344 | 15 | `jle    0x4769e5` | `jle    0x4769dd` |  |
 | 0x476be0 | src/unk_4766d0.cpp | WindowRain::Init | other | 955 | 955 | 41 | 2 | `cmp    ebp,edi` | `mov    esi,DWORD PTR [esi+0x48]` |  |
@@ -152,7 +152,7 @@ Instruction-multiset view: 38 functions are pure register/scheduling permutation
 | 0x49d970 | src/unk_49b8e0.cpp | AIDriver::FUN_0049d970 | size | 2588 | 2631 | 2118 | 31 | `mov    DWORD PTR [esp+0xa0],ecx` | `mov    DWORD PTR [esp+0x74],ecx` |  |
 | 0x49e3d0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049e3d0 | size | 3532 | 3592 | 2787 | 114 | `mov    DWORD PTR [esi+0x28],0x0` | `mov    DWORD PTR [esp+0x74],eax` |  |
 | 0x49f1f0 | src/unk_49b8e0.cpp | AIDriver::FUN_0049f1f0 | size | 485 | 522 | 354 | 15 | `mov    ebx,ecx` | `push   esi` |  |
-| 0x49ffa0 | src/unk_49fee0.cpp | AIDriver::FUN_0049ffa0 | size | 1146 | 1149 | 927 | 14 | `sub    esp,0xc0` | `sub    esp,0xc4` |  |
+| 0x49ffa0 | src/unk_49fee0.cpp | AIDriver::FUN_0049ffa0 | size | 1142 | 1149 | 937 | 26 | `sub    esp,0xc0` | `sub    esp,0xd4` |  |
 | 0x4a0420 | src/unk_49fee0.cpp | AIDriver::FUN_004a0420 | size | 2583 | 2615 | 2156 | 16 | `mov    DWORD PTR [esp+0x2c],0x0` | `xor    ebp,ebp` |  |
 | 0x4a1050 | src/unk_49fee0.cpp | AIDriver::FUN_004a1050 | order+registers | 819 | 819 | 49 | 0 | `mov    ecx,DWORD PTR [ecx+0x24]` | `mov    edx,DWORD PTR [ecx+0x24]` |  |
 | 0x4ab010 | src/unk_4ab010.cpp | ConvertImageFormat | size | 2320 | 2302 | 1476 | 29 | `je     0x4ab8f9` | `je     0x4ab90b` |  |
