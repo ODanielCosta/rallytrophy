@@ -673,3 +673,21 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
 - A pointer already shared in a register counts as a one-node tree and loses to an operand with an offset.
 - A hidden tie-break exists (an extra unused param or an alias local flips some terms); renames change nothing.
 - One-expression sums emit the written last term first; statement chains keep source order (ParallelShadow plane sum).
+
+## EH unwind states and frames (2026-11-16 study)
+- Each constructed destructible object gets one unwind entry, numbered in construction (code) order; empty or
+  inline destructors count the same; PODs add nothing.
+- A state store is emitted only if a throwing call follows; constructions with no call between merge into one store
+  of the last index. A first store of N means N earlier silent constructions, not missing stores.
+- A destructible temporary gets an entry only if a throwing call runs while it is alive (`useref(a+b)` yes,
+  discarded `mk(); g();` no). `V c = a+b+a` gives entries a, b, T, c, c'.
+- By-value parameter: entry 0 at [ebp+8] in the callee, none in the caller. A sole named return value lives in the
+  hidden return slot with no state stores.
+- An object whose fields are never touched has an entry but no frame slot; destructible objects follow the
+  ref-count slot rule, `$T` temps sort above named objects, siblings share slots.
+- Recipe for reading an original map: same [ebp-X] + same parent = sibling blocks / reused slot; a parent chain =
+  one block in declaration order; an entry sharing a slot with a call's out-pointer is that call's result.
+- Findings: AIDriver 0x49ffa0/0x4a0420 maps already match (frame gaps are scalar slots); PhysicsStep's original has
+  9 entries (drag function-scope, wp2 in the speed2 block, f before arm2) - the map-exact variant scores worse
+  on insns, so not adopted; ColModel 0x41a890 entry 8 is the first Sub's P3 temporary (map-exact form re-allocates
+  the whole function, not adopted).
