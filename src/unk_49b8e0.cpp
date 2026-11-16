@@ -290,6 +290,7 @@ extern float DAT_00500cfc;
 // Pass 2026-11-13: SetV member-wise copies for unk60/unkc8/unkd4 (+player->car->body for unkd4), unk134.x=t after f2, len1 local before 1/len, lateral x,z,y store order, sideways z before x: insns differ 176->144, size 2540->2588 (orig 2631); open: k1 lives in ebx (orig memory; volatile pk1 read gives 142 but rejected), vel2 spill layout, sl dup (fld st0/st1) before t, Eval arg pushes hoisted above len2.
 // Tried 2026-11-01 pm: 0.0/1.0/5.0/36.0 compares as DAT_ globals (no change in insns), double ls for acc and segLen/t (matches the original's FPU-resident sqrt; fixes those sequences), k as plain int with k1 read via a pointer: 319->314; ~30 variants (declaration orders of vel/fwd/vel2/dir/dir2, phase/k, full dir2 copy, dir2.y early) no better; the original has dir/dir2/k below pts/w and acc/phase/k1 above, ours puts dir2 above w and phase low, and it reads dir.y from memory in segLen (ours folds).
 // Tried 2026-11-13: q0/q1 locals removed (seg->unk28[i] CSE'd lazily like the original: this/seg registers swap, z read at seg+0x30/0x3c), A/B/C/D y stored after z (C.y init literal 0, DAT_004e134c after SubV), D by members: insns differ 652->411, bytes 3210->2899, size 3802->3819 (orig 3877); original keeps dA/dB on the FPU stack (fst/fxch/fcomp), shares the DAT zero via st(0) for C.y/D.y, and has flat as Vec3 (EH state 6; r2 variant gets size 3868 but scores 433), tail n1/n2/n3/P share one Vec3 slot.
+// Pass 2026-11-16: il1-3 divide by the unrounded double sqrt (fdiv st,st(1)): insns differ 411->409, size 3819->3839 (orig 3877); tried zero-register local, player->car->body reload for flat: no gain.
 #define POS ((Vec3*)&((CarBodyV*)car->body)->position)
 // original sums |nearest|^2 as (x*x + z*z) + y*y
 #define NLEN(v) ((float)sqrt(((v).x * (v).x + (v).z * (v).z) + (v).y * (v).y))
@@ -444,7 +445,7 @@ float AIDriver::FUN_0049c130()
 
     // Distances from the car to the two edges of the track at the target point.
     PV n1; n1.x = -unk54.z; n1.y = 0; n1.z = unk54.x;
-    float il1 = DAT_004e1348 / (float)sqrt(n1.z * n1.z + n1.x * n1.x);
+    double s1 = sqrt(n1.z * n1.z + n1.x * n1.x); float il1 = DAT_004e1348 / s1; // unrounded sqrt stays on the FPU stack
     n1.x *= il1;
     n1.z *= il1;
     n1.x *= w;
@@ -459,7 +460,7 @@ float AIDriver::FUN_0049c130()
     float d1 = (float)sqrt(d1s);
     unk18 = d1;
     PV n2; n2.x = unk54.z; n2.y = 0; n2.z = -unk54.x;
-    float il2 = DAT_004e1348 / (float)sqrt(n2.x * n2.x + n2.z * n2.z);
+    double s2 = sqrt(n2.x * n2.x + n2.z * n2.z); float il2 = DAT_004e1348 / s2; // unrounded sqrt stays on the FPU stack
     n2.x *= il2;
     n2.z *= il2;
     n2.x *= w;
@@ -491,7 +492,7 @@ float AIDriver::FUN_0049c130()
     n3.x = unk54.z;
     n3.y = 0;
     n3.z = -unk54.x;
-    float il3 = DAT_004e1348 / (float)sqrt(n3.x * n3.x + n3.z * n3.z);
+    double s3 = sqrt(n3.x * n3.x + n3.z * n3.z); float il3 = DAT_004e1348 / s3; // unrounded sqrt stays on the FPU stack
     n3.x *= il3;
     n3.z *= il3;
     unk3c.y = 0;
