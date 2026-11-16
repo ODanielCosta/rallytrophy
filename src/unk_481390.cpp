@@ -15,12 +15,9 @@ unsigned int IntVector::Size() const { return size(); }
 IntVector::iterator IntVector::Erase(iterator first, iterator last) { return erase(first, last); }
 #pragma auto_inline(on)
 
-// NONMATCHING: RALLYTROPHY 0x481390
-// 498 vs 491 bytes. EraseOut gives the original's inline erase with _Destroy (0x403130) as a call, but it
-// reloads end() through `this` ([esi+0x8a8]) where the original reuses the member pointer in edi and keeps a
-// zeroed slot (a resize(0) default argument?); ResizeB(0) drops the degenerate copy loop entirely (466 bytes).
-// Tried 2026-10-30 night: PlayerVector* local + EraseY(0) (size()>0 guard, EraseOut) 24->6 insns, 491 bytes; ~15 resize/default-arg variants and permute -r 20 found nothing better; still differs: zeroed [esp+0x18] slot, a second n<size() check (cmp/jbe), and EH-state/lea-push order, since an unused default arg is elided.
-// Tried 2026-10-31 re-pass: dropping the outer size() guard (EraseY already tests n<size), volatile unk860 store (lea/push order) and a volatile-zeroed `Player* z` passed to EraseY 24->2 insns; ~35 variants + permute -r 40 found nothing better; still differs: the z slot store [esp+0x18] lands before `mov ebx,[edi+4]` instead of after `cmp ebx,ebp`, and `mov ecx,esi` before ClearMessages one slot early.
+// FUNCTION: RALLYTROPHY 0x481390
+// Matched 2026-11-16: EraseY keeps the (dead for n == 0) insert branch so the default-argument temporary
+// stays; volatile unk844 store orders the `mov ecx,esi` before ClearMessages.
 NetRace::NetRace()
 {
     unk7a8 = 0;
@@ -33,11 +30,8 @@ NetRace::NetRace()
     unk854 = 0;
     unk858 = 0;
     InitializeCriticalSection(&m_lock);
-    PlayerVector* r = &m_removed;
-    Player* z;
-    *(volatile int*)&z = 0;
-    r->EraseY(0, z);
-    unk844 = 0;
+    m_removed.EraseY(0);
+    *(volatile int*)&unk844 = 0;
     unk880 = 0;
     ClearMessages();
     DAT_00501450 = this;
