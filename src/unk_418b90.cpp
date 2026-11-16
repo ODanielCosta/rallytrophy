@@ -16,12 +16,14 @@ struct SphX { Vec3 c; float d; SphX(const Vec3& p, float r) : c(p) { d = r; } ~S
 // Tried 2026-10-31: original builds dead Vec3 e1/e2/e3 edge vectors, a dead bounding sphere (struct with dtor), Vec3 mn/mx/q locals (all added, 423->322); still differs in regalloc: original keeps this/esi, org/ebx, chain/ebp and spills i,p to [esp+0x18]/[0x14]; tried volatile self, head/chain reorder, first/last order (no effect).
 // Tried 2026-11-01 re-pass: float sums re-checked against asm (d2, plane num/den dots, normal length fixed to the original association; dead e3 = b-c); 322->326 insns differ is the cost of correct sums. d2 as double/volatile, bestT/chain/edge split decls, e1/e2 order, for-loop, folded operator chain: no gain; d2 stays on the x87 stack in the original (fcom then fsqrt) while ours spills it.
 // Pass 2026-11-13 (r6418b90): 307 -> 253 insns differ (2140 -> 2157 bytes): hit test as if(fun) hit else edges (block layout), loop-2 iterates `volatile first` (orig keeps first/t in one [esp+0x10] slot, reloaded), loop bound hits.size() w/o p!=0, `Vec3 sm; sm = ...` default-ctor form. Rejected: non-volatile t (size 2059 but 373 insns), ScenePoint types (same bytes, only symbol names differ), mn/mx/bestT decl moves, extra self ptr, rv/else return shape.
+// Pass 2026-11-16 (r29): 253 -> 251 insns differ (size unchanged 2157): `first = 0` declared before `Vec3 e`, chain test flipped to `if (chain == 0) first = t, chain = t; else last->next = t;`. Rejected: nesting/rv/else forms for the early return (epilogue still cloned), per-iteration `t = first` local (size 2085 but 312-352 insns: regalloc org/dir/t shuffles), chain/last decl moves, num-before-den.
 float SweepQuery::Cast(float r, float* org, float* dir, float* outPt, float* outN)
 {
     float d2 = dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2];
     if (d2 == DAT_004e134c)
         return ((TriCollector*)this)->Closest(r, org, outPt, outN);
 
+    CTri* volatile first = 0;
     Vec3 e = *(Vec3*)org; e += *(Vec3*)dir;
     Vec3 dv = *(Vec3*)dir;
     SphY sph;
@@ -30,7 +32,6 @@ float SweepQuery::Cast(float r, float* org, float* dir, float* outPt, float* out
     sph.c = sm; sph.d = (float)sqrt(d2) * 0.5f + r;
     float ex = e.x, ey = e.y, ez = e.z;
     float dx = dv.x, dy = dv.y, dz = dv.z;
-    CTri* volatile first = 0;
     CTri* last = 0;
     Vec3 mn = *(Vec3*)org;
     Vec3 mx = *(Vec3*)org;
@@ -53,10 +54,10 @@ float SweepQuery::Cast(float r, float* org, float* dir, float* outPt, float* out
                 *t->e[1] = 0;
                 *t->e[2] = 0;
                 t->next = 0;
-                if (chain != 0)
-                    last->next = t;
-                else
+                if (chain == 0)
                     first = t, chain = t;
+                else
+                    last->next = t;
                 last = t;
             }
         }
