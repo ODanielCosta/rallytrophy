@@ -353,6 +353,7 @@ static __forceinline void BoxWorldPoint(Vec3* o, const float* p, const float* m,
 // Tried 2026-11-01 re-pass: reusing outer worldA/worldB for the center transform (no inner redeclare) 573->504 insns differ; plain float[] for axes/centers/extents/projected (no EH objects) drops built to 2223 bytes and 718 insns (original has EH states 0,2,3 and 0xf4 frame, so some Vec3 locals are needed); hoisting all Vec3 to function scope, a/r arrays, a-before-r order: no gain. Gap is ~500 bytes of code (a/r in frame slots), far from permuter range.
 // Pass 2026-11-13 (agent): 597 -> 407 insns differ (2741 -> 2917 bytes of 3131): r/a as float r[9]/a[9] (frame slots now exact), centerB hoisted to function scope after worldB (slot -0x48 exact; EH state order now differs), t/ra/rb locals for compares (cross tests give the fadd st,st(1) form; the original's fxch/fcomp st(1)/fstp st(0) compare still not reproduced). Open: fcomp form, x,z,y term order of r00/r02 (VC6 emits z,y,x), missing inline return-0 cleanups (original has 7 dtor pairs, we 3).
 // Pass 2026-11-16 (agent): 407 -> 150 insns differ (2917 -> 2971 bytes of 3131): original test order is A axes, B axes, then 9 cross tests; named sum (float sm = ...; float s = ra; s += rb;) gives the fcomp st(1)/fstp form and fadd st,st(1); r0/r2/r3/r5/r6/r8 as C + (B + A) without the q temp. Open: original keeps 6 cloned return-0 epilogues (tests 1,2,3 and 13,14,15; tests 4-12 jump back to the first three), we merge to 2 (160 bytes); no source lever found (see REPORT).
+// Pass 2026-11-16 round 28: 97 -> 33 insns differ (3133 -> 3131 bytes, size exact): dropped the inner scope braces and trailing return 0 (arrays, centerA, centerB now function scope after the radius test; centerB declared with its initializer, so the EH states match). Open: centerA/centerB init scheduling (~15 insns); r0/r2/r3/r5/r6/r8 term order x,z,y vs our z,x,y (operand swaps and assoc permutations make no difference).
 int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
                  float* positionA, float* positionB)
 {
@@ -361,15 +362,13 @@ int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
     struct F3 { float x, y, z; } extentA, extentB;
     BoxWorldPoint(&worldA, boxA + 6, matrixA, positionA);
     BoxWorldPoint(&worldB, boxB + 6, matrixB, positionB);
-    Vec3 centerB;
     Vec3 delta;
     delta.x = worldA.x - worldB.x;
     delta.y = worldA.y - worldB.y;
     delta.z = worldA.z - worldB.z;
     float radius = boxA[9] + boxB[9];
     if (delta.z * delta.z + delta.y * delta.y + delta.x * delta.x > radius * radius) return 0;
-    {
-        Vec3 axisA[3];
+    Vec3 axisA[3];
         Vec3 axisB[3];
         axisA[0].x = matrixA[0];
         axisA[0].y = matrixA[1];
@@ -390,7 +389,7 @@ int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
         axisB[2].y = matrixB[9];
         axisB[2].z = matrixB[10];
         Vec3 centerA = *(Vec3*)boxA;
-        centerB = *(Vec3*)boxB;
+        Vec3 centerB = *(Vec3*)boxB;
         centerA.x += boxA[3];
         centerA.y += boxA[4];
         centerA.z += boxA[5];
@@ -458,6 +457,4 @@ int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
         { float t = fabs(projected.y * r[1] - r[4] * projected.x); float ra = a[4] * extentA.x + a[1] * extentA.y; float rb = a[6] * extentB.z + a[8] * extentB.x; float s = ra; s += rb; if (t > s) return 0; }
         { float t = fabs(projected.y * r[2] - r[5] * projected.x); float ra = a[5] * extentA.x + a[2] * extentA.y; float rb = a[6] * extentB.y + a[7] * extentB.x; float s = ra; s += rb; if (t > s) return 0; }
         return 1;
-    }
-    return 0;
 }
