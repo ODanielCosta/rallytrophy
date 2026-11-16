@@ -708,10 +708,8 @@ static inline void W6_AddTo(float* dst, const Vec3& v)
     dst[2] = v.z + dst[2];
 }
 
-static inline float W6_Sub(float a, float b)
-{
-    return a - b;
-}
+inline float W6_Rd(const float* p) { return *p; }
+static inline float W6_Sub(float a, float b) { float t = b; float u = a; return u - t; }
 
 
 // ---- W7 helpers ----
@@ -1623,15 +1621,16 @@ void Car::PhysicsStep(float dt)
 // Anti-roll store order and aggregate initialization each worsened the count by one; a local torque result did too.
 // Tried 2026-10-30 night: 9 more variants (plain a-b, swapped mul order, split front/rear, const-ref and volatile Sub helpers, hoisted spring locals); 84-87 insns differ at best (hoisting gives 84 but +20 bytes); original keeps both compress loads on the FPU as `fld A; fld B; fxch; fsub st,st(1)` + `fstp st(0)` (a by-value inline float call) which no source form reproduced.
 // Tried 2026-10-31 re-pass: 20 more variants (named-temp spring compress pair, init of dead/arm/world Vec3 from body fields, store order of lastLoad/load, volatile lastLoad store, arb fill order, decl order of body/c, rp increment placement, per-component force); still 84-87 insns differ; dead=*(Vec3*)rotation init makes size 756 = original but 84 insns; remaining diff is the original fld A; fld B; fxch; fsub st,st(1) compress pair and its four distinct induction pointer temps, not reproduced.
+// Pass 2026-11-16 (r25): 87 -> 77 insns differ (739 -> 754 bytes, orig 756): W6_Sub takes float temps (t=b; u=a) and its first args are read through W6_Rd, which reproduces the `fld A; fld B; fxch; fsub st,st(1); fstp st(0)` pairs; arb[3] copied as int bits (original fstp/mov eax). Open: loop induction slot numbers (arb/w/count at -0x18/-0x1c/-0x20 in the original, asm operand temps after them), dead/arm Vec3 slot swap, torque add operand order.
 // Per wheel: spring force + anti-roll term, applied to the body force and (arm x force) torque.
 void Car::ApplySuspensionForces()
 {
     W6_Car* c = (W6_Car*)this;
     W6_Body* body = c->body;
-    float front = W6_Sub(c->spring[1].compress, c->spring[0].compress) * c->rateFront[c->setup[2]];
-    float rear = W6_Sub(c->spring[2].compress, c->spring[3].compress) * c->rateRear[c->setup[2]];
+    float front = W6_Sub(W6_Rd(&c->spring[1].compress), c->spring[0].compress) * c->rateFront[c->setup[2]];
+    float rear = W6_Sub(W6_Rd(&c->spring[2].compress), c->spring[3].compress) * c->rateRear[c->setup[2]];
     float arb[4];
-    arb[3] = rear;
+    *(int*)&arb[3] = *(int*)&rear;
     arb[0] = front;
     arb[1] = -front;
     arb[2] = -rear;
@@ -1677,7 +1676,6 @@ void Car::ApplySuspensionForces()
     }
 }
 
-inline float W6_Rd(const float* p) { return *p; }
 // NONMATCHING: RALLYTROPHY 0x45c700
 // original: FUN_0045c700. Current candidate: 1128/1144 bytes, 868 differing bytes outside relocations. Loading the
 // target's 1.0f at 0x4e1c1c through a volatile read reproduces its `fld [constant]; fadd rideTop` order; reading

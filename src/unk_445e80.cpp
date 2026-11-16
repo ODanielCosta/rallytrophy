@@ -30,22 +30,34 @@ ConfigKey SMA_Keys[12] = {
     { "RepairTime_Steering", 1 },
 };
 
-// The inline Sprite set-up of the constructor (the same field writes as the ping-indicator sprite).
-#define SMA_SPRITE(s, last) \
-    (s).unk60[0] = 1.0f; \
-    (s).unk60[1] = 1.0f; \
-    (s).unk60[2] = 1.0f; \
-    (s).unk60[3] = 1.0f; \
-    (s).unk40[0] = 1.0f; \
-    (s).unk40[1] = 1.0f; \
-    (s).unk40[2] = 1.0f; \
-    (s).unk40[3] = 1.0f; \
+// The inline Sprite set-up of the constructor (the same field writes as the ping-indicator sprite). The two colour
+// quads go through float pointers (the original's address arithmetic).
+#define SMA_C(s) \
+    { \
+        float* c = (s).unk60; \
+        c[0] = 1.0f; \
+        c[1] = 1.0f; \
+        c[2] = 1.0f; \
+        c[3] = 1.0f; \
+    }
+#define SMA_D(s) \
+    { \
+        float* d = (s).unk40; \
+        d[0] = 1.0f; \
+        d[1] = 1.0f; \
+        d[2] = 1.0f; \
+        d[3] = 1.0f; \
+    }
+// The loops write the two int fields first.
+#define SMA_LOOP_SPRITE(s, last) \
+    (s).unk9c = (last); \
+    (s).unk98 = 15; \
+    SMA_C(s) \
+    SMA_D(s) \
     (s).unk18 = 5; \
     (s).unk1c = 6; \
     (s).unk24 = 2; \
-    (s).unk20 = 2; \
-    (s).unk9c = (last); \
-    (s).unk98 = 15;
+    (s).unk20 = 2;
 
 
 // ---- from group draft V2 ----
@@ -180,33 +192,91 @@ static float SMI_RALLYY = 630.0f; // 0x4f9f90
 extern int DAT_004f9ca8[];             // tab text ids {120, 121, 122, 124, 23, 30}
 
 // NONMATCHING: RALLYTROPHY 0x445e80
-// Same size (1603) and same call/EH skeleton; only the store scheduling of the inline Sprite field writes differs: the
-// original issues the 1.0f stores of the first sprites ahead of the mode/int blocks and delays the 5/6/2/0xf int stores
-// (the sprite order damageIcons, damageBar, tuneSelectors, repair, tune, info, startRace, load is right). original: FUN_00445e80
-// Tried 2026-10-30 night: reordered SMA_SPRITE stores (floats+ints first, unk98/unk9c last: 82->69 insns), pointer loops, per-loop macros, 6 other orders; the original schedules sprite int stores in a different interleave and its loop base is sprite+0x68 (ours +0x98), not reachable from source order.
-// Tried 2026-10-31 re-pass: swept all 24 orders of the four store groups (unk9c/98, f60, f40, ints) = 68 best vs 69; the loop body order 9c,98,f60,f40,18,1c,24,20 reproduces the original loop but the strength-reduced base stays sprite+0x98/0x64 (original +0x68), also with explicit base-pointer stores, Sprite& and Sprite* forms; the non-loop sprites need the unexplained cross-sprite interleave; 68 insns, permute skipped.
+// Same size (1603), 1 instruction differs (7 bytes): the store of tuneSelectors.unk98 (0x3e4) lands two slots before the
+// original's. original: FUN_00445e80
+// 2026-11-16: the two colour quads written through float pointers (SMA_C/SMA_D: `float* c = s.unk60; c[0..3]`) instead of
+// s.unk60[i] took 69 -> 7 insns (the strength-reduced loop base became sprite+0x68 like the original's, and the straight
+// stores stopped being hoisted); a hill-climb over the statement order of the straight sprites (any order is neutral, the
+// scheduler places the stores) then reached 1. The sprite order damageIcons, damageBar, tuneSelectors, repair, tune, info,
+// startRace, load is right. Moving tuneSelectors.unk98 anywhere in the sequence leaves the 1-insn difference.
 ServiceMenu::ServiceMenu()
 {
     m_selected = 0;
     mode = 0;
+    totalTime = 60;
     unk24 = 0;
     unk28 = 0;
-    unk2c = 0;
-    totalTime = 60;
     timeLeft = 60;
-    SMA_SPRITE(damageIcons, 2)
-    SMA_SPRITE(damageBar, 2)
-    SMA_SPRITE(tuneSelectors, 2)
-    SMA_SPRITE(repairSprite, 2)
-    SMA_SPRITE(tuneSprite, 2)
-    SMA_SPRITE(infoMap, 14)
-    SMA_SPRITE(startRace, 2)
-    SMA_SPRITE(loadSprite, 2)
+    unk2c = 0;
+    SMA_C(damageIcons)
+    SMA_D(damageIcons)
+    damageIcons.unk9c = 2;
+    damageIcons.unk98 = 15;
+    damageIcons.unk18 = 5;
+    damageIcons.unk1c = 6;
+    damageIcons.unk24 = 2;
+    damageIcons.unk20 = 2;
+    damageBar.unk9c = 2;
+    SMA_C(damageBar)
+    SMA_D(damageBar)
+    damageBar.unk98 = 15;
+    damageBar.unk18 = 5;
+    damageBar.unk1c = 6;
+    damageBar.unk24 = 2;
+    tuneSelectors.unk98 = 15;
+    damageBar.unk20 = 2;
+    tuneSelectors.unk9c = 2;
+    SMA_C(tuneSelectors)
+    SMA_D(tuneSelectors)
+    tuneSelectors.unk18 = 5;
+    tuneSelectors.unk1c = 6;
+    tuneSelectors.unk24 = 2;
+    tuneSelectors.unk20 = 2;
+    SMA_C(repairSprite)
+    SMA_D(repairSprite)
+    repairSprite.unk9c = 2;
+    repairSprite.unk18 = 5;
+    repairSprite.unk98 = 15;
+    repairSprite.unk1c = 6;
+    repairSprite.unk24 = 2;
+    repairSprite.unk20 = 2;
+    SMA_C(tuneSprite)
+    tuneSprite.unk98 = 15;
+    tuneSprite.unk9c = 2;
+    tuneSprite.unk18 = 5;
+    tuneSprite.unk1c = 6;
+    tuneSprite.unk24 = 2;
+    tuneSprite.unk20 = 2;
+    SMA_D(tuneSprite)
+    SMA_C(infoMap)
+    infoMap.unk98 = 15;
+    SMA_D(infoMap)
+    infoMap.unk9c = 14;
+    infoMap.unk18 = 5;
+    infoMap.unk1c = 6;
+    infoMap.unk24 = 2;
+    infoMap.unk20 = 2;
+    startRace.unk98 = 15;
+    SMA_C(startRace)
+    SMA_D(startRace)
+    startRace.unk9c = 2;
+    startRace.unk18 = 5;
+    loadSprite.unk98 = 15;
+    startRace.unk1c = 6;
+    startRace.unk24 = 2;
+    SMA_C(loadSprite)
+    startRace.unk20 = 2;
+    loadSprite.unk9c = 2;
+    SMA_D(loadSprite)
+    loadSprite.unk18 = 5;
+    loadSprite.unk1c = 6;
+    loadSprite.unk24 = 2;
+    loadSprite.unk20 = 2;
     for (int i = 0; i < 8; i++) {
-        SMA_SPRITE(partSprites[i], 2)
+        SMA_LOOP_SPRITE(partSprites[i], 2)
     }
     for (int j = 0; j < 3; j++) {
-        SMA_SPRITE(stageSprites[j], 14)
+        SMA_LOOP_SPRITE(stageSprites[j], 14)
     }
     Config config;
     config.Define(SMA_Keys, 12);
