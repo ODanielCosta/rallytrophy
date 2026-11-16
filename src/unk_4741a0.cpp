@@ -75,6 +75,7 @@ struct SkStr {
 // flag sets do not change that (inline_depth(4): 640 bytes, other shape). 0x404100 shows the reverse (original
 // jumps, this build clones), also with the real std::string, so the difference is not in the string emulations.
 // Tried 2026-11-13: 12 more variants, all 43 insns/635 bytes (no-return done-flag form, store-order swaps, pragma optimize a/g/t/y; w/s worse). Remaining: epilogue cloned per arm in the original, ours merges; final block stores ptr[n] before len and `mov edi,eax` before `mov esi,src`.
+// Tried 2026-11-16 (round 23, 25 variants): ptr[n]=0 before len=n, trailing return, nested __forceinline/inline helper with the returns, tail duplicated per arm, goto/do-while, condition/store-order/Rc-compare forms: all 43 insns/635 bytes or worse (do-while 617/62 insns, strlen folded 527/128); VC6 always merges the three returns into one epilogue.
 SkidMarks::SkidMarks()
 {
     int q = DAT_00501428;
