@@ -1221,6 +1221,7 @@ void ServiceMenu::DrawTune()
 // Tried 2026-11-01 re-pass: 176->168 insns (1105->925 bytes): damage loop as a do-while over `float* dp` with a volatile down-counter k=7 (the original has dp walking in ebp, the count in a [esp+0x24] slot, no guard), y(248) assigned before x(601) so the slot stores follow the original; ~25 variants (decl order of i/dp/k, loop forms, -1 via int/white temp, ptr walk of SMH_PartText, i==unk2c, unsigned i, if/else colour) did not change the remaining diff: first loop has i/ptr in ebx/ebp swapped vs the original's ebp/ebx and -1 lands in ebp not ebx after the loop (so DrawQuad pushes ebp), loop x/y slots 0x14/0x18 swapped; the original has no EH states in the loop so empty-dtor colour structs do not apply.
 // 2026-11-12: 30 more variants (loop tp pointer, if/else and SetColorObj colour, direct text->color, x/y decl swap, k/dp declaration placement): unchanged 165 insns; i/tp and -1/dp register pairs stay swapped.
 // 2026-11-13 round 2: 65->63 insns (x(339) computed before y(262)); ~45 more variants on the -1/dp ebx/ebp swap (white int/Color locals, separate white for the loop, col set inside loop, dp/k/col order, loop forms, repair[7-k], float dv=*dp) all 65 or worse.
+// 2026-11-15 round 15: 63->62 insns (u and v both initialised before the level tests); k-- order, y+=, dp++ order, SetColorObj/scale/x/y reorders, non-volatile k all no gain.
 // original: FUN_0044a420 (page 2 of Draw)
 void ServiceMenu::DrawRepair()
 {
@@ -1275,10 +1276,10 @@ void ServiceMenu::DrawRepair()
                     level = 1;
                 }
                 float u = 0.0f;
+                float v = 0.0f;
                 if (level & 1) {
                     u = 0.5f;
                 }
-                float v = 0.0f;
                 if (level & 2) {
                     v = 0.5f;
                 }

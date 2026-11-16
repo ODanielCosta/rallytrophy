@@ -2181,6 +2181,7 @@ static inline void AssignStd(NameString& n, const std::string& s)
 }
 
 // NONMATCHING: RALLYTROPHY 0x463940
+// 2026-11-15 pass: light sprite unk9c store moved after the color stores (before unk20): 66 -> 63 insns, 1115 -> 1101 bytes, 2923 bytes. Tried: meters store reorders (m1-m6, 64-70), volatile on blendSrc/Dst, unk9c at end / after lightSprite (no better).
 // 2026-11-13 pass: spriteCount non-volatile, tail store before ++count, SpriteName temp via pointer, AssignStd(b, dir + "x") (std::string temp, inline dtor): 1532->1115 bytes, 119->66 insns, 2936->2924. Left: meters stores 18/1c/20 scheduled late (2 sites), light sprite 2-in-edx/test dl, Brake/Reverse eax/edi load order; 300 store permutations per site found nothing better; QuadF helper and stale-volatile removal were worse.
 // 2026-10-31: 30 trailing discarded Bal(1) calls (N 27..37; fewer do nothing, 38+ over-spend) keep the early-return _Tidy calls out of line, chained cache stores reversed: 190->150 insns. Tried: JoinPath temp as the Assign argument (worse, 2977 bytes). Still differs: ADD_SPRITE count inc scheduling (mov/inc/mov vs inc mem), the original passes the operator+ result eax straight to Assign instead of lea of a named tmp, sprite store order.
 // Tried 2026-11-01 re-pass: ADD_SPRITE with count inc before the tail store and the free-list next in a block temp, flareBrake stored before the name Assign, volatile color40[0] at the Brake site: 311->263 diff lines. Count inc deferral past the next call's arg pushes, node reg (ecx vs edx) and color40/color60 store order at Brake/Reverse sites still differ (about 120 insns; permute not run, too far).
@@ -2297,7 +2298,6 @@ void Car::LoadTextures(const std::string& dir)
     s->blendDst = 2;
     s->unk98 = 0xf;
     s->unka0 = 0xf;
-    s->unk9c = 2;
     s->color60[0] = 1.0f;
     s->color60[1] = 1.0f;
     s->color60[2] = 1.0f;
@@ -2307,6 +2307,7 @@ void Car::LoadTextures(const std::string& dir)
     s->color70[1] = 0;
     s->color70[2] = 0;
     s->color70[3] = 0;
+    s->unk9c = 2;
     s->unk20 = 4;
     v->lightSprite = s;
     s->color40[0] = 1.0f;
