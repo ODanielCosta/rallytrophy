@@ -480,6 +480,7 @@ int Player::FUN_00491f70()
 
 // NONMATCHING: RALLYTROPHY 0x491c10
 // 2026-11-16 (F7): accumulator form (float s0=b0; s0-=a0; s0*=inv) for s0,s1 moves the copyFrom mov/test one slot earlier: 2 -> 1 insn differ (9 bytes); a third slot is not reachable (~270 accumulator/double combos).
+// 2026-11-16 (F10): ~200 more: cf as bool/int/inline-helper (local struct Get, by value and by ref) at all 19 statement positions, constant-first s2..s4, if (Get(copyFrom)), mixed accumulator/inv-first/inv*x forms: test never moves, 1 insn stays.
 // Tried 2026-10-30 night: bool/int copy of copyFrom, inline slopes (worse), ternary offset temps (worse), volatile copy (worse); the mov ecx,[esp+30h]/test still sits after the fsub/fmul pair instead of before them.
 // Tried 2026-10-31 re-pass: volatile copyFrom read at 8 positions (best case moves mov+test one slot too early, 2 insns), split slope decls, plain int copy; permute.py -r 40 found nothing better than the (2,8) baseline.
 // 2026-11-16 (round 32): ~45 more variants (copyFrom copy local at every statement boundary incl. const/!!/unsigned/const param, slopes inline/declared per store, product order, two-if split, goto): all stay at 2 insns; the test position never moves.
