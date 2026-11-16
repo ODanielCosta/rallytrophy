@@ -348,6 +348,7 @@ void ServiceMenu::UnloadTextures()
 // worse); text declared first with a late int/struct/memcpy init: unchanged. Probes: extra stores to text do not move
 // it, one reference fewer on d moves d above f. So the original has fewer counted references on d and f than ours.
 // 2026-11-12: 15 more variants (separate f/g, double fr via qword asm, no d, text first/last with explicit stores, stage1 local, loop-counter forms): unchanged 40 insns.
+// 2026-11-16 (r20): ~55 more variants (stageNo++ before the loop with shifted uses, 45 operand-order forms of n/b3/==5, hoisted s1/base2 locals, rallyNo*10+0xbe): none below 40 insns; sizegap now shows only the hoisted stageNo+1 temp in esi vs the original's eax (3 hunks, +-6 bytes).
 // original: FUN_004470a0 (thiscall, ret 0xc; info.ini loader: per-stage strings)
 void ServiceMenu::Init(int rallyNo, int stageNo, int count)
 {
