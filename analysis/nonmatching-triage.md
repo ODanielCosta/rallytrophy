@@ -31,7 +31,7 @@ Instruction-multiset view: 41 functions are pure register/scheduling permutation
 | 0x4150b0 | src/unk_414fe0.cpp | StageSounds::FUN_004150b0 | size | 689 | 697 | 131 | 11 | `jb     0x415361` | `jb     0x415359` |  |
 | 0x415370 | src/unk_415370.cpp | StageSoundLoader::LoadSounds | other | 3209 | 3209 | 248 | 16 | `jle    0x4156d6` | `mov    DWORD PTR [ebp-0x2c],ebx` |  |
 | 0x416260 | src/unk_416260.cpp | StageSoundLoader::LoadSoundFiles | size | 1837 | 1822 | 814 | 26 | `mov    ebp,ecx` | `mov    ebx,ecx` |  |
-| 0x416f30 | src/unk_416f30.cpp | PropStage::Load | size | 1254 | 1270 | 633 | 9 | `jne    0x41740d` | `jne    0x4173fd` |  |
+| 0x416f30 | src/unk_416f30.cpp | PropStage::Load | size | 1280 | 1270 | 636 | 17 | `jne    0x41740d` | `jne    0x417417` |  |
 | 0x417540 | src/unk_417540.cpp | Stage::FUN_00417540 | size | 2292 | 2332 | 1929 | 107 | `sub    esp,0x90` | `sub    esp,0xac` |  |
 | 0x417ee0 | src/unk_416f30.cpp | ?Ins@PropVec@@QAEXPAUStageProp@@IABU2@@Z | size | 804 | 818 | 391 | 30 | `mov    ecx,edi` | `mov    edx,edi` |  |
 | 0x418b90 | src/unk_418b90.cpp | SweepQuery::Cast | size | 2157 | 2054 | 1809 | 55 | `je     0x418c12` | `je     0x418c25` |  |
@@ -71,13 +71,13 @@ Instruction-multiset view: 41 functions are pure register/scheduling permutation
 | 0x44a420 | src/unk_445e80.cpp | ServiceMenu::DrawRepair | size | 2255 | 2256 | 1066 | 10 | `jle    0x44ac62` | `jle    0x44ac61` |  |
 | 0x44c580 | src/unk_44b930.cpp | ReplayMenu::DrawField | order+registers | 2554 | 2554 | 13 | 0 | `mov    edx,DWORD PTR [esi+0x24]` | `mov    esi,DWORD PTR [esi+0x24]` |  |
 | 0x44d6a0 | src/unk_44d260.cpp | SaveGame::LoadSlot | size | 2071 | 2053 | 1317 | 18 | `je     0x44d833` | `je     0x44d846` |  |
-| 0x44deb0 | src/unk_44d260.cpp | SlotStore::LoadRelay | size | 1270 | 1321 | 966 | 40 | `sub    esp,0x48` | `sub    esp,0x44` |  |
+| 0x44deb0 | src/unk_44d260.cpp | SlotStore::LoadRelay | size | 1281 | 1321 | 965 | 36 | `sub    esp,0x48` | `sub    esp,0x44` |  |
 | 0x44e3e0 | src/unk_44d260.cpp | SlotStore::SaveRelay | size | 619 | 624 | 402 | 8 | `lea    eax,[ecx*8+0x0]` | `mov    al,BYTE PTR [esp+0x5c]` |  |
 | 0x44ed90 | src/unk_44ea60.cpp | SlotMenu::Frame | other | 3386 | 3386 | 1751 | 28 | `jmp    0x44f1cf` | `jmp    0x44f1d9` |  |
 | 0x450be0 | src/unk_44ea60.cpp | SlotMenu::Slot3 | other | 706 | 706 | 272 | 14 | `push   0x3f800000` | `mov    ebp,DWORD PTR ds:0x0` |  |
 | 0x452b20 | src/unk_452b20.cpp | Car::FUN_00452b20 | order | 897 | 897 | 160 | 0 | `mov    ecx,DWORD PTR [eax]` | `fld    DWORD PTR [esi+0x20d0]` |  |
 | 0x453940 | src/unk_452b20.cpp | Car::FUN_00453940 | size | 4994 | 5036 | 3298 | 33 | `sub    esp,0x11c` | `sub    esp,0x110` |  |
-| 0x454d10 | src/unk_452b20.cpp | Car::FUN_00454d10 | other | 843 | 843 | 56 | 0 | `fld    DWORD PTR [ebp-0x14]` | `fld    DWORD PTR [ebp-0x10]` |  |
+| 0x454d10 | src/unk_452b20.cpp | Car::FUN_00454d10 | other | 843 | 843 | 51 | 0 | `fld    DWORD PTR [ebp-0x14]` | `fld    DWORD PTR [ebp-0x10]` |  |
 | 0x455070 | src/unk_452b20.cpp | Car::LoadDriver | registers | 3651 | 3651 | 10 | 0 | `lea    ebp,[esi+edx*1]` | `lea    ebp,[edx+esi*1]` |  |
 | 0x456b10 | src/unk_4563e0.cpp | ViewManager::FUN_00456b10 | size | 3505 | 3489 | 2661 | 87 | `mov    eax,DWORD PTR [ebp+0x8]` | `mov    edx,DWORD PTR [ebp+0x8]` |  |
 | 0x4581f0 | src/unk_4581f0.cpp | Car::FUN_004581f0 | size | 915 | 923 | 295 | 8 | `mov    DWORD PTR [ebp-0x4c],ecx` | `mov    DWORD PTR [ebp-0x40],ecx` |  |
