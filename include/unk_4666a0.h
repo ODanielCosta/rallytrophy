@@ -12,7 +12,7 @@ class TmpString {
 public:
     ~TmpString() { Tidy(true); }
     void Tidy(bool built);             // 0x402700
-    const char* c_str() const { return ptr ? ptr : ""; }
+    const char* c_str() const { const char* r = ptr; if (r == 0) r = ""; return r; }
     std::allocator<char> alloc;
     char* ptr;
     unsigned int len;

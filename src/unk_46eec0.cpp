@@ -7,6 +7,7 @@
 #include "unk_47b4c0.h"
 #include "unk_474c50.h"
 #include "unk_46eec0.h"
+#include "scene_object.h"
 #include <math.h>
 
 // Float to int with the x87 default rounding (inline assembler, as in the original).
@@ -57,6 +58,7 @@ struct TmpLV : public ViewMat {
 // corner helper still uses a different register schedule.
 // Tried 2026-10-31: CopyV int copy for corner stores plus this->corner[k] for corners 1-3 (c only for corner 0) took 101->~19 insns; kind/flags barriers and load permutations done; still differs in EH state store placement (early vs just before Concat), flags/position14 register choice, and x87 operand order of the first corner add.
 // Tried 2026-10-31 re-pass: local ViewMat-derived TmpLV with inline copy ctor (EH state 2 now lands before Concat as in the original) and tmp.m[14] stored after it took 19->14 insns; sweeps of flags/position14 load order, glow/flare/matrix store order, volatile tmp stores, and AddRC/AddCR x87 operand helpers did not move the remaining diffs (add esi,0x20 slot, edx/eax roles for position14/flags, first-component fld order of corners 0 and 1).
+// Tried 2026-11-15 (r14): 144 load/store/flags-load permutations of the position14 copy, flags written as f/f|1 forms, glow/flare/unk8 store reorders: none below 14 insns (px lands in eax, original edx; the 1 byte size gap is and al,0xfd vs and dl,0xfd).
 CityLight::CityLight(LightSource* source, TextureLoader* loader, Sprite* glowSprite, Sprite* flareSprite)
 {
     unk8 = 0;
@@ -152,12 +154,26 @@ inline void FlareUV(EffectVertex* v, float c, float s)
     v[3].v = c + (0.5f - ms);
 }
 
+inline EffectVertex* FlareSet(EffectVertex* quad, const Vec3& d, Camera* camera, float& cs, float& sn)
+{
+    float rightAngle = (d.z * camera->right.z + d.y * camera->right.y + d.x * camera->right.x) * 0.7f;
+    float upAngle = (d.z * camera->up.z + d.y * camera->up.y + d.x * camera->up.x) * 0.7f;
+    float ang = rightAngle + upAngle;
+    ang = ang * 3.1415927f;
+    cs = (float)cos(ang) * 0.5f;
+    sn = (float)sin(ang) * 0.5f;
+    FlareUV(quad, cs, sn);
+    return quad;
+}
+
 // NONMATCHING: RALLYTROPHY 0x46f360
 // 1777 vs 1767 bytes. The eye-relative vector follows the target's component load/subtract/store order; separately
 // named right/up flare-angle contributions preserve their scale-before-add sequence. Volatile flare intermediates
 // remain at different stack slots, and projection, normalization, and UV code still differ.
 // Tried 2026-10-30 night: shared float temp/bit-compare for near plane, pos*m operand order, forceinline ScaleVec for normalise and R/U, Vec3 d*inv, double inv, quad normal x,y,z order, local declaration order (204 insns, only the inline inv multiply changed); still differs: original keeps inv on the FPU stack (fld y; fmul st,st(1)), frame is 4 bytes larger (extra 8-byte slot before depth), depth/near compare via [ebp+0xc] float copy, return-path layout.
 // Tried 2026-11-01 re-pass: 17 more variants (depth operand order pos*m, sqrt as double 1.0/ls, volatile/shared nearZ, nearZ in dead camera param slot, sign-test branch flip, dead float/volatile locals for the extra frame slot); none under 204 insns differ. The 4-byte larger frame and nearZ in [ebp+0xc] are not reproduced; permuter not run (far over 10 insns).
+// 2026-11-13 pass: 205 -> 190 insns differ (1777 -> 1765 vs 1767 bytes): c -= ScenePoint operator*(1.0f) (0x40b0c0, call now matches), per-component corner positions then += corner[j], int dz copy for the near clamp. Remaining: nearZ dead store to [ebp+0xc] + 4-byte larger frame, inv kept on the FPU stack, R/U scale (size loaded once, fstp st(0)), angle math with DrawQuad args pushed early, return-path layout of the f sign test.
+// 2026-11-15 pass: 190 -> 179 insns differ (1765 vs 1767): everything after the alpha clamp nested under if (bits(a) >= 0) with the else-if return kept; sibling forms (sign test nested, a>0.001 nest, per-component R/U scale, Dot/depth operand swaps, d*=inv variants) were equal or worse.
 void CityLight::Render(RenderDevice* device, Camera* camera)
 {
     Vec3 d;
@@ -172,17 +188,18 @@ void CityLight::Render(RenderDevice* device, Camera* camera)
     const float* m = device->GetViewMatrix();
     float depth = m[10] * position.z + m[6] * position.y + m[2] * position.x + m[14] - size;
     int nearZ = camera->nearBits;
-    if (*(int*)&depth <= nearZ) {
+    int dz = *(int*)&depth;
+    if (dz <= nearZ) {
         *(int*)&depth = nearZ;
     }
     float ls = d.x * d.x; ls = d.z * d.z + ls; ls = d.y * d.y + ls;
     float inv = 1.0f / (float)sqrt(ls);
-    d.x = inv * d.x;
-    d.y = d.y * inv;
-    d.z = d.z * inv;
+    d.x *= inv;
+    d.y *= inv;
+    d.z *= inv;
     EffectVertex quad[4];
     Vec3 c = *(Vec3*)&position;
-    c -= d * 1.0f;
+    c -= *(Vec3*)&(*(ScenePoint*)&d * 1.0f);
     for (int i = 0; i < 4; i++) {
         quad[i].normal.x = axis.x;
         quad[i].normal.z = axis.z;
@@ -219,36 +236,37 @@ void CityLight::Render(RenderDevice* device, Camera* camera)
     }
     float e = exponent;
     float a = (float)pow(f, e) * scale + bias;
-    if (*(int*)&a < 0) {
+    if (*(int*)&a >= 0) {
+        if (*(int*)&a > 0x3f800000) {
+            a = 1.0f;
+        } else if (a <= 0.001f) {
         return;
+        }
+        c = *(Vec3*)&position;
+        int v = FloatToInt(a * 255.0f) & 0xff;
+        DWORD col = (v << 8) | v;
+        col = col | (col << 16);
+        for (int j = 0; j < 4; j++) {
+            quad[j].position.x = c.x;
+            quad[j].position.y = c.y;
+            quad[j].position.z = c.z;
+            quad[j].position += corner[j];
+        }
+        quad[0].color = col;
+        quad[1].color = col;
+        quad[2].color = col;
+        quad[3].color = col;
+        float rightAngle = (d.z * camera->right.z + d.y * camera->right.y + d.x * camera->right.x) * 0.7f;
+        float upAngle = (d.z * camera->up.z + d.y * camera->up.y + d.x * camera->up.x) * 0.7f;
+        float ang = rightAngle + upAngle;
+        ang = ang * 3.1415927f;
+        float cs = (float)cos(ang) * 0.5f;
+        float sn = (float)sin(ang) * 0.5f;
+        FlareUV(quad, cs, sn);
+        device->DrawQuad(quad, flare, depth);
+        FlareUV(quad, cs, -sn);
+        device->DrawQuad(quad, flare, depth);
     }
-    if (*(int*)&a > 0x3f800000) {
-        a = 1.0f;
-    } else if (a <= 0.001f) {
-        return;
-    }
-    c = *(Vec3*)&position;
-    int v = FloatToInt(a * 255.0f) & 0xff;
-    DWORD col = (v << 8) | v;
-    col = col | (col << 16);
-    for (int j = 0; j < 4; j++) {
-        quad[j].position = c;
-        quad[j].position += corner[j];
-    }
-    quad[0].color = col;
-    quad[1].color = col;
-    quad[2].color = col;
-    quad[3].color = col;
-    float rightAngle = (d.z * camera->right.z + d.y * camera->right.y + d.x * camera->right.x) * 0.7f;
-    float upAngle = (d.z * camera->up.z + d.y * camera->up.y + d.x * camera->up.x) * 0.7f;
-    float ang = rightAngle + upAngle;
-    ang = ang * 3.1415927f;
-    float cs = (float)cos(ang) * 0.5f;
-    float sn = (float)sin(ang) * 0.5f;
-    FlareUV(quad, cs, sn);
-    device->DrawQuad(quad, flare, depth);
-    FlareUV(quad, cs, -sn);
-    device->DrawQuad(quad, flare, depth);
 }
 
 // Module end: the STL header statics guard and its atexit registration (the stub of this file).

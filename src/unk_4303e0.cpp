@@ -112,7 +112,7 @@ extern "C" void __fastcall FUN_00433bc0(Game*);
 extern "C" void __fastcall FUN_00434a50(Game*);
 extern "C" void __fastcall FUN_00434df0(Game*);
 extern "C" void __fastcall FUN_00434dd0(Game*);
-extern "C" void __fastcall FUN_00434ba0();
+extern "C" void __fastcall FUN_00434ba0(Game*);
 extern "C" void __fastcall FUN_004327d0(Game*);
 extern "C" void __fastcall FUN_00425e50(Game*);
 extern "C" void __fastcall FUN_004a9520(void*, void*, const char*, float, float);
@@ -130,11 +130,8 @@ extern "C" void fun_0049a5a0();
 extern "C" void __fastcall FUN_004af120(void*);
 extern "C" void __fastcall FUN_004adf50(void*);
 
-// NONMATCHING: RALLYTROPHY 0x4309d0
-// State 0-2 share the audio/resource update calls. The target lays the shared block after case 0 so cases 1 and 2 jump
-// backward to it; VC6 places it after cases 1 and 2, changing the dispatch targets. Other small switch-order differences remain.
-// Tried 2026-10-30 night: case order permutations, goto-into-case-0 label, per-case inline tails, if-chain, post-switch tail; moving DAT_00501472=0 before FUN_004a4870 in cases 1/2 fixed store order (28->16 insns); still differs: VC6 always places the shared audio block after case 2, the original has it after case 0 with cases 1/2 jumping back.
-// Tried 2026-10-31 re-pass: 13 more variants (goto-to-shared-label in all 3 cases, if(0){label} block, for/do-while wrapper, case order 1,2,0, volatile state/this barrier before goto, end-of-loop label); all 16+ insns differ, VC6 always tail-merges the audio block after case 2 (last copy), never at case 0; stays 16 insns (over the permuter limit).
+// FUNCTION: RALLYTROPHY 0x4309d0
+// Matched 2026-11-16: while(1){if(DAT_0057b9f4) goto cleanup;..} loop with the audio tail written out in each of cases 0-2 (no goto); a goto-shared tail never matched.
 void Game::FUN_004309d0() {
     Config config;
     config.Define(G9_GameIniKeys, 12);
@@ -161,7 +158,8 @@ void Game::FUN_004309d0() {
         ((RaceMode*)emptyObject)->RaceMode::Lock();
     menu.FUN_0043cb50(0);
     FUN_00432aa0(this);
-    while (!DAT_0057b9f4) {
+    while (1) {
+        if (DAT_0057b9f4) goto G2_cleanup;
         int state = FUN_00432e10(this);
         DAT_00501460 = 0;
         if ((unsigned int)state <= 6) {
@@ -169,20 +167,27 @@ void Game::FUN_004309d0() {
             case 0:
                 FUN_004a4870("data/settings/game.ini"); DAT_00501458 = 0; DAT_0050145c = 1; DAT_00501473 = 0;
                 FUN_00433220(this); DAT_00501472 = 0;
-            G2_update_audio:
                 FUN_004af120((char*)this + 0x1393e4);
                 FUN_004af120((char*)this + 0x139404);
                 FUN_004adf50((char*)this + 0x139424);
                 break;
             case 1:
                 DAT_00501472 = 0; FUN_004a4870("data/settings/game.ini"); DAT_00501458 = 1; DAT_0050145c = 0; DAT_00501473 = 0;
-                FUN_00433bc0(this); goto G2_update_audio;
+                FUN_00433bc0(this);
+                FUN_004af120((char*)this + 0x1393e4);
+                FUN_004af120((char*)this + 0x139404);
+                FUN_004adf50((char*)this + 0x139424);
+                break;
             case 2:
                 DAT_00501472 = 0; FUN_004a4870("data/settings/game.ini"); DAT_00501458 = 0; DAT_0050145c = 1; DAT_00501473 = 0;
-                FUN_00434a50(this); goto G2_update_audio;
+                FUN_00434a50(this);
+                FUN_004af120((char*)this + 0x1393e4);
+                FUN_004af120((char*)this + 0x139404);
+                FUN_004adf50((char*)this + 0x139424);
+                break;
             case 3: FUN_00434df0(this); break;
             case 4: FUN_00432b00(this); FUN_00425e50(this); ((GameView*)this)->FUN_00432b30(0, 0); break;
-            case 5: if (DAT_00508bdc) FUN_00434ba0(); else goto G2_cleanup; break;
+            case 5: if (DAT_00508bdc) FUN_00434ba0(this); else goto G2_cleanup; break;
             case 6: FUN_00434dd0(this); break;
             }
         }
@@ -430,6 +435,7 @@ public:
 // Tried 2026-10-31 second pass: 25 more variants (field-major FM macro/chained/reversed Style = 273 worse, if-wrapped body, volatile -1/self idiom early = worse, declared-first sprites, const locals); stuck at 182: original keeps `push edi` in the first block (we sink it past the new/null branch to the join), which shifts stack offsets by 4 and changes how VC6 interleaves the Style stores.
 // Tried 2026-10-31 third pass: 23 volatile/early-use variants for the early `push edi` (volatile uiBuilt read/store, volatile dummy locals, volatile xs/ys, volatile background/lineMain pre-stores, volatile self, bg local, ys before uiBuilt, int h, hoisted -1/6 consts); all 182 or worse (269-275 when a volatile is added before the new), push edi never leaves the join.
 // Tried 2026-11-01 re-pass: 11 more (Style order reversed/rotated 212/200, Style interleaved with Upload 430, volatile uiBuilt store 184, split sprite decls, int one/m1 locals, bg local, uiBuilt before xs); nothing under 182.
+// Tried 2026-11-15 round 14: 12 more (xs/ys split decl+assign, uiBuilt moved, Style via line* fields / array loop / before Upload, sprite locals after stores, texture chained assign, int w local); all 182 or worse, no change kept.
 // Builds the front-end once: background image, line sprites, cursor, the seven main-menu labels, the embedded
 // screens' Setup, and a random background video data/video/menu<1..11>.bik.
 void G3_Game::FUN_00430f60()
@@ -1394,6 +1400,7 @@ public:
 };
 
 // NONMATCHING: RALLYTROPHY 0x432e10
+// 2026-11-16 pass (round 19): 11 more variants (UIRect** array + index, plain/all-volatile/partial-volatile receivers, float temps, named receiver pointer); none beat 10 insns (54 bytes), same size 1031.
 // Tried 2026-10-30 night: while-loop + goto-six, Get() returns UIRect*&, volatile rect reloads (mask search of 64), x*width/y*height fix, permute -r 20; 10 insns left: ecx load/push/EH-state store order around the six rect calls (original loads are plain but not CSE'd).
 // Tried 2026-10-31 re-pass: 30+ variants (volatile/plain mask on the six rect loads, volatile/plain local receiver pointers, sequential float temps, HudPoint temps, rv/off decl order, one-expression forms) plus permute -r 40; none beat 10 insns (all-volatile 14); original orders ecx load, lea, push, EH store per rect call while VC6 sinks the ecx load past the EH-state store.
 // Current candidate: 1011 bytes vs 1031, 554 differing bytes. PE disassembly restores the six rectangle reads for the
@@ -1600,6 +1607,7 @@ public:
 // original keeps &trackSelect in ebp/[esp+0x38] across the rally loop and this in ebp in the stage loop; frame 8 bytes larger).
 // Tried 2026-10-30 night: 20 variants (local declaration/order incl. per-rally locals and limit/rallies, tracks alias/reference/none/early, this-volatile/const alias, MenuGame* alias, for-loop, stage=rally init); none beat 380 insns (limit-first gave 377 by breaking the loop shape); VC6 keeps this=edi/state=esi/1=ebx where the original has esi/ebp/edi plus two more frame dwords.
 // Tried 2026-11-01 re-pass: 22 more variants (decl order of state/stage/rally/resumed/limit, volatile/self limit, for/while forms, per-rally locals hoisted/reordered, carClass order, batch ternary, rallies/DAT_00501468 order); all 377-386 insns, nothing closer (ternary batch 379, limit inlined into while-body 377 but shape differs); main-loop regalloc (this=esi/state=ebp/1=edi, +8 frame) still unexplained.
+// Round 16 (2026-11-15): ~45 more variants, nothing kept (381 insns / 2432 bytes unchanged). Decl scope/order of i, stages, rallies, tracks, state and limit change nothing (VC6 shares slots by liveness); case-order permutations 375 insns but +9 bytes and a new epilogue hunk; tracks assigned twice / conditionally kept in a register but added dead code (397). Root is the main-loop permutation: original state=ebp, loop vars i/cars/P=esi/edi/ebx; ours state=esi.
 // Front-end race start: runs the mode / career / name / car / track screens as a state machine, creates the
 // players and runs every stage of the selected rallies (service area before each pair of stages).
 int GameG7::StartRace()
@@ -1967,6 +1975,7 @@ extern G8_Opponent DAT_004f7c30[];
 // `this` alias, zero as a variable, volatile locals, fastcall free function: none flips the allocation.
 // Tried 2026-10-30 night: ~30 variants (declaration order permutations, init order/chained inits, do-while vs for(;;), ternary vs if, lastA/lastB decl swap, volatile info, reordered career stores): declaration order has no effect at all; original keeps carClass at [esp+0x20] and info at [esp+0x24] (ours swapped), lastA above lastB, 12 bytes longer; still 191 insns differ.
 // Tried 2026-11-01 re-pass: 17 more variants (volatile self/this alias, local g for this, init order/chains, zero-store tweaks, decl moves of mode/limit/arcade, load order); none beats 191 insns; diff is the edi/ebx/ebp priority swap (orig this=edi zero=ebx one=ebp; ours zero=edi one=ebx this=ebp), not within permuter range.
+// Tried 2026-11-15 (round 18, ~45 compiles): inline vs local menu/career alias, d/e temp folding, rally-1 local, lastA/lastB store forms and orders, `1 == n`/`n-1 == 0`/one-variable compares, init/zero-store order, dropping constant stores to probe weights (this/zero/one allocation never flips; this stays lowest). Best stays 186 insns; no kept change.
 int GameG8::FUN_00433bc0()
 {
     DAT_00508f60 = 0;
@@ -3751,13 +3760,14 @@ struct G13_WarpPoint {
 // volatile stores, separate init statements, permute -r 20): declaring choice first fixes the back-edge `mov edi,1 / xor ebx,ebx` order but then the
 // prologue stores [esp+10]/[esp+1c] swap; the original has wait,choice order in the prologue and edi,ebx at the back-edge, which no single declaration order gives.
 // Tried 2026-11-01 re-pass: volatile init of wait/choice/first, volatile wait store-back, volatile first read, extra int local, result via temp, permute -r 40 (best 1 insn, no MATCH); still only the back-edge `mov edi,1 / xor ebx,ebx` order differs (VC6 re-materialises the two constants after the inlined G13_String dtor).
+// Tried 2026-11-14: wait=0 moved to loop end (+first=1/choice=choice), trailing continue, for(;cond;) head, BeginScene if-wrap, string in inner block, first/choice/wait reorder: none beat 1 insn (back-edge swap).
 // Modal "question / Yes / No" dialog: Left/Right or the mouse pick the answer, Enter or a click confirms, Esc cancels.
 // Returns 1 for Yes (class Game in the merged header). original: FUN_00436250
 int GameObj::FUN_00436250(MenuScreen* screen)
 {
     float x, y;
-    int wait = 0;
     int choice = 1;
+    int wait = 0;
     int first = 1;
     Color color;
     DAT_0056b0bc->ClearKeys();
@@ -3851,8 +3861,8 @@ int GameObj::FUN_00436250(MenuScreen* screen)
         DAT_0056b0ac->Present();
     }
     DAT_0056b0bc->ClearKeys();
-    DAT_0057ba20 = 0;
     DAT_0057ba24 = 0;
+    DAT_0057ba20 = 0;
     return choice == 0;
 }
 
@@ -4222,6 +4232,7 @@ struct G15_Str {
 };
 
 // NONMATCHING: RALLYTROPHY 0x437220
+// Tried 2026-11-16 (r21, sibling 0x4309d0 pattern): early `if (closed) return v->confirmSel/sel; return -1;` plus the inline SetColorObj(Color(DAT_00508c04)) final store (as matched 0x437770) cuts it to 25 insns but still 1384 bytes: both returns get a full epilogue and `or eax,-1` is scheduled between pops (original shares one epilogue, `or` before it); also no v alias, no sel local, color/x order, !closed, ?: (1309 bytes, 23), if/else, goto, `r` var: no gain over 23 insns/1311.
 // Tried 2026-10-31 re-pass: 18 more tail shapes (ternary, switch, do/break, goto, nested-block returns, bit-mask select, volatile-free sel reuse); all 23 (single cleanup, 1309-1326 bytes) or 29-43 (duplicated epilogue); original shares one epilogue yet duplicates the string cleanup per return, still unreproduced.
 // Tried 2026-10-30 night: 14 return-shape variants (goto/result var/ternary/braced string scope); `int r = -1; if (closed) r = sel; return r;` gives 34->23 (single cleanup, 1311 vs 1346 bytes); original duplicates the string cleanup per return yet shares one epilogue, which no source shape reproduced. Retried with the twin's shape (early `if (closed) return sel/v->confirmSel; return -1;`, `!closed` form, ternary, no sel local, color/x order, decl order): 30-43 insns and 1384 bytes (cleanup and epilogue both duplicated), worse than 23.
 // original: FUN_00437220 (fastcall; confirmation dialog, -1 while open, else the chosen answer)

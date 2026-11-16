@@ -31,6 +31,7 @@ static inline int Bal(int a) { return a + 1; }
 // With the for form in BOTH blocks every instruction is right but the two vertex structs swap stack slots (UV at 0x38
 // instead of 0x6c), so the second block keeps `while (n--)` (its lea is the remaining difference). Not moved by:
 // declaration orders, hoisted n/source/payload, index++ argument, outer-loop spellings, 9 other counter forms.
+// 2026-11-14: no gain (2 bytes/1 insn). Second block: != 0, n>0, --n, n-- != 0, while(n)--n, for(;;)break, copy-counter m, do-while all worse (13-145 insns); swapping which block uses for/while stays 1 insn; for in both + hoisted/reference vertex decls worse.
 void ModelCacheUpload::UploadVertices(int count, unsigned char flags, std::vector<Mesh*>* meshList)
 {
     if (count > 0) {

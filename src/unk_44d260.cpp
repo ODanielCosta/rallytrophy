@@ -109,14 +109,44 @@ public:
     ~FB2_Path()
     {
         if (ptr == 0) {
-        } else if (((unsigned char*)ptr)[-1] == 0 || ((unsigned char*)ptr)[-1] == 255) {
+        } else if (Rc() == 0 || Rc() == 255) {
             alloc.deallocate(ptr - 1, reserve + 2);
         } else {
-            --((unsigned char*)ptr)[-1];
+            --Rc();
         }
         ptr = 0, len = 0, reserve = 0;
     }
+    unsigned char& Rc() { return ((unsigned char*)ptr)[-1]; }
     void Tidy(bool built);             // 0x402700
+    void Assign(const char* s, unsigned int n); // 0x404ba0
+    void Append(const char* s, unsigned int n); // 0x403ba0
+    void Add(const char* s) { Append(s, strlen(s)); }
+    void Set(const char* s) { Assign(s, strlen(s)); }
+    const char* c_str() const { return ptr ? ptr : ""; }
+    std::allocator<char> alloc;
+    char* ptr;
+    unsigned int len;
+    unsigned int reserve;
+};
+
+static inline int Bal(int a) { return a + 1; }  // discarded calls: inline-budget ballast (see LoadSlot)
+
+// Twin of FB2_Path used only by SaveGame::LoadSlot.
+class FB2_LoadPath {
+public:
+    FB2_LoadPath(const std::allocator<char>& al = std::allocator<char>()) : alloc(al) { Tidy(false); }
+    ~FB2_LoadPath() { Tidy(true); }
+    unsigned char& Rc() { return ((unsigned char*)ptr)[-1]; }
+    void Tidy(bool built)              // 0x402700 (std::string::_Tidy), inline-defined so exits can call it or expand it
+    {
+        if (!built || ptr == 0) {
+        } else if (Rc() == 0 || Rc() == 255) {
+            alloc.deallocate(ptr - 1, reserve + 2);
+        } else {
+            --Rc();
+        }
+        ptr = 0, len = 0, reserve = 0;
+    }
     void Assign(const char* s, unsigned int n); // 0x404ba0
     void Append(const char* s, unsigned int n); // 0x403ba0
     void Add(const char* s) { Append(s, strlen(s)); }
@@ -264,19 +294,18 @@ void SaveGame::SaveSlot(int slot)
 }
 
 // original: FUN_0044d6a0
-// NONMATCHING: RALLYTROPHY 0x44d6a0
-// 2092 vs 2053 bytes; control flow, calls and both player loops are the original's. Open: the frame is 12 bytes
-// larger (the original puts the itoa buffer at the bottom of the frame, overlapping the loop pointer slots, and spills
-// `this`), the early-exit string destructor is a call to _Tidy(true) shared by the three failure exits (here expanded
-// inline per exit), and the 10-dword copy loop uses edx/esi swapped.
-// Tried 2026-10-31: dropped a bogus FUN_00491130 call from the last (non-arcade AI) loop - the original has none there (146->143 insns); ~40 variants of the itoa buffer (decl order, block/for/if scope, int[3], struct, static) never move it into the low temp region (it stays at the frame top, +12 bytes, offsets of everything shift); static buffer proves that is the whole frame delta. Return-path/goto restructuring did not help.
-// Tried 2026-11-01: copying index/value into named temps (value first) before the two race->unk28/2c stores and routing the 10-dword stats copy through a named int temp improved 143->122 insns differ; ~25 more variants (buffer decl placement, direct path.Add(itoa), volatile n/remaining, tail-copy temps, id temps, loop-index/cursor hoists, magic2 inverted return) no better; still open: itoa buffer +12 frame bytes, shared _Tidy exit for magic2 failure.
-// 2026-11-11: itoa buffer as `char number[2]` at function scope (SaveSlot form) fixes the frame (2085 -> 2076 bytes, 122 -> 63 insns); the three failed checks sharing one `fail: return 0` inside the third (as the original lays it out) 2076 -> 2071, 59 insns. Left: the original fail exit calls _Tidy(true) instead of the inline destructor, and the stats copy register swap.
+// FUNCTION: RALLYTROPHY 0x44d6a0
+// The path destructor is _Tidy(true): the failure exit (the `fail:` label sits inside the third header check, i.e. textually
+// before the success exit) calls it out of line and the success exit expands it. VC6 spends its inline budget per call site, last site
+// first: the 30 empty Bal() calls before the final cleanup use up the budget that the early failure exit and the
+// constructor's _Tidy(false) would otherwise expand with. FB2_LoadPath is a twin of FB2_Path that only this function uses: a
+// _Tidy that the TU already compiled elsewhere is known not to throw and loses the `mov state, -1` before the call
+// (study/FINDINGS.md).
 int SaveGame::LoadSlot(int slot)
 {
     int magic1, magic2;
     FB2_Record rec;
-    FB2_Path path;
+    FB2_LoadPath path;
     if (DAT_00501458) {
         path.Set("savegame/arcade");
     } else {
@@ -422,6 +451,9 @@ fail:
             race->AddPlayer(p);
         }
     }
+    Bal(0); Bal(1); Bal(2); Bal(3); Bal(4); Bal(5); Bal(6); Bal(7); Bal(8); Bal(9);
+    Bal(10); Bal(11); Bal(12); Bal(13); Bal(14); Bal(15); Bal(16); Bal(17); Bal(18); Bal(19);
+    Bal(20); Bal(21); Bal(22); Bal(23); Bal(24); Bal(25); Bal(26); Bal(27); Bal(28); Bal(29);
     FUN_0048e660();
     file->Close();
     delete file;
@@ -429,13 +461,17 @@ fail:
 }
 
 // NONMATCHING: RALLYTROPHY 0x44deb0
+// 2026-11-16 r27 (not kept): `return level < 0;` (always false) unmerges exit 3 (119 -> 111 insns, 1318 bytes) but emits test/setl where the original has xor eax,eax, so it is a fake gain. Exits 1/2 still merge; original returns int (xor eax,eax), ours bool (xor al,al) - the header's return type is a lead (check unk_4303e0.cpp caller).
 // The target deletes the file (dtor 0x4a4d90 + operator delete, no Close call) on bad headers; it Closes only on success.
 // Candidate is 1259/1321 bytes with 947 differing bytes. The target uses a 0x48 frame and local failure epilogues;
 // candidate uses a 0x44 frame and merges the three failure exits into one shared tail. Both use the per-player 10-dword stack temporary.
 // Tried 2026-10-31: 132 insns now (was 142: per-use car->snapshot[2] and a local CarSnapshot* per buffer block, dropped the bogus Close on bad headers). No source form stopped the failure-exit tail merge (return 0 vs false, nested else, goto, cipher/race decl positions, race copies per branch); int return (xor eax,eax) is right per the callers but changing the header affects other files.
 // Tried 2026-11-04 (ws-X): reading the player stats temp through a volatile int* keeps VC6 from turning the 10-dword copy loop into rep movs like the original (norm 229->208, 132->128 insns). Epilogue duplication of the done/stage failure exits is robust against: operator delete/scalar delete, alias pointers, inline helper returns, casts, decl order of race/player/cipher (toy tests: identical exits always cross-jump when the epilogue has >=4 pops; only differing code before the epilogue unmerges them). Per-block CarSnapshot* s / size temps: worse (138-150 insns).
 // Tried 2026-11-01 re-pass: 13 variants (int return via header + return 0, result local, volatile zero return, folded return exprs size-size/done&0/stage-stage, volatile level/DAT reads, store-order swap of level/stage, volatile loop stores, separate loop pointer); int return alone is 132 insns too and the three failure epilogues still merge into one tail (volatile zero return unmerges the tail but adds a spilled return slot, 129 insns, 1302 bytes); original also has 0x10 more below the cipher temp, not explained; 132 insns, too far for permute.
-bool SlotStore::LoadRelay()
+// 2026-11-16 r25: `in += 0x28` before the AI stats copy-out, `s` alias hoisted above the size test in buffer blocks 1/2, player stats loop through `int t = vt[k]` (128 -> 119 insns, 1270 -> 1281 bytes; failure exits still merge, 3 separate epilogues = the 40 byte gap).
+// 2026-11-16 r28: block 0 as `int n = s->size[0]` (test/new/memcpy) with `in += s->size[0] * 4` reloaded, `int u8 = unk8c` before the flags store, level/stage stores hoisted (DAT_00501464 = 1; DAT_0050132c = ...->level before the rally/stage loads): 75 -> 31 insns, 1317 -> 1320 bytes. Left: tail level load uses eax not ecx (mov eax,1 order) and the frame is 4 bytes smaller (0x50 vs 0x54).
+// 2026-11-16 r30 (no gain, 31 insns/1320 bytes): tail eax/ecx unchanged by `one` local, level local, `return DAT_00501472`, chain assignment, r=1 reuse; cipher at function scope/top (72-75 insns), race hoisted before cipher (53-64), cipher scope widened over memcpy/in (89 insns) all worse. Orig EH: cipher shares its slot with later buffer1 temp; orig has 3 temp slots (-60,-56 cipher,-52) where ours has 2.
+int SlotStore::LoadRelay()
 {
     DAT_00501472 = 0;
     if (!File::Exists("savegame/relay.sav")) {
@@ -445,7 +481,12 @@ bool SlotStore::LoadRelay()
     int magic0;
     int magic1;
     file->Read(&magic0, 4);
-    if (magic0 != 0x63777472 || (file->Read(&magic1, 4), magic1 != 0x20020109)) {
+    if (magic0 != 0x63777472) {
+        delete file;
+        return false;
+    }
+    file->Read(&magic1, 4);
+    if (magic1 != 0x20020109) {
         delete file;
         return false;
     }
@@ -464,10 +505,9 @@ bool SlotStore::LoadRelay()
         delete[] buffer;
         return false;
     }
-    int level = FB3_BODY(this)->level;
-    int rally = FB3_BODY(this)->rally;
     DAT_00501464 = 1;
-    DAT_0050132c = level;
+    DAT_0050132c = FB3_BODY(this)->level;
+    int rally = FB3_BODY(this)->rally;
     int stage = FB3_BODY(this)->stage;
     if (((StageTable*)((char*)DAT_0056b0c8 + 0x3aec))->FUN_00443620(rally) < stage) {
         delete[] buffer;
@@ -482,7 +522,8 @@ bool SlotStore::LoadRelay()
     strcpy(DAT_00501338[0], FB3_BODY(this)->name);
     player->unk20 = kind;
     DAT_005013ec[0] = kind;
-    player->unk24 = FB3_BODY(this)->unk8c;
+    int u8 = FB3_BODY(this)->unk8c;
+    player->unk24 = u8;
     player->unk2c = FB3_BODY(this)->flags & 0xff;
     player->FUN_00491130();
     race->AddPlayer(player);
@@ -496,42 +537,49 @@ bool SlotStore::LoadRelay()
         }
     } else {
         CarSnapView* car = (CarSnapView*)player->car;
-                car->snapshot[2].Clear();
+        car->snapshot[2].Clear();
         car->snapshot[2] = *(CarSnapshot*)in;
         in += 0x8c;
-        if (car->snapshot[2].size[0]) {
+        {
             CarSnapshot* s = &car->snapshot[2];
-            s->buffer[0] = new BYTE[s->size[0] * 4];
-            memcpy(s->buffer[0], in, s->size[0] * 4);
-            in += s->size[0] * 4;
+            int n = s->size[0];
+            if (n) {
+                s->buffer[0] = new BYTE[n * 4];
+                memcpy(s->buffer[0], in, n * 4);
+                in += s->size[0] * 4;
+            }
         }
-        if (car->snapshot[2].size[1]) {
+        {
             CarSnapshot* s = &car->snapshot[2];
-            s->buffer[1] = new BYTE[s->size[1] * 4];
-            memcpy(s->buffer[1], in, s->size[1] * 4);
-            in += s->size[1] * 4;
+            if (s->size[1]) {
+                s->buffer[1] = new BYTE[s->size[1] * 4];
+                memcpy(s->buffer[1], in, s->size[1] * 4);
+                in += s->size[1] * 4;
+            }
         }
-        if (car->snapshot[2].size[2]) {
+        {
             CarSnapshot* s = &car->snapshot[2];
-            s->buffer[2] = new BYTE[s->size[2] * 4];
-            memcpy(s->buffer[2], in, s->size[2] * 4);
-            in += s->size[2] * 4;
+            if (s->size[2]) {
+                s->buffer[2] = new BYTE[s->size[2] * 4];
+                memcpy(s->buffer[2], in, s->size[2] * 4);
+                in += s->size[2] * 4;
+            }
         }
         ((Car*)car)->FUN_0046be50(2);
         int tmp[10];
         memcpy(tmp, in, 0x28);
         in += 0x28;
         volatile int* vt = tmp;
-        for (int k = 0; k < 10; k++) player->unk1a28[k] = vt[k];
+        for (int k = 0; k < 10; k++) { int t = vt[k]; player->unk1a28[k] = t; }
         int used = FB3_BODY(this)->stage - 1;
         player->unk1a50 = used;
         for (int i = 0; i < 0x13; i++) {
             Player* ai = new Player(PLAYER_AI, i + 1);
             FB3_Stats stats;
             memcpy(&stats, in, 0x28);
+            in += 0x28;
             memcpy(ai->unk1a28, &stats, 0x28);
             ai->unk1a50 = used;
-            in += 0x28;
             race->AddPlayer(ai);
         }
     }
@@ -553,6 +601,7 @@ bool SlotStore::LoadRelay()
 // The original copies each per-player 10-dword block through a stack temporary (frame 0x3c); VC6 elides the temporary
 // here (no source form found), so the frame is 0x28 smaller; the rest of the body is the same shape.
 // Tried 2026-10-30 night: 14 variants (local/block-scope/volatile-pointer stats copies, struct assign vs memcpy, size-sum load orders); VC6 still reads the 2nd copy from the player block (not the stack temp) and spills the buffer differently, so 51 insns remain.
+// 2026-11-15 r18: `out = buffer + 0x5a5` hoisted above the header memcpy and `snap` taken right after the stage store (51 -> 41 insns differ, 616 -> 619 bytes); size-sum load order and stats stack temp (non-volatile forms are elided, 52) still open.
 // Tried 2026-10-31 re-pass: 25 more variants (struct assign, by-value forceinline getter/param, SC copy-ctor class, volatile pointer/field barriers, per-player pointer local); only plain temps get elided (57 insns), volatile temp keeps 51, volatile self-store after memcpy 50 but still re-reads the player block for copy 2; remaining diffs are buffer spill [esp+0x5c] and size-sum load order (n2 loaded first here), too many for permute.
 void SlotStore::SaveRelay(char level, char advance)
 {
@@ -564,8 +613,8 @@ void SlotStore::SaveRelay(char level, char advance)
     if (advance) {
         slot = 2;
     }
-    CarSnapshot* snap = &car->snapshot[slot];
     FB3_BODY(this)->stage = level;
+    CarSnapshot* snap = &car->snapshot[slot];
     if (!advance) {
         FB3_BODY(this)->done = advance;
     } else {
@@ -578,8 +627,8 @@ void SlotStore::SaveRelay(char level, char advance)
     file->Write(&magic0, 4);
     file->Write(&magic1, 4);
     BYTE* buffer = new BYTE[size];
-    memcpy(buffer, FB3_BODY(this), 0x5a5);
     BYTE* out = buffer + 0x5a5;
+    memcpy(buffer, FB3_BODY(this), 0x5a5);
     memcpy(out, snap, 0x8c);
     out += 0x8c;
     if (n0) {

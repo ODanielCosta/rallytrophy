@@ -15,6 +15,7 @@ static inline int Bal(int a) { return a; }
 // Tried 2026-10-30 night: ~20 variants (199->4 insns, size 626 now equal): Bal(1) x3 at end for inline budget (first three string compares out of line), EntryVec3 a/b/c declared up front (EH state 3), ReadVertices/ReadBatch/ReadBatchSmall as (file, e) members, unsigned loop test, f[9]=f[10]=s; still differs: VC6 emits `fstp [e+0xc]` (c.x) early instead of after the f[0] store, shifting 4 store/reg insns; volatile stores, store reorders and permute -r 20 did not move it.
 // Tried 2026-11-01 re-pass: 19 more variants (f[0..5] store reorders, volatile on single stores, int-temp copy, c.x/c.y/c.z read orders, c=*pc); source store order is ignored, stays at 4 insns (volatile f[0] or f[1] gives 7-8, volatile pc->x 20); permute -r 40 best also 4.
 // Tried 2026-11-01 structural pass: ~180 variants (volatile on every single store and every pair of the 11 f[] stores in two orders, all 24 group orders of a/s/b/c stores, inline SetM(f,a,s,b,c) helper, chained c.x=cx=pc->x, plain float c copies, scoped pc, flag tests before stores, int temps for c.y/c.z); only source order "a, s, b, c" keeps 4; volatile f[2] puts fstp in place but moves add esp/f[1]/f[2] (6). VC6's scheduler places the fstp of the live x87 c.x independently of source order once the int-mov stores are fixed; no source construct found that delays it.
+// Tried 2026-11-16 (round 19): 10 more variants (c.x/cx assigned after int copies, before them, c.y/c.z as float copies, f[3] stored last or in order, all-float cx/cy/cz temps); all 4 insns (or worse, 58), nothing kept.
 SceneEntry* ModelLoader::ReadMesh(File* file, unsigned int size)
 {
     SceneEntry* e = new SceneEntry;
@@ -64,6 +65,7 @@ SceneEntry* ModelLoader::ReadMesh(File* file, unsigned int size)
 // The copies are now loops too (position pair, two vectors at 0xa0/0xac): 143 -> 112 bytes, 613/613. The original
 // unrolls the position pair and interleaves it with the other copies; ours keeps that pair as a real loop.
 // 1680 orders of explicit pairs + loops were worse (29 insns).
+// 2026-11-16 (round 21): copies unrolled as plain stores (zero loop kept for xor eax) with a hill-climbed statement order; 25 -> 20 insns differ, 112 -> 80 bytes, 613/613. Left: original schedules loads/stores of 0x54..0x5c position triple differently (stores 0x18,0x1c,0x14 first) and test edi,edi + immediate pushes instead of zero kept in esi.
 void ModelLoader::ReadLight(File* file)
 {
     ModelPartRecord* rec = FUN_004af730(file);
@@ -101,10 +103,18 @@ void ModelLoader::ReadLight(File* file)
     ((ModelRecordString*)&w[0x45])->Assign(*(std::string*)rec, 0, std::string::npos);
     o->position = *(ScenePoint*)((char*)rec + 0x54);
     { for (int i = 0; i < 3; i++) w[0x14 + i] = 0; }
-    { for (int i = 0; i < 3; i++) w[0x2e + i] = w[5 + i] = RAW(rec, 0x54 + i * 4); }
+    w[6] = RAW(rec, 0x58);
+    w[0x2e] = w[5] = RAW(rec, 0x54);
+    w[0x2c] = RAW(rec, 0x90);
+    w[0x28] = RAW(rec, 0x80);
+    w[0x30] = RAW(rec, 0x5c);
+    w[0x2b] = RAW(rec, 0x8c);
     memcpy(&w[8], (char*)rec + 0x14, 0x40);
-    { for (int i = 0; i < 3; i++) w[0x28 + i] = RAW(rec, 0x80 + i * 4); }
-    { for (int i = 0; i < 3; i++) w[0x2b + i] = RAW(rec, 0x8c + i * 4); }
+    w[0x29] = RAW(rec, 0x84);
+    w[0x2a] = RAW(rec, 0x88);
+    w[0x2d] = RAW(rec, 0x94);
+    w[7] = RAW(rec, 0x5c);
+    w[0x2f] = RAW(rec, 0x58);
     w[0x31] = RAW(rec, 0x7c);
     *(unsigned char*)&w[0x33] &= 0xfc;
     Attach(o, rec->value);

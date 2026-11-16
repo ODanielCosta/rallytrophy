@@ -164,6 +164,7 @@ inline float ByteToUnitF(int b)
 
 // original: FUN_004658a0 (declared with PlayerSample*, the same packet seen from the player side)
 // NONMATCHING: RALLYTROPHY 0x4658a0
+// 2026-11-16 r22: 145->129 bytes differ, 45->24 insns: int b0 = state->body[0] hoisted above the steerSet store, position[1] stored before position[2], x/z ints + wheelY loaded before Vec3 local. No gain: steerSet/gear/rpm reorders, hn=&hitNormal[0][2] induction (+15..+36 bytes), b1/b2/b3 locals (spill, 949 bytes).
 // 2026-11-10: 926/926 bytes, 145 differ (was 913 bytes, 338). The 13 body dwords are assigned in the original's
 // store order: unk14c, unk150, unk154, position[0], unk158, position[2], position[1], then vel[0..5].
 // Earlier the same day: The contact branch re-reads V->surface[i] for each
@@ -187,15 +188,16 @@ void Car::FUN_004658a0(PlayerSample* packet)
     V->steer = (float)(state->steer - 128) * 0.007874016f;
     V->rpm = (float)state->rpm;
     V->gear = (signed char)state->gear;
+    int b0 = state->body[0];
     *(volatile char*)&V->steerSet = 1;
     StateBody* b = V->body;
-    b->unk14c = state->body[0];
+    b->unk14c = b0;
     b->unk150 = state->body[1];
     b->unk154 = state->body[2];
     *(int*)&b->position[0] = state->body[4];
     b->unk158 = state->body[3];
-    *(int*)&b->position[2] = state->body[6];
     *(int*)&b->position[1] = state->body[5];
+    *(int*)&b->position[2] = state->body[6];
     b->vel[0] = state->body[7];
     b->vel[1] = state->body[8];
     b->vel[2] = state->body[9];
@@ -215,10 +217,11 @@ void Car::FUN_004658a0(PlayerSample* packet)
     float t = V->rideA * 0.45f;
     for (i = 0; i < 4; i++) {
         StateWheel* w = &V->wheel[i];
-        Vec3 local;
-        *(int*)&local.x = *(int*)&w->pos[0];
-        *(int*)&local.z = *(int*)&w->pos[2];
+        int lx = *(int*)&w->pos[0], lz = *(int*)&w->pos[2];
         float wheelY = *(volatile float*)&w->pos[1];
+        Vec3 local;
+        *(int*)&local.x = lx;
+        *(int*)&local.z = lz;
         local.y = wheelY - (V->rideB - t);
         Vec3 world;
         {

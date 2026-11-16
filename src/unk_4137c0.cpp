@@ -78,15 +78,18 @@ extern char* __cdecl FUN_004c1902(int value, char* buf, int radix); // _itoa
 #define AT(T, off) (*(T*)((char*)this + (off)))
 #define ATP(p, T, off) (*(T*)((char*)(p) + (off)))
 
-struct FlareRect { int v[4]; ~FlareRect() {} };
+struct FlareRect { float v[4]; ~FlareRect() {} };
 
 static __forceinline void SetV3(float& x, float& y, float& z, float a, float b, float c) { x = a; y = b; z = c; }
+static __forceinline void SetF(float& d, float v) { d = v; }
 // NONMATCHING: RALLYTROPHY 0x4137c0
 // 2942 vs 2914 bytes; frame is 0x24 larger (original shares stack slots between the ini-scope locals and the
 // CarBodyEnv number buffer) and the ring-key array initialisation order differs; flow, calls and strings match
 // Tried 2026-10-30 night: msg path c_str in a local, SetV3 forceinline (fld c,b,a order), re-lea loader; 342->314; still 0x24 bigger frame (num[32] not sharing slots with ini-scope arrays: block/hoist/int[8]/volatile pad all failed), key-array init order and EH-state placement differ.
 // Re-pass 2026-11-01: 13 variants (num[32] in nested block/top/mid scope, key arrays reordered/resized, skid block, Vector2/3 order, volatile sky, layer decl order): none below 314 insns differ (base); VC6 does not overlap num with the if-scope arrays, frame stays 0x24 larger; too far (724 diff lines) for permute.
 // 2026-11-10 (after /YX: built 2878 vs 2914, now 36 bytes short): ring digits via char/int locals or separate stores, path c_str hoisted/removed/hand-written, c_str as `ptr == 0 ? "" : ptr`: no real change. Original keeps the divisor 10 in edi and pushes AssignTmp's npos/0 between the two digit stores; its c_str stores "" first and overwrites when ptr is set.
+// 2026-11-13 pass: 251 -> 198 insns differ (2878 -> 2879 bytes): ring digits via t/o char locals, c_str as `lp = ""; if (ptr) lp = ptr` locals (path, layer), Add() `n > 0` (jbe), `if (x != 0) switch`, sprite rect floats via SetF (fld/fstp). Open: fstp/int-store interleave (SetV3, sprites), EH state-store placement, tail register roles.
+// 2026-11-16 pass: 198 -> 147 insns differ (2879 -> 2899 bytes): skid is FlareStringInl (both string dtors inline as the original), sprite a addressed through the member (reloaded, as 0x9dc), Load result stored after the skid-state block, FlareStringBase::Add copies into a `char* d = ptr + len` local.
 void SceneSetup::FUN_004137c0(const FlareString& dir)
 {
     if (AT(int, 0x218) != 0) {
@@ -98,7 +101,7 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
         Config config;
         config.Define(FlareKeys, 0x33);
         if (!config.Load(path.c_str(), true, false, 0)) {
-            const char* pp = path.c_str();
+            const char* pp = ""; if (path.ptr) pp = path.ptr;
             FlareString msg;
             msg.Assign("Invalid storage file: ");
             throw std::logic_error(*(std::string*)&MissingText2(msg, pp));
@@ -117,18 +120,21 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
         float glowSize = config.GetFloat("GlowSize");
         sky->SetBase(layer.c_str(), (TextureLoader*)&AT(char, 0xd4), glowSize);
         for (int i = 0; i < rings; i++) {
-            sizeKey[4] = locKey[4] = mapKey[4] = "0123456789"[i / 10];
-            sizeKey[5] = locKey[5] = mapKey[5] = "0123456789"[i % 10];
+            char t = "0123456789"[i / 10];
+            char o = "0123456789"[i % 10];
+            sizeKey[4] = locKey[4] = mapKey[4] = t;
+            sizeKey[5] = locKey[5] = mapKey[5] = o;
             layer.AssignTmp(*(TmpString*)&path, 0, std::string::npos);
             const char* map = config.GetString(mapKey);
             layer.Append(map, strlen(map));
             ConfigVector2 size = config.GetVector2(sizeKey);
             ConfigVector3 loc = config.GetVector3(locKey);
-            AT(Sky*, 0x6ac)->AddLayer(layer.c_str(), (TextureLoader*)&AT(char, 0xd4), size.values[0],
+            const char* lp = ""; if (layer.ptr) lp = layer.ptr;
+            AT(Sky*, 0x6ac)->AddLayer(lp, (TextureLoader*)&AT(char, 0xd4), size.values[0],
                                       size.values[1], loc.values[0], loc.values[1], loc.values[2]);
         }
     }
-    switch (AT(int, 0x22c)) {
+    if (AT(int, 0x22c) != 0) switch (AT(int, 0x22c)) {
     case 1:
         AT(WeatherEffect*, 0x6b0) = new RainEffect((TextureLoader474*)&AT(char, 0xd4), 0x400, 0x200);
         break;
@@ -137,9 +143,9 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
         break;
     }
 #define loader ((TextureLoader*)&AT(char, 0xd4))
-    FlareString skid;
+    FlareStringInl skid;
     skid.AssignTmp(MissingText2(dir, "SkidMark1.tga"), 0, std::string::npos);
-    AT(Texture*, 0x908) = loader->Load(skid.c_str(), 0x40);
+    Texture* sk = loader->Load(skid.c_str(), 0x40);
     AT(int, 0x974) = 0;
     SetV3(AT(float, 0x968), AT(float, 0x96c), AT(float, 0x970), AT(float, 0x1b8), AT(float, 0x1bc), AT(float, 0x1c0));
     AT(int, 0x978) = 0;
@@ -150,6 +156,7 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
     AT(int, 0x95c) = 0;
     AT(int, 0x960) = 0;
     AT(int, 0x964) = 0;
+    AT(Texture*, 0x908) = sk;
     AT(int, 0x92c) = 4;
     AT(int, 0x9a0) = 0xd;
     AT(int, 0x9a4) = 2;
@@ -173,33 +180,31 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
     env.AssignTmp(AT(TmpString, 8), 0, std::string::npos);
     env.Add("textures/particles.tga");
     FlareRect rc = AT(FlareRect, 0x1f8);
-    int c0 = rc.v[0], c1 = rc.v[1], c2 = rc.v[2];
-    Sprite* a = new Sprite;
-    AT(Sprite*, 0x9dc) = a;
-    ATP(a, Texture*, 0) = loader->Load(env.c_str(), 0x40);
-    ATP(a, int, 0x60) = c0;
-    ATP(a, int, 0x98) = 0xd;
-    ATP(a, int, 0x9c) = 2;
-    ATP(a, int, 0x64) = c1;
-    ATP(a, int, 0x18) = 5;
-    ATP(a, int, 0x1c) = 2;
-    ATP(a, int, 0x68) = c2;
-    ATP(a, int, 0x6c) = 0;
-    ATP(a, int, 0x70) = 0;
-    ATP(a, int, 0x74) = 0;
-    ATP(a, int, 0x78) = 0;
-    ATP(a, int, 0x7c) = 0;
-    ATP(a, int, 0x24) = 4;
+    AT(Sprite*, 0x9dc) = new Sprite;
+    ATP(AT(Sprite*, 0x9dc), Texture*, 0) = loader->Load(env.c_str(), 0x40);
+    SetF(ATP(AT(Sprite*, 0x9dc), float, 0x60), rc.v[0]);
+    ATP(AT(Sprite*, 0x9dc), int, 0x98) = 0xd;
+    ATP(AT(Sprite*, 0x9dc), int, 0x9c) = 2;
+    SetF(ATP(AT(Sprite*, 0x9dc), float, 0x64), rc.v[1]);
+    ATP(AT(Sprite*, 0x9dc), int, 0x18) = 5;
+    ATP(AT(Sprite*, 0x9dc), int, 0x1c) = 2;
+    SetF(ATP(AT(Sprite*, 0x9dc), float, 0x68), rc.v[2]);
+    ATP(AT(Sprite*, 0x9dc), int, 0x6c) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x70) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x74) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x78) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x7c) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x24) = 4;
     Sprite* b = new Sprite;
-    ATP(b, Texture*, 0) = ATP(a, Texture*, 0);
-    ATP(b, int, 0x60) = c0;
+    ATP(b, Texture*, 0) = ATP(AT(Sprite*, 0x9dc), Texture*, 0);
+    SetF(ATP(b, float, 0x60), rc.v[0]);
     ATP(b, int, 0x98) = 0xd;
     ATP(b, int, 0x9c) = 2;
-    ATP(b, int, 0x64) = c1;
+    SetF(ATP(b, float, 0x64), rc.v[1]);
     ATP(b, int, 0x18) = 5;
     ATP(b, int, 0x1c) = 6;
     ATP(b, int, 0x6c) = 0;
-    ATP(b, int, 0x68) = c2;
+    SetF(ATP(b, float, 0x68), rc.v[2]);
     AT(Sprite*, 0x9e0) = b;
     ATP(b, int, 0x70) = 0;
     ATP(b, int, 0x74) = 0;

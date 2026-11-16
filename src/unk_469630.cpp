@@ -199,13 +199,8 @@ void Car::FUN_00469a00(int a, int b)
     }
 }
 
-// NONMATCHING: RALLYTROPHY 0x469a20
-// 1009 bytes, 2 insns differ (142 -> 3 -> 2; state-0 store fixed by a volatile body pointer read `bb`). Remaining: the `lea edx,[ebp-0x4c]` for the Forward40()*k temp lands after the float push, and the loop's
-// surface-pointer slot store comes before `lea ebx,[esi+0x28]`.
-// Tried 2026-10-31: fewer uses of `effect` (Spawn(effect - 1)) lets the compiler keep c in edi (frame 0x40), vel2
-// declared after vel's stores matches the EH states, `float thr`/`r` locals give fcomp+fstp, volatile kk gives
-// the double store; permute.py -r 20 found nothing better than 3.
-// Tried 2026-11-01 re-pass: ~20 variants (kk plain copy/volatile read/decl moves, Forward40 named temp, loop wheel/surf/effect reorders, volatile surf) and permute.py -r 40 stay at 2; the hidden-return `lea edx` of Forward40()*kk and the loop slot store order have no handle.
+// FUNCTION: RALLYTROPHY 0x469a20
+// 2026-11-16: wheel and surface walked as two explicit cursors (`i++, sp++, w++`) matches; the wheel loop is the same, cursors replace [i] indexing.
 // Per-frame particle emission of a car: exhaust smoke, spray/debris from the body, and the dust, smoke and
 // spray of each wheel that touches a surface with effects.
 void Car::EmitEffects(float a, float b, float c)
@@ -232,8 +227,7 @@ void Car::EmitEffects(float a, float b, float c)
                 Vec3 vel2;
                 vel += body->PointVelocity(pos);
                 vel2 = vel * 0.9f;
-                float kk;
-                *(volatile float*)&kk = (float)rand() * kInv32767 * 0.5f + level * 1.8f + 3.0f;
+                float kk = (float)rand() * kInv32767 * 0.5f + level * 1.8f + 3.0f;
                 vel2 -= body->Forward40() * kk;
                 vel2.y += ((float)rand() * kInv32767 + 1.0f) * 0.5f;
                 vel2.x += (1.0f - (float)rand() * kInv32767 * 2.0f) * 0.9f;
@@ -258,25 +252,21 @@ void Car::EmitEffects(float a, float b, float c)
                 v->debris.SpawnOne(0.0f, b, c);
             }
         }
-        for (int i = 0; i < 4; i++) {
-            EmitWheel* w = &v->wheel[i];
+        EmitWheel* w = v->wheel; int* sp = v->surface;
+        for (int i = 0; i < 4; i++, sp++, w++) {
             if (w->contact) {
-                int surf = v->surface[i];
-                int type = v->surfaces->dust[surf];
-                int effect = v->surfaces->smoke[surf];
-                if (type) {
-                    v->dust.Spawn(type - 1, b, c, (Car*)w, (CarBody*)v->body);
-                }
+                int type = v->surfaces->dust[*sp];
+                int effect = v->surfaces->smoke[*sp];
+                if (type) { v->dust.Spawn(type - 1, b, c, (Car*)w, (CarBody*)v->body); }
                 if (effect) {
-                                        v->smokeB.Spawn(effect - 1, b, c, (Car*)w, (CarBody*)v->body);
-                    if (v->detail == 2) {
-                        v->spray.Spawn(effect - 1, b, c, (Car*)w, (CarBody*)v->body);
-                    }
+                    v->smokeB.Spawn(effect - 1, b, c, (Car*)w, (CarBody*)v->body);
+                    if (v->detail == 2) { v->spray.Spawn(effect - 1, b, c, (Car*)w, (CarBody*)v->body); }
                 }
             }
         }
     }
 }
+
 
 // FUNCTION: RALLYTROPHY 0x469e20
 void Car::FUN_00469e20()
@@ -343,6 +333,8 @@ void Car::FUN_00469ea0(float k)
 // All three probes were reverted.
 // Tried 2026-10-30 night: 17 variants (mark declared/hoisted/split/unsigned/volatile, surf inlined, i declared outside, !! and !(>=) forms, mark reused in the call); all stay at 35 insns or worsen; still differs: wheel pointer takes ebx instead of the track-id test value (original ebx=mark, ecx=wheel) and VC6 gives no source-level handle on that.
 // Tried 2026-10-31 re-pass: 22 more variants (mark before contact test, nested ifs, continue-form, tm pointer, volatile contact/surf/mark/trackMark reads, unsigned char mark, operand-order flips, mark in final call, i outside); all stay at 35 insns (best 34, bytes worse); still differs: original ebx=mark, ecx=wheel cursor, ours promotes the wheel cursor to ebx.
+// 2026-11-16 pass: 17 more variants (mark/surf decl order and nesting, mark in final call, register mark, slip via char offset/reference, in via byte offset, (int)contact, !=0 forms, i outside, brace forms); all 55 bytes / 35 insns or worse (reference slip 22 insns but 513 bytes; dropping surf 45). Remaining: only the ebx allocation (original keeps no loop variable in ebx; ours promotes the wheel cursor).
+// 2026-11-16 pass 2: slip as const float&/float* (ref, *sp, in[0xa0], loop-top decl, !(>=), (void)slip) frees ebx (insn diff 35 -> 22) but reloads slip twice (fld+fcomp, fld) and hoists &slip: 513 bytes, 372 differ; none reach 511.
 // Stamps a tyre mark for each wheel on a marked surface whose slip exceeds 2.5, or ends its mark.
 void Car::UpdateTyreTracks()
 {

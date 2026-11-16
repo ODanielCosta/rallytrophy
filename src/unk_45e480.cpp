@@ -278,6 +278,12 @@ struct LightView {
     int mirror;                        // 0x138
 };
 // A material of the model (node data of the three material lists).
+struct MatName {
+    const char* ptr;
+    int len;
+    BYTE res[8];
+    const char* c_str() const { return ptr ? ptr : ""; }
+};
 struct MatView {
     void* texture;                     // 0x00
     int unk4;                          // 0x04
@@ -295,14 +301,14 @@ struct MatView {
     int f98;                           // 0x98
     int flags;                         // 0x9c
     BYTE unka0[0xa8 - 0xa0];
-    const char* name;                  // 0xa8
-    int fac;                           // 0xac
-    BYTE unkb0[0xb8 - 0xb0];
+    MatName name;                      // 0xa8: std::string-like (ptr, length, reserve)
     int fb8;                           // 0xb8
     int fbc;                           // 0xbc
     int fc0;                           // 0xc0
-    const char* Name() const { return name ? name : ""; }
+    const char* Name() const { return name.c_str(); }
 };
+static inline void Set2f(float* d, float a, float b) { d[0] = a; d[1] = b; }
+static inline void Set3f(float* d, float a, float b, float c) { d[0] = a; d[1] = b; d[2] = c; }
 struct TexView {
     BYTE unk0[0x60];
     int f60;                           // 0x60
@@ -317,6 +323,7 @@ struct TexView {
 // CarString/PtrVec/ModelObject helpers (see the declarations above).
 // Tried 2026-10-30 night: 11 variants moving/scoping `number` (top, before dir, int[10], block-scoped), sized probes, hoisting driverDir; frame is 0x1d8 vs 0x1bc because `number` sits at ebp-0xe4 (below driverDir) while the original has it at -0x70 right under dir, sharing space with later scalars; block scope moves it to the bottom (-0x1e4) with no frame shrink, declaration order has no effect; still 1124 insns differ.
 // Tried 2026-11-01 re-pass: `number` was too big; VC6 sorts large locals to the bottom, so char number[0x28] sat below driverDir and grew the frame by 0x1c; char number[12] (the _itoa max for an int) matches the frame size 0x1bc and the ModelFile slots (1124->1102 insns, 13556 bytes); still differs: number sits at -0x88 not -0x70 (orig has it above the 12-byte Vec3 slots), plus const-store register choice and Bal/inline budget. Block-scoping number or the CarPath temps, driverDir hoisting, int[3] views change nothing.
+// 2026-11-13 pass: 1102 -> 1047 insns differ, 13556 -> 13606 bytes (orig 13705). Material names are a std::string-like sub-object (MatName::c_str(), so VC6 reloads the pointer at each strcmp instead of CSE'ing it into edi); wheel inertia/1-over-inertia through a local float (fld/fst/fdiv st,st(1) shape); setup[2]-indexed copies through Set2f/Set3f inline setters (args evaluated right to left = original's fld/fld/fstp/fstp pairs). Open: setup[2] reloaded between single copies, dead-param slot order (a18/c1c/w/bodyPart), tyreLod base 8 bytes high, 1ec4 |= folded to mov.
 // SYMBOL: ??0CarObject@@QAE@PAVCarTextureCache@@HHHHHI@Z
 CarObject::CarObject(CarTextureCache* a, int b, int c, int d, int e, int f, unsigned int g)
 {
@@ -730,38 +737,30 @@ CarObject::CarObject(CarTextureCache* a, int b, int c, int d, int e, int f, unsi
         wheel[2].touching = 1;
         CF(int, 0x1ec4) |= 1;
     }
-    wheel[0].inertia = CF(float, 0x112c);
-    wheel[0].unk274 = 1.0f / CF(float, 0x112c);
-    wheel[1].inertia = CF(float, 0x112c);
-    wheel[1].unk274 = 1.0f / CF(float, 0x112c);
-    wheel[3].inertia = CF(float, 0x11f0);
-    wheel[3].unk274 = 1.0f / CF(float, 0x11f0);
-    wheel[2].inertia = CF(float, 0x11f0);
-    wheel[2].unk274 = 1.0f / CF(float, 0x11f0);
-    CF(float, 0xcf8) = CF(float, 0x11b8 + setup[2] * 4);
-    CF(float, 0xcfc) = CF(float, 0x11cc + setup[2] * 4);
-    CF(float, 0xd2c) = CF(float, 0x11b8 + setup[2] * 4);
-    CF(float, 0xd30) = CF(float, 0x11cc + setup[2] * 4);
-    CF(float, 0xd94) = CF(float, 0x127c + setup[2] * 4);
-    CF(float, 0xd98) = CF(float, 0x1290 + setup[2] * 4);
-    CF(float, 0xd60) = CF(float, 0x127c + setup[2] * 4);
-    CF(float, 0xd64) = CF(float, 0x1290 + setup[2] * 4);
+    float in1 = CF(float, 0x112c);
+    wheel[0].inertia = in1;
+    wheel[0].unk274 = 1.0f / in1;
+    float in2 = CF(float, 0x112c);
+    wheel[1].inertia = in2;
+    wheel[1].unk274 = 1.0f / in2;
+    float in3 = CF(float, 0x11f0);
+    wheel[3].inertia = in3;
+    wheel[3].unk274 = 1.0f / in3;
+    float in4 = CF(float, 0x11f0);
+    wheel[2].inertia = in4;
+    wheel[2].unk274 = 1.0f / in4;
+    Set2f(&CF(float, 0xcf8), CF(float, 0x11b8 + setup[2] * 4), CF(float, 0x11cc + setup[2] * 4));
+    Set2f(&CF(float, 0xd2c), CF(float, 0x11b8 + setup[2] * 4), CF(float, 0x11cc + setup[2] * 4));
+    Set2f(&CF(float, 0xd94), CF(float, 0x127c + setup[2] * 4), CF(float, 0x1290 + setup[2] * 4));
+    Set2f(&CF(float, 0xd60), CF(float, 0x127c + setup[2] * 4), CF(float, 0x1290 + setup[2] * 4));
     CF(float, 0xcf4) = CF(float, 0x114c + setup[2] * 4);
     CF(float, 0xd28) = CF(float, 0x114c + setup[2] * 4);
     CF(float, 0xd90) = CF(float, 0x1210 + setup[2] * 4);
     CF(float, 0xd5c) = CF(float, 0x1210 + setup[2] * 4);
-    CF(float, 0xd00) = CF(float, 0x1138 + setup[2] * 4);
-    CF(float, 0xd04) = CF(float, 0x1130);
-    CF(float, 0xd08) = CF(float, 0x1134);
-    CF(float, 0xd34) = CF(float, 0x1138 + setup[2] * 4);
-    CF(float, 0xd38) = CF(float, 0x1130);
-    CF(float, 0xd3c) = CF(float, 0x1134);
-    CF(float, 0xd9c) = CF(float, 0x11fc + setup[2] * 4);
-    CF(float, 0xda0) = CF(float, 0x11f4);
-    CF(float, 0xda4) = CF(float, 0x11f8);
-    CF(float, 0xd68) = CF(float, 0x11fc + setup[2] * 4);
-    CF(float, 0xd6c) = CF(float, 0x11f4);
-    CF(float, 0xd70) = CF(float, 0x11f8);
+    Set3f(&CF(float, 0xd00), CF(float, 0x1138 + setup[2] * 4), CF(float, 0x1130), CF(float, 0x1134));
+    Set3f(&CF(float, 0xd34), CF(float, 0x1138 + setup[2] * 4), CF(float, 0x1130), CF(float, 0x1134));
+    Set3f(&CF(float, 0xd9c), CF(float, 0x11fc + setup[2] * 4), CF(float, 0x11f4), CF(float, 0x11f8));
+    Set3f(&CF(float, 0xd68), CF(float, 0x11fc + setup[2] * 4), CF(float, 0x11f4), CF(float, 0x11f8));
     CF(int, 0xd14) = CF(int, 0x11b0);
     CF(float, 0xd18) = CF(float, 0x11b4);
     CF(float, 0xd4c) = CF(float, 0x11b4);
@@ -940,7 +939,7 @@ CarObject::CarObject(CarTextureCache* a, int b, int c, int d, int e, int f, unsi
         if (m->fb8 != -1) {
             m->f98 = 15;
         }
-        if (m->fac) {
+        if (m->name.len) {
             if (strstr(m->Name(), "#E")) {
                 MaterialSprite* tmp = (MaterialSprite*)m;
                 ((PtrVectorOps*)&vec1bcd4)->Insert(vec1bcd4.end(), 1, &tmp);
@@ -1248,6 +1247,7 @@ char* CarCopy(char* dst, const char* src, size_t n)
 // `lea eax,[esi+0x1bd94]; mov ebp,eax` and the build has `lea ebp,[esi+0x1bd94]` (30 source forms tried).
 // Tried 2026-10-30 night: 9 more (shared r/l pointer locals, r[i-3] indexing, do-while, ptr-walk, &arr[0][i]) plus permute -r 20; none gave the extra mov; the 73 differing insns are only +2 jump-offset shifts from the one missing mov.
 // Tried 2026-10-31 re-pass: 15 more (forceinline Id()/Id2() pointer helpers, volatile base pointer, char* base walk, split fl/fr cursors, fr[k-3] do-while, comma-increment) plus permute -r 40; all stay at 73 insns (just the missing `mov ebp,eax` after lea eax).
+// Tried 2026-11-16 (r26): 38 more (r aliases via &*, +0, casts, (char*)+off, self->, countdown/do-while/while, comma-init, r[-3]/(r-3), l=r-3, register, reassign r after loop); all 73 insns. volatile r gives 2276 bytes/23 insns but only by switching to index-form addressing (not the original shape), so rejected.
 CarObject::~CarObject()
 {
     delete shadow;
@@ -1665,6 +1665,9 @@ static inline int Bal(int a) { return a + 1; }
 // Tried 2026-10-30 night: Scale3 by-value/inline muls, mass declaration order, wiper-tail LOAD vs COPY forms, inline_depth(0-3), PathString/TextOf throw form (as LoadTiresIni; shifts regalloc, 81 insns). 2026-10-31: trailing Bal(1) x2 discarded calls (as LoadTiresIni; at the start they do nothing) restore the out-of-line _Tidy call 29->23; wiper angle scaling through a Vec2* 23->18; still 18 insns differ: mass reloaded from stack per Scale3 axis instead of fld st(0) (15 forms tried), esi/eax order for the message pointer (c_str/TextOf forms), EH state 7 store before the SteeringSpeeds call instead of after (steer reuse/volatile no help), push 0 vs fcos and store order around hood sin, wiper1Angle COPY2 push placement.
 // Tried 2026-10-31 re-pass: 14 more variants, none better than 18 insns: Bal count 10/12/14, Bal split start/middle/end (6+6, 4+8), mass scale as explicit per-axis *= / mass*x / float* walk / local copy / double / temp-split / volatile mass, `float mass; mass = ...` split; Scale3 forms all give the same reload-from-stack instead of fld st(0).
 // 2026-11-11: 43 -> 27 diff lines. (3) solved: mass read through a volatile cast into a float local after the GetVector3 call and before the copy gives fld mass + fld st(0) per axis. EH state 7 solved: steer copy-constructed from the call result. Left: (2) esi/eax message pointer (the 2 bytes; four more c_str spellings no change), (1) push before fcos, trunkAxes[5] store order (six statement orders, none better), wiper1Angle push placement.
+// 2026-11-16 round 30: 47 variants, none below 13 insns differ (baseline 13, 4486 vs 4484): hood/trunk axis statement orders, cos/sin temps, hoodMax temp forms, c_str() spellings via a local helper (fewer bytes differ but 16 insns, extra call). No source change.
+// 2026-11-16 round 31: (2) solved in the header: TmpString::c_str as `const char* r = ptr; if (r == 0) r = ""; return r;` (as IniString) loads the pointer straight into esi; size 4486 -> 4484 (= target), 2777 -> 48 differing bytes. Left: push before fcos, hood sin store order, trunkAxes tail order.
+// 2026-11-16 round 32: 64 more variants, none below 6 insns differ (48 bytes): hood/trunk stores in all 24 orders, chained assignments (`t[1] = axisA.y = cos`), cos/sin single-expression vs named temps vs swapped order, axisB declared earlier, hood/trunk temp placement, HoodMaxAngle named/split forms. Push before fcos and the sin/trunkAxes[5] store order did not move; no source change.
 void Car::LoadCarIni(const char* path, unsigned int checksum)
 {
     CarIniView* v = (CarIniView*)this;
@@ -2103,7 +2106,7 @@ struct CarTextureView {
     SpriteNode* spriteHead;            // 0xfc0
     SpriteNode* spriteTail;            // 0xfc4
     SpriteNode* spriteFree;            // 0xfc8
-    volatile int spriteCount;          // 0xfcc (volatile: keeps VC6 from caching the count between appends; fixes the register choice)
+    int spriteCount;          // 0xfcc (volatile: keeps VC6 from caching the count between appends; fixes the register choice)
     int spriteFreeCount;               // 0xfd0
     BYTE unkfd4[0x108c - 0xfd4];
     float unk108c;                     // 0x108c: scaled into the interior windows texture
@@ -2171,11 +2174,19 @@ struct CarTextureView {
         } else { \
             (v)->spriteHead = node; \
         } \
-        ++(v)->spriteCount; \
         (v)->spriteTail = node; \
+        ++(v)->spriteCount; \
     } while (0)
 
+// Assigns a std::string temporary (dir + name) to a file name string; its destructor is expanded at the call.
+static inline void AssignStd(NameString& n, const std::string& s)
+{
+    n.Assign(*(const TmpString*)&s, 0, std::string::npos);
+}
+
 // NONMATCHING: RALLYTROPHY 0x463940
+// 2026-11-15 pass: light sprite unk9c store moved after the color stores (before unk20): 66 -> 63 insns, 1115 -> 1101 bytes, 2923 bytes. Tried: meters store reorders (m1-m6, 64-70), volatile on blendSrc/Dst, unk9c at end / after lightSprite (no better).
+// 2026-11-13 pass: spriteCount non-volatile, tail store before ++count, SpriteName temp via pointer, AssignStd(b, dir + "x") (std::string temp, inline dtor): 1532->1115 bytes, 119->66 insns, 2936->2924. Left: meters stores 18/1c/20 scheduled late (2 sites), light sprite 2-in-edx/test dl, Brake/Reverse eax/edi load order; 300 store permutations per site found nothing better; QuadF helper and stale-volatile removal were worse.
 // 2026-10-31: 30 trailing discarded Bal(1) calls (N 27..37; fewer do nothing, 38+ over-spend) keep the early-return _Tidy calls out of line, chained cache stores reversed: 190->150 insns. Tried: JoinPath temp as the Assign argument (worse, 2977 bytes). Still differs: ADD_SPRITE count inc scheduling (mov/inc/mov vs inc mem), the original passes the operator+ result eax straight to Assign instead of lea of a named tmp, sprite store order.
 // Tried 2026-11-01 re-pass: ADD_SPRITE with count inc before the tail store and the free-list next in a block temp, flareBrake stored before the name Assign, volatile color40[0] at the Brake site: 311->263 diff lines. Count inc deferral past the next call's arg pushes, node reg (ecx vs edx) and color40/color60 store order at Brake/Reverse sites still differ (about 120 insns; permute not run, too far).
 // Built 2983 bytes against 2926, 1773 differing bytes. Volatile stores at three flare sites plus the explicit
@@ -2234,7 +2245,7 @@ void Car::LoadTextures(const std::string& dir)
     a.Assign(SoundPath(dir, "FlareBrake.tga"), 0, std::string::npos);
     s = (FlareSprite*)new Sprite;
     v->flareBrake = s;
-    ((SpriteName*)&s->name)->Assign("flare brake");
+    { SpriteName* nm = (SpriteName*)&s->name; nm->Assign("flare brake"); }
     s->texture = v->cache->Load(a.c_str(), 0x40);
     s->blendSrc = 2;
     s->blendDst = 2;
@@ -2291,7 +2302,6 @@ void Car::LoadTextures(const std::string& dir)
     s->blendDst = 2;
     s->unk98 = 0xf;
     s->unka0 = 0xf;
-    s->unk9c = 2;
     s->color60[0] = 1.0f;
     s->color60[1] = 1.0f;
     s->color60[2] = 1.0f;
@@ -2301,6 +2311,7 @@ void Car::LoadTextures(const std::string& dir)
     s->color70[1] = 0;
     s->color70[2] = 0;
     s->color70[3] = 0;
+    s->unk9c = 2;
     s->unk20 = 4;
     v->lightSprite = s;
     s->color40[0] = 1.0f;
@@ -2323,11 +2334,11 @@ void Car::LoadTextures(const std::string& dir)
         *(int*)((char*)windows + 0x60) = FloatToInt(v->unk108c * 256.0f);
     }
 
-    ASSIGN_INLINE(b, "interior_windows_damaged.tga");
+    AssignStd(b, dir + "interior_windows_damaged.tga");
     v->interiorWindows = v->cache->Load(b.c_str(), 0x40);
 
     if (v->flags & 1) {
-        ASSIGN_INLINE(b, "OverlayMetersKmh.tga");
+        AssignStd(b, dir + "OverlayMetersKmh.tga");
         s = (FlareSprite*)new Sprite;
         v->metersKmh = s;
         s->texture = v->cache->Load(b.c_str(), 0x441);
@@ -2347,7 +2358,7 @@ void Car::LoadTextures(const std::string& dir)
         s->unk9c = 2;
         ADD_SPRITE(v, s);
 
-        ASSIGN_INLINE(b, "OverlayMetersMph.tga");
+        AssignStd(b, dir + "OverlayMetersMph.tga");
         s = (FlareSprite*)new Sprite;
         v->metersMph = s;
         s->texture = v->cache->Load(b.c_str(), 0x441);

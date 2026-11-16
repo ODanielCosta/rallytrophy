@@ -120,23 +120,33 @@ public:
     unsigned int len;
     unsigned int reserve;
 };
-#define C_ADD(ul, lr) \
+// std::vector<UIRect*> (same layout) whose insert(pos, 1, x) stays an out-of-line call for the first four rectangles:
+// VC6 spends its inline budget per push_back site, so pinning them leaves the original's expansion of the last two.
+// The `items` reference is taken after the first new (C_ADDF). See study/FINDINGS.md.
+class C_Vec {
+public:
+    void insert(UIRect** pos, unsigned n, UIRect* const& x);
+    UIRect** end() { return last; }
+    std::allocator<UIRect*> alloc;
+    UIRect** first;
+    UIRect** last;
+    UIRect** unk;
+};
+#define C_NEW(rect, ul, lr) rect = (UIRect*)new C_Rect(*(const C_Point*)&config.GetVector2(ul), *(const HudPoint*)&config.GetVector2(lr))
+#define C_ADDI(rect, ul, lr) \
     do { \
-        rect = (UIRect*)new C_Rect(*(const C_Point*)&config.GetVector2(ul), *(const HudPoint*)&config.GetVector2(lr)); \
-        m_items.push_back(rect); \
+        C_NEW(rect, ul, lr); \
+        ((C_Vec&)items).insert(((C_Vec&)items).end(), 1, rect); \
     } while (0)
-
-#define C_ADDR(rect, ul, lr) \
+#define C_ADDP(rect, ul, lr) \
     do { \
-        rect = (UIRect*)new C_Rect(*(const C_Point*)&config.GetVector2(ul), *(const HudPoint*)&config.GetVector2(lr)); \
-        m_items.push_back(rect); \
+        C_NEW(rect, ul, lr); \
+        items.push_back(rect); \
     } while (0)
-
-#define C_ADDR(rect, ul, lr) \
-    do { \
-        rect = (UIRect*)new C_Rect(*(const C_Point*)&config.GetVector2(ul), *(const HudPoint*)&config.GetVector2(lr)); \
-        m_items.push_back(rect); \
-    } while (0)
+#define C_ADDF(rect, ul, lr) \
+    C_NEW(rect, ul, lr); \
+    std::vector<UIRect*>& items = m_items; \
+    ((C_Vec&)items).insert(((C_Vec&)items).end(), 1, rect)
 static inline int Bal(int a) { return a + 1; }
 
 struct C_Warp {
@@ -338,11 +348,13 @@ int MenuScreen8DC::Frame()
     return r;
 }
 
-// NONMATCHING: RALLYTROPHY 0x425220
+// FUNCTION: RALLYTROPHY 0x425220
+// Matched 2026-11-15 with the C_Vec twin for sites 1-4 plus one Bal(1) before the last site (see study/FINDINGS.md).
 // original: FUN_00425220 (SEH). Loads the 14 hit-test rectangles from data/menu/controlmenu.ini.
 // Tried 2026-10-31: three UIRect* locals (site 1 / 2-13 / 14) give the original's rect slots and frame size; one discarded Bal(1) before site 14 makes exactly the last two push_backs inline insert (401->77 insns differ; Bal at other sites, 2+ calls, 5 locals, per-site block scopes were worse); still differs: push_back temp slots (original [esp+0x18]/[esp+0x1c] at sites 8/9, ours 0x1c at site 2 and 0x18 at site 14) and the first inlined insert calls size() out of line for max(size(),1).
 // Tried 2026-11-01 re-pass: per-site rect slots fixed (one shared local for all sites except two own locals at sites 7/8 = ForceFeedbackStateArrow1/2; 77->68 insns differ, slots all match); 30+ variants of Bal(1) position/count and Bal inside the macro (between new and push_back) all worse; still differs: the first inlined insert (site 13) calls size() out of line for max(size(),1) where the original inlines it, plus a swapped add ecx,eax at site 14 that follows from it.
 // Tried 2026-11-01 night: site 13 as a hand-written VC6 vector insert (forceinline, LLVec view: SizeCall() + inline max, out-of-line Ucopy/Ufill/Destroy, SizeCall in last=) fixes site 13's size()/max shape exactly (the original's out-of-line call is the FIRST size() term), but the freed inline budget then inlines site 14's middle-arm Ufill (68->65 insns, built 2857->2861 bytes, away from 2852); 2+ Bal before site 14 overshoots (96), and a hand-written site 14 (inline Ucopy loops via a by-value helper, Ufill/deallocate variants) gives 85-86 with s kept in ebp where the original spills it to [esp+0x20] and an 8-byte shift of every C_Point temp slot; blocker is the per-function inline budget being all-or-nothing around site 14.
+// Tried 2026-11-15 round 17 (no gain, 68 insns kept): insert(end,1,x)/insert(end,x) spelled at site 13/14 (78-380), other rect locals at sites 13/14 (71-75), Bal dropped/moved to site 12-14 or doubled (84-258); Bal argument forms are dead-code eliminated so only the call count matters.
 void MenuScreen8DC::LoadLayout()
 {
     Config config;
@@ -352,19 +364,19 @@ void MenuScreen8DC::LoadLayout()
     config.Define(DAT_004f64c8, 0x1c);
     C_String path("data/menu/controlmenu.ini");
     config.Load(path.c_str(), true, false, 0);
-    C_ADDR(rb, "ConfigureControllersText_UpperLeft", "ConfigureControllersText_LowerRight");
-    C_ADDR(rb, "ForceFeedbackStateText_UpperLeft", "ForceFeedbackStateText_LowerRight");
-    C_ADDR(rb, "ForceFeedbackLevelText_UpperLeft", "ForceFeedbackLevelText_LowerRight");
-    C_ADDR(rb, "SaturationLevelText_UpperLeft", "SaturationLevelText_LowerRight");
-    C_ADDR(rb, "DeadzoneLevelText_UpperLeft", "DeadzoneLevelText_LowerRight");
-    C_ADDR(rb, "BackText_UpperLeft", "BackText_LowerRight");
-    C_ADDR(rc, "ForceFeedbackStateArrow1_UpperLeft", "ForceFeedbackStateArrow1_LowerRight");
-    C_ADDR(rd, "ForceFeedbackStateArrow2_UpperLeft", "ForceFeedbackStateArrow2_LowerRight");
-    C_ADDR(rb, "ForceFeedbackLevelArrow1_UpperLeft", "ForceFeedbackLevelArrow1_LowerRight");
-    C_ADDR(rb, "ForceFeedbackLevelArrow2_UpperLeft", "ForceFeedbackLevelArrow2_LowerRight");
-    C_ADDR(rb, "SaturationLevelArrow1_UpperLeft", "SaturationLevelArrow1_LowerRight");
-    C_ADDR(rb, "SaturationLevelArrow2_UpperLeft", "SaturationLevelArrow2_LowerRight");
-    C_ADDR(rb, "DeadzoneLevelArrow1_UpperLeft", "DeadzoneLevelArrow1_LowerRight");
+    C_ADDF(rb, "ConfigureControllersText_UpperLeft", "ConfigureControllersText_LowerRight");
+    C_ADDI(rb, "ForceFeedbackStateText_UpperLeft", "ForceFeedbackStateText_LowerRight");
+    C_ADDI(rb, "ForceFeedbackLevelText_UpperLeft", "ForceFeedbackLevelText_LowerRight");
+    C_ADDI(rb, "SaturationLevelText_UpperLeft", "SaturationLevelText_LowerRight");
+    C_ADDP(rb, "DeadzoneLevelText_UpperLeft", "DeadzoneLevelText_LowerRight");
+    C_ADDP(rb, "BackText_UpperLeft", "BackText_LowerRight");
+    C_ADDP(rc, "ForceFeedbackStateArrow1_UpperLeft", "ForceFeedbackStateArrow1_LowerRight");
+    C_ADDP(rd, "ForceFeedbackStateArrow2_UpperLeft", "ForceFeedbackStateArrow2_LowerRight");
+    C_ADDP(rb, "ForceFeedbackLevelArrow1_UpperLeft", "ForceFeedbackLevelArrow1_LowerRight");
+    C_ADDP(rb, "ForceFeedbackLevelArrow2_UpperLeft", "ForceFeedbackLevelArrow2_LowerRight");
+    C_ADDP(rb, "SaturationLevelArrow1_UpperLeft", "SaturationLevelArrow1_LowerRight");
+    C_ADDP(rb, "SaturationLevelArrow2_UpperLeft", "SaturationLevelArrow2_LowerRight");
+    C_ADDP(rb, "DeadzoneLevelArrow1_UpperLeft", "DeadzoneLevelArrow1_LowerRight");
     Bal(1);
-    C_ADDR(rb, "DeadzoneLevelArrow2_UpperLeft", "DeadzoneLevelArrow2_LowerRight");
+    C_ADDP(rb, "DeadzoneLevelArrow2_UpperLeft", "DeadzoneLevelArrow2_LowerRight");
 }

@@ -18,6 +18,7 @@ extern "C" void fun_004c1998();
 // approach the target quad layout; FPU/store scheduling still differs.
 // Tried 2026-10-30 night: ~25 variants (volatile/plain vertices+color, guard placement, store/zero-reg order, u1/v1 hoist, tail store reorder); only the tail store order helped (49->45); the quad loop interleaves FPU stores across vertices and the 8-byte size gap is unexplained.
 // Tried 2026-10-31 re-pass: cursor pointers declared reverse (v2,u2,v,u,normal,color) fixes the lea/register order; vx load hoisted above the guard (45->39); ~14 more variants (plain color, volatile u/v/u2, u1/v1 hoist, u0/v0 swap, for-loop) no better; original defers u/v fstp across vertices with pending 0x2c adds folded into disp (e.g. [edx-0x2c]).
+// 2026-11-16: per-vertex store order found by random-permutation hill climb (size now exact 924, 344 -> 187 bytes, 34 -> 32 insns differ).
 // 2026-11-11: counts, owner and array pointers through this->mesh (no volatile reloads) and the tail stores in the
 // original order (unk70[2] and viewCount right after the unk60 block): 357 -> 344 bytes differ; the head now matches
 // up to the quad loop, whose FPU/store interleaving is the remaining difference.
@@ -80,21 +81,21 @@ WindowRain::WindowRain(int count)
             *u2 = 0.0f;
             *v2 = 0.0f;
             normal += 11; color += 11; u += 11; v += 11; u2 += 11; v2 += 11;
+            *u = u1;
             normal[0] = 0.0f;
             normal[1] = 0.0f;
             normal[2] = -1.0f;
-            *color = 0xffffffff;
-            *u = u1;
             *v = v1;
+            *color = 0xffffffff;
             *u2 = 0.0f;
             *v2 = 0.0f;
             normal += 11; color += 11; u += 11; v += 11; u2 += 11; v2 += 11;
-            normal[0] = 0.0f;
-            normal[1] = 0.0f;
-            normal[2] = -1.0f;
             *color = 0xffffffff;
             *u = u0;
             *v = v1;
+            normal[0] = 0.0f;
+            normal[1] = 0.0f;
+            normal[2] = -1.0f;
             *u2 = 0.0f;
             *v2 = 0.0f;
             normal += 11; color += 11; u += 11; v += 11; u2 += 11; v2 += 11;
@@ -153,6 +154,7 @@ void WindowRain::vf6(RenderDevice* device, Camera* camera, int unused)
 // 955 vs 955 bytes; 72 -> 36 insns differ (cursor/idiom pass 2026-11-01).
 // Tried 2026-10-30 night: dy as a local, int copy of the vertex into a Vec3* w = &s->world (gets the ecx=&world.z base, frame size now matches; 127->72 insns); separate angle pointers, store reorders, indexed spots[j] did not add the original second induction pointer (edx=s) or its imm 100.0 stores; bounds-copy register rotation still differs.
 // Tried 2026-11-01: cursor float* cz=&s->world.z re-derived in the for-increment (keeps edx=s and ecx separate), dy declared after the right/up constant stores, drops loop as indexed dr=&drops[j]; 72->36 insns, size 955 matches. Left: bounds-copy register rotation (orig starts eax, ours edx; bounds.w/struct copy/vmd/reverse order no help), zero/imm store order in loop, add ecx,0x2c vs lea ecx,[edx+0x10]; volatile barriers on cz stores only reach 34.
+// Pass 2026-11-13: for-increment `cz = &(s + 1)->world.z, s++, src++` (8 -> 7 insns differ, 45 -> 41 bytes). ~120 store-order permutations, loop-init placement, `cz += 11`/char* strides (949 bytes), `cz += 0` tried: no better.
 void WindowRain::Init(RainScene* scene)
 {
     int i = 0;
@@ -210,7 +212,7 @@ void WindowRain::Init(RainScene* scene)
     float* cz = &s->world.z;
     Vec3* src = md->vertices;
     int j;
-    for (j = 0; j < n; j++, s++, src++, cz = &s->world.z) {
+    for (j = 0; j < n; j++, cz = &(s + 1)->world.z, s++, src++) {
         cz[-2] = src->x; cz[-1] = src->y; cz[0] = src->z;
         cz[3] = 0.0f;
         cz[6] = 0.0f;

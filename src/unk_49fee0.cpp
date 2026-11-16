@@ -102,6 +102,7 @@ static inline SubPod* SubP(const Vec3& a, const Vec3& b, SubPod* out)
 // 2026-11-04 (ws-I): EH map now exact (states 4,5,6,7,8,6,9,10 as the original). Cause: the out-of-line Sub (0x414330) returns a plain struct (SubPod, no unwind state) read through the returned pointer; rel/r3/v4 are three function-scope Vec3 declared before ownVel (states 0-2), dir/diff in-loop, `other` is re-derived from the Car pointer (oc->body) at every use. Left: this in esi vs edi, frame 0xc4 vs 0xc0.
 // Tried 2026-10-30 night: ~25 variants; 215->170 insns by declaring rel/diff Vec3 outside the loop (assigned per pass) and copying forward into dir field by field; original still has frame 0xc0 (ours 0xd8), EH state 4 before the loop and this in edi/i in ecx with the dir inverse sharing i's slot.
 // Tried 2026-11-01: ~18 more variants (dir/r3/v4/otherFwd hoisted out of the loop, extra dummy Vec3, int i, double length, result=0); only hoisting otherFwd up to after 'other' helped, 170->168; still frame 0xd8 vs 0xc0 and EH state 3 vs 4 at loop entry.
+// 2026-11-15 (r15): 206 -> 142 insns differ, 1146 -> 1142 bytes: `diff` is the out-of-line Sub result (plain SubPod t0, no volatile y read) copied into a Vec3 diff (x,0,z); oc->body cached in a local after the Subs; this now in edi as the original. Left: frame/slots (0xe4 vs 0xc0), ownVel/ownFwd store schedule, ob base +0x1a8 vs original +0x1b0.
 // Logic complete (1110 vs 1149 bytes). The original has four Vec3 objects (EH state 4) alive before the loop and
 // reads the results of the out-of-line Vec3 +/- (0x419f00/0x414330) straight from the returned pointers; the
 // build's temporaries, EH state numbers and register allocation (original: this in edi) differ.
@@ -129,15 +130,17 @@ void AIDriver::FUN_0049ffa0()
         SubPod t1, t2, t3;
         SubPod* q = SubP(((AiBody*)oc->body)->position, ownBody->position, &t1);
         rel.x = q->x; rel.y = 0; rel.z = q->z;
-        Vec3 diff = ((AiBody*)oc->body)->position - ownBody->position;
-        diff.y = 0.0f;
+        SubPod t0;
+        SubPod* dq = SubP(((AiBody*)oc->body)->position, ownBody->position, &t0);
+        Vec3 diff(dq->x, 0, dq->z);
         q = SubP(((AiBody*)oc->body)->position + *(Vec3*)&((AiBody*)oc->body)->vx, ownBody->position + *(Vec3*)&ownBody->vx, &t2);
         r3.x = q->x; r3.y = 0; r3.z = q->z;
         q = SubP(((AiBody*)oc->body)->position + *(Vec3*)&((AiBody*)oc->body)->vx, ownBody->position, &t3);
         v4.x = q->x; v4.y = 0; v4.z = q->z;
-        Vec3 otherFwd(((AiBody*)oc->body)->Forward());
+        AiBody* ocb = (AiBody*)oc->body;
+        Vec3 otherFwd(ocb->Forward());
         float along = diff.z * forward.z;
-        along = *(volatile float*)&diff.y * forward.y + along;
+        along = diff.y * forward.y + along;
         along = diff.x * forward.x + along;
         float ownSpeed = 0;
         if (ownBody->vx * ownBody->vx + ownBody->vy * ownBody->vy + ownBody->vz * ownBody->vz > 0.0f) {
@@ -147,10 +150,10 @@ void AIDriver::FUN_0049ffa0()
         }
         unk568 = ownSpeed;
         float otherSpeed = 0;
-        if (((AiBody*)oc->body)->vx * ((AiBody*)oc->body)->vx + ((AiBody*)oc->body)->vy * ((AiBody*)oc->body)->vy + ((AiBody*)oc->body)->vz * ((AiBody*)oc->body)->vz > 0.0f) {
-            otherSpeed = otherFwd.y * ((AiBody*)oc->body)->vy;
-            otherSpeed = otherFwd.z * ((AiBody*)oc->body)->vz + otherSpeed;
-            otherSpeed = otherFwd.x * ((AiBody*)oc->body)->vx + otherSpeed;
+        if (ocb->vx * ocb->vx + ocb->vy * ocb->vy + ocb->vz * ocb->vz > 0.0f) {
+            otherSpeed = otherFwd.y * ocb->vy;
+            otherSpeed = otherFwd.z * ocb->vz + otherSpeed;
+            otherSpeed = otherFwd.x * ocb->vx + otherSpeed;
         }
         if (along > 0.0f) {
             float distance = (float)sqrt(rel.z * rel.z + rel.x * rel.x);
@@ -158,18 +161,18 @@ void AIDriver::FUN_0049ffa0()
                 if (ownSpeed > otherSpeed || unk164 == 1) {
                     unkbc = 1;
                     ob->valid = 1;
-                    ob->unk0.x = ((AiBody*)oc->body)->position.x;
-                    ob->unk0.y = ((AiBody*)oc->body)->position.y;
-                    ob->unk0.z = ((AiBody*)oc->body)->position.z;
+                    ob->unk0.x = ocb->position.x;
+                    ob->unk0.y = ocb->position.y;
+                    ob->unk0.z = ocb->position.z;
                     ob->unk0.y = 0;
                     ob->leftDone = ob->rightDone = ob->side = 0;
                     ::FUN_004a1390(ob, (AiBody*)oc->body);
-                    ob->unk4c.x = ((AiBody*)oc->body)->Forward().x;
-                    ob->unk4c.z = ((AiBody*)oc->body)->Forward().z;
-                    ob->unk4c.y = ((AiBody*)oc->body)->Forward().y;
-                    ob->unk40.x = ((AiBody*)oc->body)->vx;
-                    ob->unk40.y = ((AiBody*)oc->body)->vy;
-                    ob->unk40.z = ((AiBody*)oc->body)->vz;
+                    ob->unk4c.x = ocb->Forward().x;
+                    ob->unk4c.z = ocb->Forward().z;
+                    ob->unk4c.y = ocb->Forward().y;
+                    ob->unk40.x = ocb->vx;
+                    ob->unk40.y = ocb->vy;
+                    ob->unk40.z = ocb->vz;
                     unk554++;
                 } else {
                     ob->valid = 0;
@@ -186,6 +189,8 @@ void AIDriver::FUN_0049ffa0()
 
 // NONMATCHING: RALLYTROPHY 0x4a0420
 // 2026-11-04 (ws-I): EH states and frame (0xb0) now exact. The missing 4th persistent object is a function-scope RotMatrix (empty dtor, state 0) re-initialised by the out-of-line 0x4b5760 (rot.Set(&up,..)); `up` is a block-local Vec3 destroyed before the multiply; Vec3*Rot (0x4b5850) and Sub return plain structs read through eax; p is a Vec3 declared before the Sub call. Left: scheduling/register differences.
+// 2026-11-16 (r29): 208 -> 123 insns differ, 2583 -> 2615 bytes (size exact), 2156 -> 188 differing bytes: best/leftSum/rightSum declared before `rot` (immediate zero stores), separate len2/k2 for axis, `Vec3 up(0,1,0)`, `Vec3 t(*(Vec3*)&unkd4); t.y = 0` and p/dir stores x,z then y, `if (!calls) again = 0` (no `more` temp), first limit branch split into `if (!f) .. else if (!local)`. Left: p lea ecx hoist / register picks in the p loop, `found` mov ebx,1 ordering, dotV term fld order.
+// 2026-11-16 (r30): reorder.py statement order (rightSum decl first, unk104/best, p.x, dir.x/z/y stores): 129 -> 124 insns differ (188 -> 192 bytes, size exact); found/best store order, early lea hoist (Vec3* alias, const ref, found placement) not movable by source.
 // Current: 2546/2615 bytes, 2189 differing bytes, instruction-multiset delta 54. The target frame is 0xb0 vs 0xa4.
 // Its unwind map arms separate cleanups for the argument/result Vec3 temporaries and the two branch-local rotation
 // axes. Branch-local Vec3 `up` gives candidate states 4/5/6/7; the exact frame/register schedule still differs.
@@ -194,15 +199,15 @@ void AIDriver::FUN_0049ffa0()
 // Tried 2026-11-01 re-pass: 14 more variants (unused/dead-store/volatile/copy-init extra function-scope Vec3 at 6 positions, branchy `more` forms); best 250->243 insns (extra Vec3 pre with dead stores) but bytes grow and frame/EH states still differ; unreferenced Vec3 gets elided, and the 12-byte slot is still unidentified.
 void AIDriver::FUN_004a0420()
 {
+    float rightSum = 0.0f;
+    float best = 0.0f;
+    float leftSum = 0.0f;
     RotMatrix rot;
     SubPod rs;
     MulPod tmp;
-    float best = 0.0f;
-    float leftSum = 0.0f;
-    float rightSum = 0.0f;
+    int found = 0;
     unsigned int i = 0;
     Vec3 dir;
-    int found = 0;
     float f;
     float dotV1, dotA1, dotV2, dotA2;
     int again;
@@ -218,23 +223,21 @@ void AIDriver::FUN_004a0420()
     float q = axis.x * axis.x;
     q = axis.z * axis.z + q;
     q = axis.y * axis.y + q;
-    len = (float)sqrt(q);
-    k = 1.0f / len;
-    axis.x = axis.x * k;
-    axis.y = axis.y * k;
-    axis.z = axis.z * k;
+    float len2 = (float)sqrt(q);
+    float k2 = 1.0f / len2;
+    axis.x = axis.x * k2;
+    axis.y = axis.y * k2;
+    axis.z = axis.z * k2;
     Obstacle* o = obstacles;
     for (i = 0; i < listeners.size(); i++, o++) {
         if (o->valid) {
-            Vec3Slot t;
-            t.x = unkd4.x;
+            Vec3 t(*(Vec3*)&unkd4);
             t.y = 0.0f;
-            t.z = unkd4.z;
-            float r = FUN_004a0e60(o, (Vec3*)&t);
+            float r = FUN_004a0e60(o, &t);
             if (r != -1.0f) {
                 if (best < r) {
-                    unk104 = i;
                     best = r;
+                    unk104 = i;
                 }
                 found = 1;
                 o->side = 1;
@@ -251,10 +254,10 @@ void AIDriver::FUN_004a0420()
         if (o->valid && o->side != 1) {
             Vec3 p;
             SubP(*(Vec3*)&o->unk0, ((CarBodyV*)car->body)->position, &rs);
-            p.x = unkd4.z;
             p.y = 0.0f;
             p.z = -unkd4.x;
             rs.y = 0.0f;
+            p.x = unkd4.z;
             if (rs.z * p.z + rs.x * p.x < 0.0f) {
                 o->side = 2;
             } else {
@@ -263,9 +266,9 @@ void AIDriver::FUN_004a0420()
         }
     }
 
-    dir.x = unkd4.x;
     dir.y = 0.0f;
     dir.z = unkd4.z;
+    dir.x = unkd4.x;
     do {
         again = 0;
         leftSum += FUN_004a1050(&obstacles[unk104], (Vec3*)&dir, 1);
@@ -276,10 +279,7 @@ void AIDriver::FUN_004a0420()
             dir.z = 0.0f;
         } else {
             {
-                Vec3 up;
-                up.x = 0.0f;
-                up.y = 1.0f;
-                up.z = 0.0f;
+                Vec3 up(0.0f, 1.0f, 0.0f);
                 rot.Set(&up, -leftSum);
             }
             MulPod* r = ((const MulThis*)&unkd4)->Mul(&tmp, &rot);
@@ -320,17 +320,15 @@ void AIDriver::FUN_004a0420()
                 unk104 = i;
             }
         }
-        int more = again;
-        if (!calls) more = 0;
+        if (!calls) again = 0;
         if (f > best) {
             best = f;
         }
-        again = more;
     } while (again);
 
     dir.x = unkd4.x;
-    dir.y = 0.0f;
     dir.z = unkd4.z;
+    dir.y = 0.0f;
     do {
         again = 0;
         rightSum += FUN_004a1050(&obstacles[unk104], (Vec3*)&dir, 0);
@@ -341,10 +339,7 @@ void AIDriver::FUN_004a0420()
             dir.z = 0.0f;
         } else {
             {
-                Vec3 up;
-                up.x = 0.0f;
-                up.y = 1.0f;
-                up.z = 0.0f;
+                Vec3 up(0.0f, 1.0f, 0.0f);
                 rot.Set(&up, rightSum);
             }
             MulPod* r = ((const MulThis*)&unkd4)->Mul(&tmp, &rot);
@@ -385,12 +380,10 @@ void AIDriver::FUN_004a0420()
                 unk104 = i;
             }
         }
-        int more = again;
-        if (!calls) more = 0;
+        if (!calls) again = 0;
         if (f > best) {
             best = f;
         }
-        again = more;
     } while (again);
 
     unk564 = dotA2;
@@ -415,7 +408,9 @@ void AIDriver::FUN_004a0420()
         limit = DAT_00500e98 + 0.03f;
     }
     if (limit < unk110) {
-        if (!FUN_0049f1f0(listeners[unk104]) || !listeners[unk104]->local) {
+        if (!FUN_0049f1f0(listeners[unk104])) {
+            unk110 = 0.1f;
+        } else if (!listeners[unk104]->local) {
             unk110 = 0.1f;
         }
     } else if (unk110 < -limit) {
@@ -522,6 +517,8 @@ float AIDriver::FUN_004a0e60(Obstacle* ob, Vec3* unused)
 
 
 // NONMATCHING: RALLYTROPHY 0x4a1050
+// 2026-11-15 reg sweep (~25 compiles): side branch matrix before point 18 -> 17 insns (49 bytes unchanged); else-branch swap, hoists, own/car chains, c.* load order all worse; matrix/point temps still edx/eax vs original ecx/ecx.
+// 2026-11-13 pass: (float) cast on the return expression 14 -> 13 insns (return fld still one slot early elsewhere). No effect: matrix/point decl order, per-branch slot order (side: point first), const/DWORD/void* types, pos/matrix per-use or via car/own (worse), idx placement before/after/in perp or loop head (ebx hoist moves perp stores), named result.
 // Logic complete (819 bytes, 70 -> 18 insns differ). Tried 2026-10-31 re-pass: f scale via `double ls = sqrt(..); float inv2 = (float)(DAT_004e1348 / ls);` (fld dword K; fdiv st,st(1)), ez/ey temps with e.x read directly, idx read after perp. Fixed: `best` assigned after the z add in the side branch
 // (keeps the two y/z add tails from merging), volatile read of `side` for idx (no ebx hoist), e/f sums in original
 // order. Tried 2026-10-31: inline-function and macro forms of the transform, operand swaps, volatile on matrix/point,
@@ -574,8 +571,8 @@ float AIDriver::FUN_004a1050(Obstacle* ob, Vec3* dir, int side)
             }
         } else {
             if (d > best) {
-                best = d;
                 idx = i;
+                best = d;
             }
         }
     }
@@ -595,7 +592,7 @@ float AIDriver::FUN_004a1050(Obstacle* ob, Vec3* dir, int side)
     f.y = inv2 * y;
     f.z = inv2 * z;
     float ez = e.z, ey = e.y;
-    return 1.0f - (ez * f.z + ey * f.y + e.x * f.x);
+    return (float)(1.0f - (ez * f.z + ey * f.y + e.x * f.x));
 }
 
 // original: FUN_004a1390

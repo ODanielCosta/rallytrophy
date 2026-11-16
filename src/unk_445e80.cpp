@@ -30,22 +30,34 @@ ConfigKey SMA_Keys[12] = {
     { "RepairTime_Steering", 1 },
 };
 
-// The inline Sprite set-up of the constructor (the same field writes as the ping-indicator sprite).
-#define SMA_SPRITE(s, last) \
-    (s).unk60[0] = 1.0f; \
-    (s).unk60[1] = 1.0f; \
-    (s).unk60[2] = 1.0f; \
-    (s).unk60[3] = 1.0f; \
-    (s).unk40[0] = 1.0f; \
-    (s).unk40[1] = 1.0f; \
-    (s).unk40[2] = 1.0f; \
-    (s).unk40[3] = 1.0f; \
+// The inline Sprite set-up of the constructor (the same field writes as the ping-indicator sprite). The two colour
+// quads go through float pointers (the original's address arithmetic).
+#define SMA_C(s) \
+    { \
+        float* c = (s).unk60; \
+        c[0] = 1.0f; \
+        c[1] = 1.0f; \
+        c[2] = 1.0f; \
+        c[3] = 1.0f; \
+    }
+#define SMA_D(s) \
+    { \
+        float* d = (s).unk40; \
+        d[0] = 1.0f; \
+        d[1] = 1.0f; \
+        d[2] = 1.0f; \
+        d[3] = 1.0f; \
+    }
+// The loops write the two int fields first.
+#define SMA_LOOP_SPRITE(s, last) \
+    (s).unk9c = (last); \
+    (s).unk98 = 15; \
+    SMA_C(s) \
+    SMA_D(s) \
     (s).unk18 = 5; \
     (s).unk1c = 6; \
     (s).unk24 = 2; \
-    (s).unk20 = 2; \
-    (s).unk9c = (last); \
-    (s).unk98 = 15;
+    (s).unk20 = 2;
 
 
 // ---- from group draft V2 ----
@@ -179,34 +191,93 @@ static float SMI_TITLEY = 142.0f; // 0x4f9f88
 static float SMI_RALLYY = 630.0f; // 0x4f9f90
 extern int DAT_004f9ca8[];             // tab text ids {120, 121, 122, 124, 23, 30}
 
-// NONMATCHING: RALLYTROPHY 0x445e80
-// Same size (1603) and same call/EH skeleton; only the store scheduling of the inline Sprite field writes differs: the
-// original issues the 1.0f stores of the first sprites ahead of the mode/int blocks and delays the 5/6/2/0xf int stores
-// (the sprite order damageIcons, damageBar, tuneSelectors, repair, tune, info, startRace, load is right). original: FUN_00445e80
-// Tried 2026-10-30 night: reordered SMA_SPRITE stores (floats+ints first, unk98/unk9c last: 82->69 insns), pointer loops, per-loop macros, 6 other orders; the original schedules sprite int stores in a different interleave and its loop base is sprite+0x68 (ours +0x98), not reachable from source order.
-// Tried 2026-10-31 re-pass: swept all 24 orders of the four store groups (unk9c/98, f60, f40, ints) = 68 best vs 69; the loop body order 9c,98,f60,f40,18,1c,24,20 reproduces the original loop but the strength-reduced base stays sprite+0x98/0x64 (original +0x68), also with explicit base-pointer stores, Sprite& and Sprite* forms; the non-loop sprites need the unexplained cross-sprite interleave; 68 insns, permute skipped.
+// FUNCTION: RALLYTROPHY 0x445e80
+// Matched 2026-11-16: colour quads written through float pointers, constant store order found by tools/reorder.py.
+// Same size (1603), 1 instruction differs (7 bytes): the store of tuneSelectors.unk98 (0x3e4) lands two slots before the
+// original's. original: FUN_00445e80
+// 2026-11-16: the two colour quads written through float pointers (SMA_C/SMA_D: `float* c = s.unk60; c[0..3]`) instead of
+// s.unk60[i] took 69 -> 7 insns (the strength-reduced loop base became sprite+0x68 like the original's, and the straight
+// stores stopped being hoisted); a hill-climb over the statement order of the straight sprites (any order is neutral, the
+// scheduler places the stores) then reached 1. The sprite order damageIcons, damageBar, tuneSelectors, repair, tune, info,
+// startRace, load is right. Moving tuneSelectors.unk98 anywhere in the sequence leaves the 1-insn difference.
 ServiceMenu::ServiceMenu()
 {
     m_selected = 0;
     mode = 0;
+    totalTime = 60;
     unk24 = 0;
     unk28 = 0;
-    unk2c = 0;
-    totalTime = 60;
     timeLeft = 60;
-    SMA_SPRITE(damageIcons, 2)
-    SMA_SPRITE(damageBar, 2)
-    SMA_SPRITE(tuneSelectors, 2)
-    SMA_SPRITE(repairSprite, 2)
-    SMA_SPRITE(tuneSprite, 2)
-    SMA_SPRITE(infoMap, 14)
-    SMA_SPRITE(startRace, 2)
-    SMA_SPRITE(loadSprite, 2)
+    unk2c = 0;
+    SMA_C(damageIcons)
+    SMA_D(damageIcons)
+    damageIcons.unk9c = 2;
+    damageIcons.unk98 = 15;
+    damageIcons.unk18 = 5;
+    damageIcons.unk1c = 6;
+    damageIcons.unk24 = 2;
+    damageIcons.unk20 = 2;
+    damageBar.unk9c = 2;
+    SMA_C(damageBar)
+    SMA_D(damageBar)
+    damageBar.unk98 = 15;
+    damageBar.unk18 = 5;
+    damageBar.unk1c = 6;
+    damageBar.unk24 = 2;
+    damageBar.unk20 = 2;
+    tuneSelectors.unk9c = 2;
+    tuneSelectors.unk98 = 15;
+    SMA_C(tuneSelectors)
+    SMA_D(tuneSelectors)
+    tuneSelectors.unk18 = 5;
+    tuneSelectors.unk1c = 6;
+    tuneSelectors.unk24 = 2;
+    tuneSelectors.unk20 = 2;
+    SMA_C(repairSprite)
+    SMA_D(repairSprite)
+    repairSprite.unk9c = 2;
+    repairSprite.unk18 = 5;
+    repairSprite.unk98 = 15;
+    repairSprite.unk1c = 6;
+    repairSprite.unk24 = 2;
+    repairSprite.unk20 = 2;
+    SMA_C(tuneSprite)
+    tuneSprite.unk98 = 15;
+    tuneSprite.unk9c = 2;
+    tuneSprite.unk18 = 5;
+    tuneSprite.unk1c = 6;
+    tuneSprite.unk24 = 2;
+    tuneSprite.unk20 = 2;
+    SMA_D(tuneSprite)
+    SMA_C(infoMap)
+    infoMap.unk98 = 15;
+    SMA_D(infoMap)
+    infoMap.unk9c = 14;
+    infoMap.unk18 = 5;
+    infoMap.unk1c = 6;
+    infoMap.unk24 = 2;
+    infoMap.unk20 = 2;
+    startRace.unk98 = 15;
+    SMA_C(startRace)
+    SMA_D(startRace)
+    startRace.unk9c = 2;
+    startRace.unk18 = 5;
+    loadSprite.unk98 = 15;
+    startRace.unk1c = 6;
+    startRace.unk24 = 2;
+    SMA_C(loadSprite)
+    startRace.unk20 = 2;
+    loadSprite.unk9c = 2;
+    SMA_D(loadSprite)
+    loadSprite.unk18 = 5;
+    loadSprite.unk1c = 6;
+    loadSprite.unk24 = 2;
+    loadSprite.unk20 = 2;
     for (int i = 0; i < 8; i++) {
-        SMA_SPRITE(partSprites[i], 2)
+        SMA_LOOP_SPRITE(partSprites[i], 2)
     }
     for (int j = 0; j < 3; j++) {
-        SMA_SPRITE(stageSprites[j], 14)
+        SMA_LOOP_SPRITE(stageSprites[j], 14)
     }
     Config config;
     config.Define(SMA_Keys, 12);
@@ -348,6 +419,7 @@ void ServiceMenu::UnloadTextures()
 // worse); text declared first with a late int/struct/memcpy init: unchanged. Probes: extra stores to text do not move
 // it, one reference fewer on d moves d above f. So the original has fewer counted references on d and f than ours.
 // 2026-11-12: 15 more variants (separate f/g, double fr via qword asm, no d, text first/last with explicit stores, stage1 local, loop-counter forms): unchanged 40 insns.
+// 2026-11-16 (r20): ~55 more variants (stageNo++ before the loop with shifted uses, 45 operand-order forms of n/b3/==5, hoisted s1/base2 locals, rallyNo*10+0xbe): none below 40 insns; sizegap now shows only the hoisted stageNo+1 temp in esi vs the original's eax (3 hunks, +-6 bytes).
 // original: FUN_004470a0 (thiscall, ret 0xc; info.ini loader: per-stage strings)
 void ServiceMenu::Init(int rallyNo, int stageNo, int count)
 {
@@ -1030,6 +1102,7 @@ void ServiceMenu::DrawInfo()
 // Tried 2026-10-31: buf[16]->buf[40] matches the original frame size 0x90 (279->229); 720 decl-order permutations of uv/pos/color/buf/i/unused, x/y swap, separate j counter, color.value=-1, volatile z did not beat it; still differs: uv/pos/color/i slot order (original: i low, uv/pos above, Color above them) and -1 held in ebp.
 // Tried 2026-11-01 re-pass: ~20 variants (tune loop as do-while over int* tp with volatile k=5 like DrawRepair, k/row/i merged into one local, y/x and k/row/dummy decl orders, buf[32]/[40]); the code already equals the original apart from stack offsets (loops, -1 in ebp, calls identical) and decl order never moves scalar slots; original frame has x/y at 0x18/0x14 with a hole at 0x10 and row/k shared at 0x1c below uv/pos, ours puts x/y at 0x10/0x14 and the counter above pos (229 insns differ, all slot offsets); no behaviour bug found (per-entry tune[i] vs tuneOrig[i] already correct).
 // 2026-11-12: the two selector markers as `x = (...) * DAT; y = DAT * 551; stores` (x kept on the FPU stack like the original) and `int row = unk28;` hoisted above the second marker: 229 -> 63 insns differ (3000 vs 3004 bytes). Left: frame 0x98 vs 0x90 (original spills (float)tune[row] into a slot at 0x6c, ours adds slots) and the uv store order in the changed-tune quad.
+// 2026-11-15 round 14: 511 -> 203 differing bytes, size 3000 -> 3004 (exact): x(604) as its own statement before the Print, x(985) - width in one expression, damageBar uv stores after the pos stores. Left: SetScale/color-store interleave and row-spill position near itoa, edx/eax in the tuneSprite else branch.
 // original: FUN_00449860 (page 1, the Tune tab)
 void ServiceMenu::DrawTune()
 {
@@ -1085,15 +1158,15 @@ void ServiceMenu::DrawTune()
             y = DAT_0056aeac * 42.0f + y;
         }
         x = DAT_0056aea8 * 600.0f;
-        uv[0].x = uv[3].x = 0.0f;
-        uv[0].y = uv[1].y = 0.0f;
-        uv[1].x = uv[2].x = 0.779296875f;
-        uv[2].y = uv[3].y = 0.28125f;
         y = DAT_0056aeac * 551.0f;
         pos[0].x = pos[3].x = x;
         pos[0].y = pos[1].y = y;
         pos[1].x = pos[2].x = DAT_0056aea8 * 402.0f + x;
         pos[2].y = pos[3].y = DAT_0056aeac * 22.0f + y;
+        uv[0].x = uv[3].x = 0.0f;
+        uv[0].y = uv[1].y = 0.0f;
+        uv[1].x = uv[2].x = 0.779296875f;
+        uv[2].y = uv[3].y = 0.28125f;
         DAT_0056b0ac->vf35(&damageBar);
         ((RaceDeviceSlots*)DAT_0056b0ac)->DrawQuad((Vec2*)pos, (Vec2*)uv, color, 1.0f, 1.0f);
         pos[0].x = pos[3].x = x - DAT_0056aea8;
@@ -1162,7 +1235,8 @@ void ServiceMenu::DrawTune()
         x = DAT_0056aea8 * 804.0f;
         y = DAT_0056aeac * 192.0f;
         lil->Print(DAT_0056b0ac, x, y, FUN_00405380(0x73), 0, 1.0f, 1.0f);
-        lil->Print(DAT_0056b0ac, DAT_0056aea8 * 604.0f, y, FUN_00405380(0x77), 0, 1.0f, 1.0f);
+        x = DAT_0056aea8 * 604.0f;
+        lil->Print(DAT_0056b0ac, x, y, FUN_00405380(0x77), 0, 1.0f, 1.0f);
         lil->color = DAT_00508c04;
         int cost = tuneTime[row];
         lil->SetScale(DAT_0056aea8 * 1.5f, DAT_0056aeac * 1.5f);
@@ -1172,8 +1246,7 @@ void ServiceMenu::DrawTune()
         x = x - lil->GetWidth(buf, 0);
         lil->Print(DAT_0056b0ac, x, y, buf, 0, 1.0f, 1.0f);
         itoa(timeLeft, buf, 10);
-        x = DAT_0056aea8 * 985.0f;
-        x = x - lil->GetWidth(buf, 0);
+        x = DAT_0056aea8 * 985.0f - lil->GetWidth(buf, 0);
         if (timeLeft < cost && tune[row] == tuneOrig[row]) {
             lil->SetColor(ColorArg(0xFFD14A4F));
         } else {
@@ -1219,12 +1292,14 @@ void ServiceMenu::DrawTune()
 // Tried 2026-10-30 night: 277->176 via damage loop on a separate int j with float* dp walking damage[] (repair read as dp[-14], same data), x/y decl swap, bool selected; still differs: original keeps -1 in ebx (or ebx,-1 / push ebx) where we push imm, and first-loop index/pointer regs (ebp/ebx) are swapped; z=-1 volatile store, white locals, Color/int variants did not move it.
 // Tried 2026-11-01 re-pass: 176->168 insns (1105->925 bytes): damage loop as a do-while over `float* dp` with a volatile down-counter k=7 (the original has dp walking in ebp, the count in a [esp+0x24] slot, no guard), y(248) assigned before x(601) so the slot stores follow the original; ~25 variants (decl order of i/dp/k, loop forms, -1 via int/white temp, ptr walk of SMH_PartText, i==unk2c, unsigned i, if/else colour) did not change the remaining diff: first loop has i/ptr in ebx/ebp swapped vs the original's ebp/ebx and -1 lands in ebp not ebx after the loop (so DrawQuad pushes ebp), loop x/y slots 0x14/0x18 swapped; the original has no EH states in the loop so empty-dtor colour structs do not apply.
 // 2026-11-12: 30 more variants (loop tp pointer, if/else and SetColorObj colour, direct text->color, x/y decl swap, k/dp declaration placement): unchanged 165 insns; i/tp and -1/dp register pairs stay swapped.
+// 2026-11-13 round 2: 65->63 insns (x(339) computed before y(262)); ~45 more variants on the -1/dp ebx/ebp swap (white int/Color locals, separate white for the loop, col set inside loop, dp/k/col order, loop forms, repair[7-k], float dv=*dp) all 65 or worse.
+// 2026-11-15 round 15: 63->62 insns (u and v both initialised before the level tests); k-- order, y+=, dp++ order, SetColorObj/scale/x/y reorders, non-volatile k all no gain.
 // original: FUN_0044a420 (page 2 of Draw)
 void ServiceMenu::DrawRepair()
 {
     TextRenderer* text = m_game->text;
-    float y = DAT_0056aeac * 262.0f;
     float x = DAT_0056aea8 * 339.0f;
+    float y = DAT_0056aeac * 262.0f;
     HudPoint uv[4];
     HudPoint pos[4];
     Color col;
@@ -1250,12 +1325,12 @@ void ServiceMenu::DrawRepair()
             y = DAT_0056aeac * 42.0f + y;
         }
         DAT_0056b0ac->vf35(&damageIcons);
-        y = DAT_0056aeac * 248.0f;
-        col.value = -1;
         x = DAT_0056aea8 * 601.0f;
+        col.value = -1;
         float* dp = damage;
         volatile int k;
         k = 7;
+        y = DAT_0056aeac * 248.0f;
         do {
             if (*dp > 0.0f) {
                 pos[0].x = pos[3].x = x;
@@ -1273,10 +1348,10 @@ void ServiceMenu::DrawRepair()
                     level = 1;
                 }
                 float u = 0.0f;
+                float v = 0.0f;
                 if (level & 1) {
                     u = 0.5f;
                 }
-                float v = 0.0f;
                 if (level & 2) {
                     v = 0.5f;
                 }
@@ -1315,39 +1390,46 @@ void ServiceMenu::DrawRepair()
         pos[2].y = pos[3].y = DAT_0056aeac * 32.0f + y;
         DAT_0056b0ac->vf66(pos, uv, col.value, 1.0f, 1.0f);
         TextRenderer* text2 = SMH_FONT2(m_game);
-        float ty = DAT_0056aeac * 580.0f;
+        y = DAT_0056aeac * 580.0f;
         col.value = 0xff000000;
         text2->color = col.value;
-        text2->Print(DAT_0056b0ac, DAT_0056aea8 * 607.0f, ty, "0%", 0, 1.0f, 1.0f);
-        float tx = DAT_0056aea8 * 995.0f - text2->GetWidth("100%", 0);
-        text2->Print(DAT_0056b0ac, tx, ty, "100%", 0, 1.0f, 1.0f);
-        tx = DAT_0056aea8 * 801.0f - text2->GetWidth(FUN_00405380(0x74), 0) * 0.5f;
-        text2->Print(DAT_0056b0ac, tx, ty, FUN_00405380(0x74), 0, 1.0f, 1.0f);
+        text2->Print(DAT_0056b0ac, DAT_0056aea8 * 607.0f, y, "0%", 0, 1.0f, 1.0f);
+        x = DAT_0056aea8 * 995.0f - text2->GetWidth("100%", 0);
+        text2->Print(DAT_0056b0ac, x, y, "100%", 0, 1.0f, 1.0f);
+        x = DAT_0056aea8 * 801.0f - text2->GetWidth(FUN_00405380(0x74), 0) * 0.5f;
+        text2->Print(DAT_0056b0ac, x, y, FUN_00405380(0x74), 0, 1.0f, 1.0f);
         text->scaleX = DAT_0056aea8 * 0.75f;
         text->scaleY = DAT_0056aeac * 0.75f;
-        text->color = DAT_00508c04;
-        float hy = DAT_0056aeac * 192.0f;
-        text->Print(DAT_0056b0ac, DAT_0056aea8 * 804.0f, hy, FUN_00405380(0x73), 0, 1.0f, 1.0f);
-        text->Print(DAT_0056b0ac, DAT_0056aea8 * 604.0f, hy, FUN_00405380(0x76), 0, 1.0f, 1.0f);
-        text->color = DAT_00508c04;
-        text->SetScale(DAT_0056aea8 * 1.5f, DAT_0056aeac * 1.5f);
+        text->SetColorObj(Color(DAT_00508c04));
+        x = DAT_0056aea8 * 804.0f;
+        y = DAT_0056aeac * 192.0f;
+        text->Print(DAT_0056b0ac, x, y, FUN_00405380(0x73), 0, 1.0f, 1.0f);
+        x = DAT_0056aea8 * 604.0f;
+        text->Print(DAT_0056b0ac, x, y, FUN_00405380(0x76), 0, 1.0f, 1.0f);
+        text->scaleX = DAT_0056aea8 * 1.5f;
+        text->scaleY = DAT_0056aeac * 1.5f;
+        text->SetColorObj(Color(DAT_00508c04));
         int cost = repairTime[unk2c];
         itoa(cost, buf, 10);
-        float ry = DAT_0056aeac * 200.0f;
-        text->Print(DAT_0056b0ac, DAT_0056aea8 * 785.0f - text->GetWidth(buf, 0), ry, buf, 0, 1.0f, 1.0f);
+        y = DAT_0056aeac * 200.0f;
+        x = DAT_0056aea8 * 785.0f;
+        x -= text->GetWidth(buf, 0);
+        text->Print(DAT_0056b0ac, x, y, buf, 0, 1.0f, 1.0f);
         int left = timeLeft;
         if (left < cost && !repair[unk2c]) {
             text->SetColor(0xffd14a4f);
         } else {
-            text->color = DAT_00508c04;
+            text->SetColorObj(Color(DAT_00508c04));
         }
         itoa(left, buf, 10);
-        text->Print(DAT_0056b0ac, DAT_0056aea8 * 985.0f - text->GetWidth(buf, 0), ry, buf, 0, 1.0f, 1.0f);
-        float titleScaleX0 = DAT_0056aea8;
-        int titleColor0 = *(volatile const int*)&DAT_00508c04;
-        text->scaleX = titleScaleX0;
-        text->color = titleColor0;
-        text->scaleY = DAT_0056aeac;
+        x = DAT_0056aea8 * 985.0f;
+        x -= text->GetWidth(buf, 0);
+        text->Print(DAT_0056b0ac, x, y, buf, 0, 1.0f, 1.0f);
+        x = DAT_0056aea8;
+        y = DAT_0056aeac;
+        text->scaleX = x;
+        text->SetColorObj(Color(DAT_00508c04));
+        text->scaleY = y;
     } else {
         col.value = -1;
         DAT_0056b0ac->vf35(&repairSprite);

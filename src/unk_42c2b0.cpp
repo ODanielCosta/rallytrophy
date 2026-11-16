@@ -569,11 +569,21 @@ static float H4c_four = 4.0f;      // 0x4e164c
 static float H4c_base = 166.0f;    // 0x4e1610
 static float H4c_trim = 20.0f;     // 0x4e1654
 
+// std::vector<UIRect*> (same layout) whose insert(pos, 1, x) stays an out-of-line call: VC6 spends its inline budget
+// per push_back site, so pinning the first three sites leaves the original's expansion (one size() call before the
+// growth arm, size() CSE-d in max()) for the last five. See study/FINDINGS.md.
+class H4c_Vec {
+public:
+    void insert(UIRect** pos, unsigned n, UIRect* const& x);
+    UIRect** end() { return last; }
+    std::allocator<UIRect*> alloc;
+    UIRect** first;
+    UIRect** last;
+    UIRect** unk;
+};
 // original: FUN_0042d710 (creates the hit rectangles)
-// NONMATCHING: RALLYTROPHY 0x42d710
-// last push_back is inlined in the original (inline size math); ours emits an extra out-of-line size() call (+7 bytes)
-// Tried 2026-10-30 night: ~35 variants (last-block statement orders, insert(end(),1,x) forms, local/ref temps, inline_depth/recursion/auto_inline pragmas) plus permute -r 20; none beats 13 insns/1711 bytes; original inlines vector::insert(P,1,X) only at the last site with size() CSE-d in the max() branch, ours re-calls size() there (inliner budget).
-// Tried 2026-10-31 re-pass: local `r=&m_items` pointer for all/each single push_back site (size 1709 vs 1704 but 30 insns differ, worse); permute -r 40 (16 rounds, ~240 candidates) baseline 13 never beaten; the extra call is size() re-evaluated in the max() branch of the last site.
+// FUNCTION: RALLYTROPHY 0x42d710
+// Matched 2026-11-15 by the H4c_Vec twin (first three pushes) plus the `items` reference taken after the first new.
 void GameScreen1E9C::BuildRects()
 {
     H4c_Point a;
@@ -585,48 +595,49 @@ void GameScreen1E9C::BuildRects()
     a.y = top;
     b.y = H4a_step + top;
     rect = (UIRect*)new H4c_Rect(a, b);
-    m_items.push_back(rect);
+    std::vector<UIRect*>& items = m_items;
+    ((H4c_Vec&)items).insert(((H4c_Vec&)items).end(), 1, rect);
     b.x = H4c_x + H4c_w;
     a.x = H4c_x;
     a.y = H4a_step + top;
     b.y = H4a_step + H4a_step + top;
     rect = (UIRect*)new H4c_Rect(a, b);
-    m_items.push_back(rect);
+    ((H4c_Vec&)items).insert(((H4c_Vec&)items).end(), 1, rect);
     b.x = H4c_x + H4c_w;
     a.x = H4c_x;
     a.y = H4a_step + H4a_step + top;
     b.y = H4a_step * H4c_three + top;
     rect = (UIRect*)new H4c_Rect(a, b);
-    m_items.push_back(rect);
+    ((H4c_Vec&)items).insert(((H4c_Vec&)items).end(), 1, rect);
     b.x = H4c_x + H4c_w;
     a.x = H4c_x;
     a.y = H4a_step * H4c_three + top;
     b.y = H4a_step * H4c_four + top;
     rect = (UIRect*)new H4c_Rect(a, b);
-    m_items.push_back(rect);
+    items.push_back(rect);
     b.x = H4c_x + H4c_back;
     a.x = H4c_x;
     a.y = H4a_backY - H4c_margin;
     b.y = H4a_backY + H4a_step;
     rect = (UIRect*)new H4c_Rect(a, b);
-    m_items.push_back(rect);
+    items.push_back(rect);
     a.x = 554.0f;
     b.x = 596.0f;
     a.y = 150.0f;
     b.y = 329.0f;
     rect = (UIRect*)new H4c_Rect(a, b);
-    m_items.push_back(rect);
+    items.push_back(rect);
     b.x = (a.x = H4c_mid - H4c_gap) + H4c_btn;
     a.y = H4a_step + top;
     b.y = H4a_step * H4c_four + top;
     rect = (UIRect*)new H4c_Rect(a, b);
-    m_items.push_back(rect);
+    items.push_back(rect);
     b.y = H4a_step + top;
     a.x = 242.0f;
     b.x = 284.0f;
     a.y = top;
     rect = (UIRect*)new H4c_Rect(a, b);
-    m_items.push_back(rect);
+    items.push_back(rect);
 }
 
 // original: FUN_0042ddc0

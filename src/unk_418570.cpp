@@ -422,23 +422,158 @@ void TriCollector::Gather(TriMesh* m)
     }
 }
 
+#include <string>
+#include <math.h>
+#include "unk_418b90.h"
+#include "unk_418570.h"
+
+extern float DAT_004e134c, DAT_004e138c, DAT_004e1408, DAT_004e1348;
+extern "C" char __cdecl fun_004b3ee0(float* pt, float* n, float* a, float* b, float* c); // point in triangle
+extern "C" char __cdecl fun_004b4090(float* org, float* dir, float r, float* a, float* b, float* t, float* hit); // sphere vs edge
+
+struct SphY { Vec3 c; float d; ~SphY() {} };
+struct EmptyD { ~EmptyD() {} };
+struct SphX { Vec3 c; float d; SphX(const Vec3& p, float r) : c(p) { d = r; } ~SphX() {} };
+// NONMATCHING: RALLYTROPHY 0x418b90
+// reason: first draft; original frame 0xc4 keeps all pseudocode locals (no reuse), 0x418b90 EH states for Vec3 temps differ
+// Tried 2026-10-31: original builds dead Vec3 e1/e2/e3 edge vectors, a dead bounding sphere (struct with dtor), Vec3 mn/mx/q locals (all added, 423->322); still differs in regalloc: original keeps this/esi, org/ebx, chain/ebp and spills i,p to [esp+0x18]/[0x14]; tried volatile self, head/chain reorder, first/last order (no effect).
+// Tried 2026-11-01 re-pass: float sums re-checked against asm (d2, plane num/den dots, normal length fixed to the original association; dead e3 = b-c); 322->326 insns differ is the cost of correct sums. d2 as double/volatile, bestT/chain/edge split decls, e1/e2 order, for-loop, folded operator chain: no gain; d2 stays on the x87 stack in the original (fcom then fsqrt) while ours spills it.
+// Pass 2026-11-13 (r6418b90): 307 -> 253 insns differ (2140 -> 2157 bytes): hit test as if(fun) hit else edges (block layout), loop-2 iterates `volatile first` (orig keeps first/t in one [esp+0x10] slot, reloaded), loop bound hits.size() w/o p!=0, `Vec3 sm; sm = ...` default-ctor form. Rejected: non-volatile t (size 2059 but 373 insns), ScenePoint types (same bytes, only symbol names differ), mn/mx/bestT decl moves, extra self ptr, rv/else return shape.
+// Pass 2026-11-16 (r29): 253 -> 251 insns differ (size unchanged 2157): `first = 0` declared before `Vec3 e`, chain test flipped to `if (chain == 0) first = t, chain = t; else last->next = t;`. Rejected: nesting/rv/else forms for the early return (epilogue still cloned), per-iteration `t = first` local (size 2085 but 312-352 insns: regalloc org/dir/t shuffles), chain/last decl moves, num-before-den.
+float SweepQuery::Cast(float r, float* org, float* dir, float* outPt, float* outN)
+{
+    float d2 = dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2];
+    if (d2 == DAT_004e134c)
+        return ((TriCollector*)this)->Closest(r, org, outPt, outN);
+
+    CTri* volatile first = 0;
+    Vec3 e = *(Vec3*)org; e += *(Vec3*)dir;
+    Vec3 dv = *(Vec3*)dir;
+    SphY sph;
+    Vec3 sm; sm = *(Vec3*)org; sm += e;
+    sm.x *= 0.5f; sm.y *= 0.5f; sm.z *= 0.5f;
+    sph.c = sm; sph.d = (float)sqrt(d2) * 0.5f + r;
+    float ex = e.x, ey = e.y, ez = e.z;
+    float dx = dv.x, dy = dv.y, dz = dv.z;
+    CTri* last = 0;
+    Vec3 mn = *(Vec3*)org;
+    Vec3 mx = *(Vec3*)org;
+    if (e.x < mn.x) mn.x = e.x; else if (e.x > mx.x) mx.x = e.x;
+    if (e.y < mn.y) mn.y = e.y; else if (e.y > mx.y) mx.y = e.y;
+    if (e.z < mn.z) mn.z = e.z; else if (e.z > mx.z) mx.z = e.z;
+    mn.x -= r; mn.y -= r; mn.z -= r;
+    mx.x += r; mx.y += r; mx.z += r;
+
+    CTri* chain = 0;
+    CTri** p = hits.begin();
+    for (unsigned i = 0; i < hits.size(); i++, p++) {
+        CTri* t = *p;
+        if (dv.z * t->n.z + dv.y * t->n.y + dv.x * t->n.x < DAT_004e1408) {
+            unsigned s = t->sel;
+            if (t->v[(s >> 6) & 3]->y >= mn.y && t->v[(s >> 4) & 3]->y <= mx.y &&
+                t->v[(s >> 2) & 3]->x >= mn.x && t->v[s & 3]->x <= mx.x &&
+                t->v[(s >> 10) & 3]->z >= mn.z && t->v[(s >> 8) & 3]->z <= mx.z) {
+                *t->e[0] = 0;
+                *t->e[1] = 0;
+                *t->e[2] = 0;
+                t->next = 0;
+                if (chain == 0)
+                    first = t, chain = t;
+                else
+                    last->next = t;
+                last = t;
+            }
+        }
+    }
+    head = chain;
+
+    float bestT = 1.0f;
+    int edge = -1;
+    CTri* bestTri = 0;
+    Vec3 hitPtV;
+    EmptyD z7;
+    while (first != 0) {
+        float den = first->n.z * dir[2]; // chained: keeps the original's (z+y)+x association
+        den = first->n.y * dir[1] + den;
+        den = first->n.x * dir[0] + den;
+        float num = first->n.y * org[1];
+        num = first->n.z * org[2] + num;
+        num = first->n.x * org[0] + num;
+        float tt = ((first->d - num) + r) / den;
+        if (DAT_004e134c <= tt && tt < bestT) {
+            TVert* c = first->v[2];
+            TVert* a = first->v[0];
+            TVert* b = first->v[1];
+            float* pa = &a->x;
+            float* pb = &b->x;
+            float* pc = &c->x;
+            Vec3 e1 = *(Vec3*)pb; e1 -= *(Vec3*)pa;
+            Vec3 e2 = *(Vec3*)pc; e2 -= *(Vec3*)pa;
+            Vec3 e3 = *(Vec3*)pb; e3 -= *(Vec3*)pc;
+            Vec3 q = *(Vec3*)org;
+            q += *(Vec3*)dir * tt;
+            q -= first->n * r;
+            if (fun_004b3ee0(&q.x, &first->n.x, pa, pb, pc)) {
+                edge = 0;
+                hitPtV.x = q.x; hitPtV.y = q.y; hitPtV.z = q.z;
+                bestTri = first;
+                bestT = tt;
+            } else {
+                if (*first->e[0] == 0) {
+                    *first->e[0] = 1;
+                    if (fun_004b4090(org, dir, r, pa, pb, &bestT, &hitPtV.x)) { edge = 1; bestTri = first; }
+                }
+                if (*first->e[1] == 0) {
+                    *first->e[1] = 1;
+                    if (fun_004b4090(org, dir, r, pb, pc, &bestT, &hitPtV.x)) { edge = 2; bestTri = first; }
+                }
+                if (*first->e[2] == 0) {
+                    *first->e[2] = 1;
+                    if (fun_004b4090(org, dir, r, pc, pa, &bestT, &hitPtV.x)) { edge = 3; bestTri = first; }
+                }
+            }
+        }
+        first = first->next;
+    }
+
+    if (outPt != 0) {
+        outPt[0] = hitPtV.x; outPt[1] = hitPtV.y; outPt[2] = hitPtV.z;
+        if (outN != 0) {
+            if (edge == -1) {
+                outN[0] = 0.0f; outN[1] = 0.0f; outN[2] = 0.0f;
+            } else if (edge == 0) {
+                outN[0] = bestTri->n.x; outN[1] = bestTri->n.y; outN[2] = bestTri->n.z;
+            } else {
+                Vec3 s = *(Vec3*)dir * bestT;
+                Vec3 e = *(Vec3*)org + s;
+                float vx = e.x - outPt[0], vy = e.y - outPt[1], vz = e.z - outPt[2];
+                float inv = DAT_004e1348 / (float)sqrt(vz * vz + vy * vy + vx * vx);
+                outN[0] = vx * inv; outN[1] = vy * inv; outN[2] = vz * inv;
+            }
+        }
+    }
+    return bestT;
+}
+
 struct Sph419 { ScenePoint c; float d; Sph419(const float* p, float r) { c.x = p[0]; c.y = p[1]; c.z = p[2]; d = r; } ~Sph419() {} };
 static __forceinline bool Near419(const ScenePoint& p, const Tri* t, float r) { float q = (r + t->r) * (r + t->r); float dx = p.x - t->cx, dy = p.y - t->cy, dz = p.z - t->cz; float d2 = dx * dx + dy * dy + dz * dz; return *(int*)&d2 <= *(int*)&q; }
 
 // NONMATCHING: RALLYTROPHY 0x4193a0
+// Pass 2026-11-13: 175 -> 120 insns differ (874 -> 962 bytes, orig 974): e1/e2 through hoisted ScenePoint* operands, out[] if/else flipped, rr used in compare, loop walks an explicit Tri** iterator (it++), lo/hi ScenePoint, cp as per-iteration ScenePoint copied to float cp[3]; open: register assignment (orig this in ecx, pos in ebp, begin in ebx, headT in edi), i/found/ret in dead param slots, e2 fsub scheduling around the call args.
 // Tried 2026-11-04: original objects = P(0, ScenePoint at +0x60, r plain float at +0x6c), lo(1), hi(2) with ONE store (2) after hi, res(3, reuses lo's dead slot, receives cp on a hit and feeds out[]), spare(4, no storage), e1/e2/cp ScenePoints (5-7, stores merged to 7). Variants with res+spare+ScenePoint cp reproduce 0->4->7 numbering but the pre-loop `mov [state],2` never appears (VC6 drops state stores until the next throwing call; only a real call between hi and the loop keeps it) and insns differ rises 175->192; not adopted.
 // Tried 2026-10-31: EH frame needs a throwing call (C++-linkage TriClosest4b via /alternatename, since extern "C" is nothrow), Sph419+Near419, plain V3p lo/hi, v>=lo compare flips, ScenePoint e1/e2 with -=; 218->175 but built 874 vs 974 bytes: original has EH states 2/4/7 (we get 0/1/3: two more function-scope dtor objects plus three in the loop), cp/out-copy layout and rr hoist still differ.
 // Tried 2026-11-01: rr reuse, ScenePoint lo/hi/cp/res with dtors (extra EH states), lo/hi built from pos+-r ctor, lo/hi order swap, extra aa/spare dtor objects (14 variants, best 969 vs 974 bytes but ~190 insns differ); lo/hi prologue schedule and loop e1/e2 copy order stay misaligned and the 2/4/7 state numbering is not reached; far from 10 so no permute.
 float TriCollector::Closest(float r, float* pos, float* out, float* nrm)
 {
     float rr = r * r;
-    Sph419 P(pos, r);
-    V3p lo = *(V3p*)pos; lo.x -= r; lo.y -= r; lo.z -= r;
-    V3p hi = *(V3p*)pos; hi.x += r; hi.y += r; hi.z += r;
     Tri* headT = 0;
     Tri* tail = 0;
-    for (unsigned i = 0; hits.begin() != 0 && i < hits.size(); i++) {
-        Tri* t = hits[i];
+    Tri** it = hits.begin();
+    Sph419 P(pos, r);
+    ScenePoint lo(*(ScenePoint*)pos); lo.x -= r; lo.y -= r; lo.z -= r;
+    ScenePoint hi(*(ScenePoint*)pos); hi.x += r; hi.y += r; hi.z += r;
+    for (unsigned i = 0; hits.begin() != 0 && i < hits.size(); it++, i++) {
+        Tri* t = *it;
         if (Near419(P.c, t, r)) {
             unsigned s = t->sel;
             if (t->v[(s >> 2) & 3]->x >= lo.x && t->v[s & 3]->x <= hi.x &&
@@ -462,11 +597,16 @@ float TriCollector::Closest(float r, float* pos, float* out, float* nrm)
     Tri* found = 0;
     while (cur != 0) {
         TVert* a = cur->v[0];
-        ScenePoint e1(*(ScenePoint*)&cur->v[1]->x);
-        e1 -= *(ScenePoint*)&a->x;
-        ScenePoint e2(*(ScenePoint*)&cur->v[2]->x);
-        e2 -= *(ScenePoint*)&a->x;
-        if (TriClosest4b(pos, &a->x, &e1.x, &e2.x, cp) <= r * r) {
+        ScenePoint* pa = (ScenePoint*)&a->x;
+        ScenePoint* p1 = (ScenePoint*)&cur->v[1]->x;
+        ScenePoint* p2 = (ScenePoint*)&cur->v[2]->x;
+        ScenePoint e1(*p1);
+        e1 -= *pa;
+        ScenePoint e2(*p2);
+        e2 -= *pa;
+        ScenePoint cpL;
+        if (TriClosest4b(pos, &a->x, &e1.x, &e2.x, &cpL.x) <= rr) {
+            cp[0] = cpL.x; cp[1] = cpL.y; cp[2] = cpL.z;
             ret = 0.0f;
             hit = 0;
             found = cur;
@@ -475,10 +615,10 @@ float TriCollector::Closest(float r, float* pos, float* out, float* nrm)
         cur = cur->next;
     }
     if (out != 0) {
-        if (hit == -1) {
+        if (hit != -1) {
+            if (hit == 0) { out[0] = cp[0]; out[1] = cp[1]; out[2] = cp[2]; }
+        } else {
             out[0] = 0.0f; out[1] = 0.0f; out[2] = 0.0f;
-        } else if (hit == 0) {
-            out[0] = cp[0]; out[1] = cp[1]; out[2] = cp[2];
         }
         if (nrm != 0) {
             if (hit == 0) {
@@ -511,6 +651,8 @@ float TriCollector::Closest(float r, float* pos, float* out, float* nrm)
     } while (0)
 
 // NONMATCHING: RALLYTROPHY 0x419770
+// Pass 2026-11-16: size 1094 -> 1128 (orig 1130), differing bytes 1000 -> 944 (insns differ 164 -> 182, alignment shift): lo/hi copied as int bits then -= r (original int-copies pos, as P); open: original i in memory + q bits in ebp (ours i in ebx), no ED::~ED call at exit (local-class dtor never inlines; file-scope ED/Sph419 variants lose the 4th saved register: 204/197), pop-before-je epilogue, e1/e2/dv int-copy variants (+20 bytes, worse), tail sqrt keeps y,z on the FPU. Statement-order, while/for(;;) and struct-held i variants compile identically.
+// Pass 2026-11-13: 170 -> 164 insns differ (1090 -> 1094 bytes, orig 1130): TriClosest4b call (as orig), x/y/z bounds as nested ifs with local float pairs (xb,xa loaded before the first compare, as the original's two-fld pattern); open: orig keeps i in memory and q bits in ebp (ours i in ebx, q in memory -> e1/e2/dv z-copies fuse), ss ScenePoint (no ED::~ED) always worse (205+), Near419 forceinline puts q in a reg but adds and eax,0xff/bool store (893 bytes differ but 184 insns).
 // Tried 2026-11-04: original state 0 (ebp-0x94, zeroed x/y/z at esp+0x10..0x18) is the sum accumulator, not an empty ED: `ScenePoint ss` (+ qz dead volatile store for the 0x5c slot) gives the original 3/7/3 state stores and removes the ED::~ED call but 4th saved register (esi) is lost: 170->207 insns, not adopted.
 // Tried 2026-11-01 re-pass: 220->170 insns differ (~30 variants): rewritten Closest-style (Sph419 P, ScenePoint lo/hi with lo.x = pos[0] - r, ED empty-dtor local first, float s[3], plane test dv.x = pos[0]-a->x with dot in the asm order z,y,x, int bit-compare of d2 vs q); frame 0x88 now matches. Still differs: q/d2 stack slots (orig q at 0x64, d2 at 0x6c, P at 0x70 vs ours one slot lower), shared xor-eax zero, dv.y/z int-copied then fsub in the original but fused here, bounds checks load vertex pointers up front in the original, e1/e2 int-copied first; too far for permute.
 int TriCollector::Contact(float r, float* pos, float* a_, float* b, float* c, int* surf)
@@ -521,8 +663,8 @@ int TriCollector::Contact(float r, float* pos, float* a_, float* b, float* c, in
     s[2] = s[1] = s[0] = 0.0f;
     int n = 0;
     Sph419 P(pos, r);
-    ScenePoint lo(*(ScenePoint*)pos); lo.x = pos[0] - r; lo.y -= r; lo.z -= r;
-    ScenePoint hi(*(ScenePoint*)pos); hi.x += r; hi.y += r; hi.z += r;
+    ScenePoint lo; {int* d=(int*)&lo; const int* sp=(const int*)pos; d[0]=sp[0]; d[1]=sp[1]; d[2]=sp[2];} lo.x -= r; lo.y -= r; lo.z -= r;
+    ScenePoint hi; {int* d=(int*)&hi; const int* sp=(const int*)pos; d[0]=sp[0]; d[1]=sp[1]; d[2]=sp[2];} hi.x += r; hi.y += r; hi.z += r;
     for (unsigned i = 0;
  hits.begin() != 0 && i < hits.size(); i++) {
         Tri* t = hits[i];
@@ -535,13 +677,16 @@ int TriCollector::Contact(float r, float* pos, float* a_, float* b, float* c, in
             ScenePoint dv(*(ScenePoint*)pos); dv.x = pos[0] - a->x; dv.y -= a->y; dv.z -= a->z;
             if (DAT_004e134c <= dv.z * t->nz + dv.y * t->ny + dv.x * t->nx) {
                 unsigned s_ = t->sel;
-                if (t->v[(s_ >> 2) & 3]->x >= lo.x && t->v[s_ & 3]->x <= hi.x &&
-                    t->v[(s_ >> 6) & 3]->y >= lo.y && t->v[(s_ >> 4) & 3]->y <= hi.y &&
-                    t->v[(s_ & 0xc00) >> 10]->z >= lo.z && t->v[(s_ >> 8) & 3]->z <= hi.z) {
+                float xb = t->v[s_ & 3]->x; float xa = t->v[(s_ >> 2) & 3]->x;
+                if (xa >= lo.x && xb <= hi.x) {
+                float yb = t->v[(s_ >> 4) & 3]->y; float ya = t->v[(s_ >> 6) & 3]->y;
+                if (ya >= lo.y && yb <= hi.y) {
+                float zb = t->v[(s_ >> 8) & 3]->z; float za = t->v[(s_ & 0xc00) >> 10]->z;
+                if (za >= lo.z && zb <= hi.z) {
                     ScenePoint e1(*(ScenePoint*)&t->v[1]->x); e1 -= *(ScenePoint*)&a->x;
                     ScenePoint e2(*(ScenePoint*)&t->v[2]->x); e2 -= *(ScenePoint*)&a->x;
                     ScenePoint cp; float tmp[3];
-                    if (fun_004b3800(pos, &a->x, &e1.x, &e2.x, &cp.x) <= rr) {
+                    if (TriClosest4b(pos, &a->x, &e1.x, &e2.x, &cp.x) <= rr) {
                         if (n == 0) {
                             if (b != 0) { b[0] = cp.x; b[1] = cp.y; b[2] = cp.z; }
                             if (c != 0) { c[0] = t->nx; c[1] = t->ny; c[2] = t->nz; }
@@ -551,6 +696,8 @@ int TriCollector::Contact(float r, float* pos, float* a_, float* b, float* c, in
                         s[0] += d[0]; s[1] += d[1]; s[2] += d[2];
                         n++;
                     }
+                }
+                }
                 }
             }
         }
@@ -566,6 +713,7 @@ int TriCollector::Contact(float r, float* pos, float* a_, float* b, float* c, in
 
 
 // NONMATCHING: RALLYTROPHY 0x419be0
+// Pass 2026-11-13: 72 -> 50 insns differ (726 -> 730 bytes, orig 748): e1/e2 operands hoisted as ScenePoint* pa/p1/p2 before the copies (same form as Closest).
 // reason: first draft; SEH/temp layout unchecked.
 // Tried 2026-10-30 night: pos copy as Sph419 (ScenePoint+r, dtor) for EH state, ScenePoint -= for plane/edge vectors, forceinline sphere test, chained sx=sy=sz=0, rr hoisted (163->136); still differs: original frame is 4 bytes bigger, e1/e2 are int-copied before the fsub (ours fuses the z fld), sphere d2 temp lives in a dead param slot, EH state numbering ends 5/1 vs ours 4/0 (v4 gets 5 with extra ScenePoint tmp but scores 141).
 // Tried 2026-11-04: ED+float s[3] -> `ScenePoint ss` as the real accumulator (state 0; ED was a guess): 73->72 insns, EH stores now 1/5/1 like the original (it keeps state value 1 in dl). Original EH objects: ss, P, then per candidate dv,e1,e2,cp.
@@ -592,10 +740,13 @@ int TriCollector::ContactList(float r, float* pos, float* a_, float* b, float* c
                 dv -= *(ScenePoint*)&a->x;
                 float dp = dv.z * t->nz; dp = dv.y * t->ny + dp; dp = dv.x * t->nx + dp; // original: ((z*nz)+y*ny)+x*nx
                 if (dp >= DAT_004e134c) {
-                    ScenePoint e1(*(ScenePoint*)&t->v[1]->x);
-                    e1 -= *(ScenePoint*)&a->x;
-                    ScenePoint e2(*(ScenePoint*)&t->v[2]->x);
-                    e2 -= *(ScenePoint*)&a->x;
+                    ScenePoint* pa = (ScenePoint*)&a->x;
+                    ScenePoint* p1 = (ScenePoint*)&t->v[1]->x;
+                    ScenePoint* p2 = (ScenePoint*)&t->v[2]->x;
+                    ScenePoint e1(*p1);
+                    e1 -= *pa;
+                    ScenePoint e2(*p2);
+                    e2 -= *pa;
                     ScenePoint cp; float tmp[3];
                     if (fun_004b3800(pos, &a->x, &e1.x, &e2.x, &cp.x) <= rr) {
                         if (n == 0) {

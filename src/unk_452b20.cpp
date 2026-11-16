@@ -112,6 +112,7 @@ struct F_CarView {
     { F_Vec* r = c->body->FUN_004204f0(&t, &w); (dst).x = r->x; (dst).y = r->y; (dst).z = r->z; }
 
 // NONMATCHING: RALLYTROPHY 0x452b20
+// Pass 2026-11-13: insdiff lines 489->229, size 5077->4994 (orig 5036): H_Normalize tail as v[0]*(1/len), (1/len)*v[1], (1/len)*v[2] (indicators match; H_Normalize1 keeps inv local for v[0]); part2020/2024 build the difference as block-local H_V3 dir2 = B - A (result written in place, no copy into a function-scope dir); part2020 A first then A.x -= t before A.z. Still differs: A/B frame offsets (orig A=-0x50, B=-0x40 with 4-byte gap; a pad subclass did not help), sum-chain scheduling (mov/faddp order), hood m[9] = -m[6] reload (fstp;fld;fchs), the first Normalize1 extra fld st(0).
 // Tried 2026-10-30 night: ~80 variants (struct copy, += forms, x as one expression, volatile on copy/add/expr per axis); best is x as a
 // Re-pass 2026-11-01: sums rewritten in the asm's fadd order (chained temps in H_Normalize/H_Normalize1/lenSq, loc.* dot as z,y,x chain written into loc directly), H_AddPos as fld o; fadd p via a temp, one function-scope H_V3 dir puts the float temps in the original's -0x34 slot (insdiff 362->237 lines); still differs: dir/A/B Vec copy order at the part2020/2024 blocks, normalise tail (fld st(0); fmul mem vs fld mem; fmul st,st(1)), lea/pointer-setup order in H_Cross sites, EH-state init order at 0xd8/0xc8.
 // volatile expression + volatile y/z adds (23->17); the original delays the y/z fstp past the argument setup, which no form reproduces.
@@ -119,6 +120,7 @@ struct F_CarView {
 // Tried 2026-11-11: the plain form (copy x, y, z; then += x, y, z; no volatile) has the original's instruction set
 // at the exact size but starts the x87 chain three integer moves early (21 insns vs 17 with the volatile form kept
 // here); the result copy as a struct assignment, int copies or int temporaries does not move it.
+// 2026-11-16 round 22: ~20 more variants, none beat 17 insns: G_Copy float form is moot (the copy is already int movs in the original, and ours); sums non-volatile/lamp-first/deferred p.x via block temp, struct-assign and local-temp result copies all 21-41 insns (one temp form: 135 bytes but 25 insns).
 void Car::FUN_00452b20()
 {
     F_CarView* c = (F_CarView*)this;
@@ -280,12 +282,12 @@ static inline float G_DotV(const Vec3& a, const Vec3& b) { return a.x * b.x + a.
 static inline float G_DotC(const Vec3& a, const Vec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 static __forceinline void G_Copy(Vec3& d, const Vec3& s) { d.x = s.x; d.y = s.y; d.z = s.z; }
 static __forceinline void G_AddRev(Vec3& d, const Vec3& s) { float a = s.x; d.x = a + d.x; d.y = s.y + d.y; d.z = s.z + d.z; }
-static __forceinline void G_Copy3(Vec3& d, const Vec3& s) { *(int*)&d.y = *(int*)&s.y; *(int*)&d.z = *(int*)&s.z; d.x = s.x; }
 static inline void G_Mul(Vec3& v, float k) { v.x *= k; v.y *= k; v.z *= k; }
 static inline void G_Set(Vec3& v, float x, float y, float z) { v.x = x; v.y = y; v.z = z; }
 #define V ((G_Car*)this)
 
-// NONMATCHING: RALLYTROPHY 0x452eb0
+// FUNCTION: RALLYTROPHY 0x452eb0
+// 2026-11-16 MATCH: p = vec copies use plain G_Copy (was int/float G_Copy3). Older notes:
 // 2726 vs 2693 bytes; logic complete (all four spring-point accelerations, the 0.5/0.65/0.35 blends and both
 // SpringFollower updates). Open: struct copy of a call result still goes through `mov reg,ebx` (original stores
 // straight through ebx), fadd operand order for ctrl += k*vec, register choice (edx/eax/ecx) for the asm pointer
@@ -332,7 +334,7 @@ void Car::FUN_00452eb0(float dt)
         G_AddRev(V->ctrl3, V->ctrl2);
     }
     {
-        G_Copy3(p, V->vec20d0);
+        G_Copy(p, V->vec20d0);
         p += V->vec1018;
         const float* trans = V->body->pos;
         const float* mat = V->body->mat;
@@ -345,7 +347,7 @@ void Car::FUN_00452eb0(float dt)
         G_Mul(V->ctrl5, factor);
     }
     {
-        G_Copy3(p, V->vec203c);
+        G_Copy(p, V->vec203c);
         p += V->vec1024;
         const float* trans = V->body->pos;
         const float* mat = V->body->mat;
@@ -668,10 +670,7 @@ inline void H_Normalize(float* v)
     s = s + v[1] * v[1];
     s = s + v[2] * v[2];
     float len = (float)sqrt(s);
-    float inv = 1.0f / len;
-    v[0] *= inv;
-    v[1] *= inv;
-    v[2] *= 1.0f / len;
+    v[0] = v[0] * (1.0f / len); v[1] = (1.0f / len) * v[1]; v[2] = (1.0f / len) * v[2];
 }
 inline void H_Normalize1(float* v)
 {
@@ -679,10 +678,7 @@ inline void H_Normalize1(float* v)
     s = s + v[1] * v[1];
     s = s + v[2] * v[2];
     float len = (float)sqrt(s);
-    float inv = 1.0f / len;
-    v[0] = v[0] * inv;
-    v[1] *= 1.0f / len;
-    v[2] *= 1.0f / len;
+    float inv = 1.0f / len; v[0] = v[0] * inv; v[1] = (1.0f / len) * v[1]; v[2] = (1.0f / len) * v[2];
 }
 
 // NONMATCHING: RALLYTROPHY 0x453940
@@ -962,23 +958,23 @@ scaled:
         }
         if (V->part2020) {
             H_Part* q = V->part2020;
-            H_Vec B(q->pos);
             H_Vec A(q->pos);
-            A.z = q->boxMin;
+            H_Vec B(q->pos);
             A.x -= t;
+            A.z = q->boxMin;
             B.z = q->boxMax;
             A.y = A.y - loc.y * 0.024f;
-            dir = B - A;
-            float lp = dir.x * dir.x;
-            lp = dir.z * dir.z + lp;
-            lp = dir.y * dir.y + lp; // original: (x*x + z*z) + y*y
+            H_V3 dir2 = B - A;
+            float lp = dir2.x * dir2.x;
+            lp = dir2.z * dir2.z + lp;
+            lp = dir2.y * dir2.y + lp; // original: (x*x + z*z) + y*y
             float inv = 1.0f / (float)sqrt(lp);
-            dir.x = dir.x * inv;
-            dir.y = dir.y * inv;
-            dir.z = dir.z * inv;
-            *(H_V3*)&q->matrix.m[8] = dir;
-            H_Cross(&up.x, &dir.x, &q->matrix.m[0]);
-            H_Cross(&dir.x, &V->part2020->matrix.m[0], &V->part2020->matrix.m[4]);
+            dir2.x = dir2.x * inv;
+            dir2.y = dir2.y * inv;
+            dir2.z = dir2.z * inv;
+            *(H_V3*)&q->matrix.m[8] = dir2;
+            H_Cross(&up.x, &dir2.x, &q->matrix.m[0]);
+            H_Cross(&dir2.x, &V->part2020->matrix.m[0], &V->part2020->matrix.m[4]);
             V->part2020->pos.z = V->part2020->pos.z - loc.z * 0.008f;
             H_AddPos(&V->part2020->pos, &V->iniOffset);
         }
@@ -991,17 +987,16 @@ scaled:
             B.z = q->boxMax;
             A.y = A.y - loc.y * 0.024f;
             H_V3 dir2 = B - A;
-            dir = dir2;
-            float lq = dir.z * dir.z;
-            lq = dir.y * dir.y + lq;
-            lq = dir.x * dir.x + lq; // original: (z*z + y*y) + x*x on the dir slots
+            float lq = dir2.z * dir2.z;
+            lq = dir2.y * dir2.y + lq;
+            lq = dir2.x * dir2.x + lq; // original: (z*z + y*y) + x*x on the dir slots
             float inv = 1.0f / (float)sqrt(lq);
-            dir.x = dir.x * inv;
-            dir.y = dir.y * inv;
-            dir.z = dir.z * inv;
-            *(H_V3*)&q->matrix.m[8] = dir;
-            H_Cross(&up.x, &dir.x, &q->matrix.m[0]);
-            H_Cross(&dir.x, &V->part2024->matrix.m[0], &V->part2024->matrix.m[4]);
+            dir2.x = dir2.x * inv;
+            dir2.y = dir2.y * inv;
+            dir2.z = dir2.z * inv;
+            *(H_V3*)&q->matrix.m[8] = dir2;
+            H_Cross(&up.x, &dir2.x, &q->matrix.m[0]);
+            H_Cross(&dir2.x, &V->part2024->matrix.m[0], &V->part2024->matrix.m[4]);
             V->part2024->pos.z = V->part2024->pos.z - loc.z * 0.008f;
             H_AddPos(&V->part2024->pos, &V->iniOffset);
         }
@@ -1153,6 +1148,8 @@ __forceinline void F2_Copy3(F2_V& d, const F2_V& s) { *(int*)&d.y = *(int*)&s.y;
 // and the first part's y/z position stores; the function static (0x508c60, atexit 0x455060) is in place.
 // Tried 2026-10-30 night: ~35 variants (sum/normalise order, F2_Copy3 y/z int-copy + x float store, d.z/d.x tail order; 98->49 insns). Still differs: y/z load order and spilled x/y stay in the opposite order at the top (z loaded before y), the x-first normalise form re-enregisters y/z, and the F2_Cross call takes lea edi/push edi instead of an in-place esi add.
 // Tried 2026-10-31 re-pass: reusing len2 as the sqrt-branch scale k (original keeps it in the len2 slot [ebp-4]) 49->47 insns; ~15 more variants (len2 reuse in the 1/Length branch, sum orders, double len, operand order) no better; x87 order of the normalise/rotate sums and the F2_Cross edi/lea call form still differ.
+// 2026-11-16 r24: plain float local k in the 1/Length branch (len2 reuse there let VC6 cross-jump into the sqrt branch tail; the sqrt branch keeps len2), F2_Rot* R = &q->rot with per-component r1 copy: 34 -> 13 insns, 830 -> 843 bytes. Left: static-guard byte load (mov cl) is scheduled after d.z instead of between the part-B pos adds; r1 pointer spill order.
+// 2026-11-16 r25: `static axis` moved before the d.z scale (guard load now hoisted as in the original), d.z scale no longer volatile: 13 -> 12 insns. ~60 variants (static at 12 other positions, d.z forms, r1/r2 pointer forms) no better; original has the d.z fmul between the guard test and jne.
 void Car::FUN_00454d10()
 {
     F2_CarView* c = (F2_CarView*)this;
@@ -1161,15 +1158,16 @@ void Car::FUN_00454d10()
     len2 = v.z * v.z + len2;
     len2 = v.x * v.x + len2; // original: (y*y + z*z) + x*x
     if (len2 > 196.0f) {
-        // Original keeps the scale in len2's slot: x times the unrounded value (fst; fmulp), y/z times the stored
-        // float; the volatile stores keep y/z in memory as the original does (they are stored there in every branch).
-        v.x = v.x * (len2 = 1.0f / v.Length());
-        *(volatile float*)&v.y = v.y * len2;
-        *(volatile float*)&v.z = v.z * len2;
+        // The volatile stores keep y/z in memory as the original does (they are stored there in every branch).
+        // A separate k (not len2) keeps VC6 from cross-jumping this branch's tail into the sqrt branch.
+        float k = 1.0f / v.Length();
+        v.x = v.x * k;
+        *(volatile float*)&v.y = v.y * k;
+        *(volatile float*)&v.z = v.z * k;
     } else if (len2 < 4.0f) {
         v.x = 0.0f;
-        v.y = 0.0f;
         v.z = 0.0f;
+        v.y = 0.0f;
     } else {
         float len = (float)sqrt(len2);
         v.x = v.x * (len2 = (len - 2.0f) / (len * 12.0f));
@@ -1208,11 +1206,15 @@ void Car::FUN_00454d10()
         float inv = 1.0f / (float)sqrt(z * z + x * x + 1.0f);
         d.x = x * inv;
         d.y = inv;
-        d.z = *(volatile float*)&d.z * inv; // original reloads the stored (rounded) d.z here
         static Vec3 axis(0.0f, 0.0f, 1.0f);
-        F2_Cross(&d, (const F2_V*)&axis, &q->rot.r0);
-        q->rot.r1 = d;
-        F2_Cross(&q->rot.r0, &q->rot.r1, &q->rot.r2);
+        d.z = d.z * inv; // original reloads the stored (rounded) d.z here
+        F2_Rot* R = &q->rot;
+        F2_Cross(&d, (const F2_V*)&axis, &R->r0);
+        F2_V* r1 = &R->r1;
+        r1->x = d.x;
+        r1->y = d.y;
+        r1->z = d.z;
+        F2_Cross(&R->r0, r1, &R->r2);
     }
 }
 

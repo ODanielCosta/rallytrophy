@@ -483,6 +483,7 @@ static inline void CopyProp(StageProp* d, const StageProp* src)
 // operator= inlined at two sites and called at the third (true with 6-7 copy statements, e.g. one 3- or 4-float
 // sub-struct plus single floats; 9 single copies give two calls, two sub-structs none) and the element anchored at
 // +0x14 (4-float sub-struct first). Best layouts still swap M and last (esi/edi), the same residual as this body.
+// 2026-11-13 pass: third branch reads `last` once into a local (Oe, as the STL's _Oend): M/last swap fixed, 132 -> 94 insns differ, 797 -> 804 bytes. Left: third-loop copy_backward element copy (original biases pointers at +0x14, 5 insns less) and the P+M fill loop.
 // Follow-up: the original calls operator= only at the last of its three sites (calls N C C C D F C C C =). Nine single
 // copies (the layout its _Construct/operator= helpers show) give calls at both fill sites here; {3-float, 2-float
 // sub-structs + singles} gives the original's pattern but different copy code. Not moved by: how the instance is
@@ -523,9 +524,10 @@ void PropVec::Ins(StageProp* P, unsigned int M, const StageProp& X)
             CopyProp(F, &X);
         last += M;
     } else if (0 < M) {
-        StageProp* D = last;
+        StageProp* Oe = last;
+        StageProp* D = Oe;
         StageProp* F;
-        for (F = last - M; F != last; ++D, ++F)
+        for (F = Oe - M; F != Oe; ++D, ++F)
             ConstructProp(D, F);
         StageProp* B = last;
         StageProp* E = last - M;
@@ -1131,6 +1133,7 @@ extern float DAT_004e138c;                                                    //
 // bytes lower, `magic`/`ver` swapped, the midpoint temporary is the lowest aggregate in the original).
 // Tried 2026-10-31: `int count` scoped inside the if (shares the slot with the AnimalObj temp as in the original: 142->112 insns, frame size now exact); mid kept in the loop, declared at function top / before prop / as MidOf() __forceinline temp or const& (all worse), magic/ver swap (no effect), sums-then-scale orders for mid and 0.5f literal; still differs: mid sits above prop (orig: lowest aggregate below path), model/tex strings swapped slots (orig model<tex), props.end() reload via ecx, tail loop shape.
 // Tried 2026-11-01 re-pass: tail loop fixed (parts vector is at mesh+0x30 not 0x34, no size()>0 guard, first reloaded each pass via volatile read of the begin pointer): 112->101 insns; 14 more variants (mid declared before path / after path / in File scope / before prop / plain float[3] + empty object, tex in nested scope or own subclass, model hoisted out of the File block, volatile/named-temp OR store) all equal or worse; still differs: mid lies above prop (orig: lowest aggregate below path), model/tex slots swapped (orig model<tex), `push ebp` vs `xor edx,edx` for MeshAt arg 0.
+// Tried 2026-11-16 (r25): midpoint as three stored sums then in-place scale (mid.x = p0+p3; mid.y = ..; mid.z = ..; mid.x = mid.x * K; mid.y *= K; mid.z *= K) reproduces the original's sum/store sequence: 101 -> 66 insns, size 1254 -> 1280 (orig 1270). Left: original keeps the x sum on the fp stack (`fmul K`, no reload; ours `fld K; fmul st,st(1)`) and reloads y/z as `fld m; fmul K` (ours `fld K; fmul m`); `push &mid` earlier; props.end() read through ecx (a PropVec* local takes a callee-saved register: 94 insns). K*x / sx-local / pointer-scaled orders all equal.
 // Loads data/stage<N>.apf props, then models/animal_run.bmf.
 void PropStage::Load()
 {
@@ -1155,9 +1158,12 @@ void PropStage::Load()
                     f.Read(&prop, 0xc);
                     f.Read(&prop.v[3], 0xc);
                     LoadVec3 mid;
-                    mid.x = (prop.v[0] + prop.v[3]) * DAT_004e138c;
-                    mid.y = (prop.v[1] + prop.v[4]) * DAT_004e138c;
-                    mid.z = (prop.v[2] + prop.v[5]) * DAT_004e138c;
+                    mid.x = prop.v[0] + prop.v[3];
+                    mid.y = prop.v[1] + prop.v[4];
+                    mid.z = prop.v[2] + prop.v[5];
+                    mid.x = mid.x * DAT_004e138c;
+                    mid.y *= DAT_004e138c;
+                    mid.z *= DAT_004e138c;
                     LoadCheckpoint* cp = (LoadCheckpoint*)StageNearestCheckpoint(this, &mid.x, 0);
                     if (cp) {
                         float dx = prop.v[3] - prop.v[0];

@@ -101,6 +101,7 @@ RecordEntry* RecordTable::FUN_00490010(int a, int b, int c, int d)
 // Same structure and size as the original; register allocation differs (key/record/first end up in other registers).
 // Tried 2026-10-30 night: declaring i after result (i gets ebx) and `!a ? 0 : a*11+2` (jne layout) took 70->61; indexed loops, key/first order, self pointer, tp++ walkers did not help; original keeps this in ebp, key in esi, first in edi, ours allocates them differently (330 vs 341 bytes).
 // Tried 2026-10-31 re-pass: char* p computed from the base (records + list*230*0x60 + 0x54) beside first took 61->43 insns; ~45 variants (decl-order permutations, list/key forms, volatile record/this, rederived first, first[i] stores) stayed at 43; original keeps this in ebp/record in eax short-lived and spills list into the key slot, ours puts this in eax and record in ebp (332 vs 341 bytes).
+// Pass 2026-11-15 (r18): second loop with fresh locals (l2, f2, p2, k) keeps this in ebp like the original: 43 -> 35 insns, 332 -> 328 bytes; first-block decl permutations, scoped i in loop 1, key forms did not move it.
 int RecordTable::FUN_00490050(ScoreRecord* record, int a, int b)
 {
     int result = 0;
@@ -119,15 +120,14 @@ int RecordTable::FUN_00490050(ScoreRecord* record, int a, int b)
             break;
         }
     }
-    list = list * 23 + record->unk1f;
-    i = 0;
-    p = (char*)records + list * 10 * 0x60 + 0x54;
-    first = (ScoreRecord*)records + list * 10;
-    for (; i < 10; i++, p += 0x60) {
-        if (key < *(int*)p) {
+    int l2 = list * 23 + record->unk1f;
+    ScoreRecord* f2 = (ScoreRecord*)records + l2 * 10;
+    char* p2 = (char*)records + l2 * 10 * 0x60 + 0x54;
+    for (int k = 0; k < 10; k++, p2 += 0x60) {
+        if (key < *(int*)p2) {
             dirty = 1;
-            for (int j = 9; j > i; j--) first[j] = first[j - 1];
-            ((ScoreRecord*)records)[list * 10 + i] = *record;
+            for (int j = 9; j > k; j--) f2[j] = f2[j - 1];
+            f2[k] = *record;
             break;
         }
     }
@@ -143,6 +143,7 @@ int RecordTable::FUN_00490050(ScoreRecord* record, int a, int b)
 // list expression give the original's first half (this in ebp); 35 -> 13 insns. The original recomputes the last
 // store from list and i (exact size with that form, but then this/record swap registers throughout); 128 ordering
 // combinations, all 720 declaration orders and eight zero-first forms did not combine the two.
+// Pass 2026-11-16 (r21): fresh locals (l2/f2/p2/k) in the second loop, with or without a fresh counter, regress 13 -> 35 insns here (this form needs i reused); fresh f2/p2/l2 with i reused stay at 13; recomputing the last store from list+i gives exact size but 54 insns.
 int RecordTable::FUN_004901b0(ScoreRecord* record, int a, int b)
 {
     int result = 0;
@@ -185,6 +186,7 @@ int RecordTable::FUN_004901b0(ScoreRecord* record, int a, int b)
 // list expression give the original's first half (this in ebp); 35 -> 13 insns. The original recomputes the last
 // store from list and i (exact size with that form, but then this/record swap registers throughout); 128 ordering
 // combinations, all 720 declaration orders and eight zero-first forms did not combine the two.
+// Pass 2026-11-16 (r21): fresh locals (l2/f2/p2/k) in the second loop, with or without a fresh counter, regress 13 -> 35 insns here (this form needs i reused); fresh f2/p2/l2 with i reused stay at 13; recomputing the last store from list+i gives exact size but 54 insns.
 int RecordTable::FUN_00490310(ScoreRecord* record, int a, int b)
 {
     int result = 0;
@@ -235,6 +237,7 @@ struct OldScoreRecord {
 // so the loop counters and several operands are swapped.
 // Tried 2026-10-30 night: OldScoreRecord needed pad25 (date at 0x28, 94->~92), `!g ? g : X` for the g loop base (94->86); folding the unk1f/+3 terms (c+1, old.unk24, base+h+3, count-counts), loop var declaration order and row hoisting leave 86; original keeps two induction values (230*(b+h) in ebp, 23*(b+h)+1 in a stack slot) and this in ebx.
 // Tried 2026-10-31 re-pass: two induction ints r230=230*base (+=230) and r23=23*base+1 (+=23) in the h for-increment, as the original keeps them in stack slots (86->143 insns, ~15 variants incl. volatile r230, decl order, old.unk24 for unk1f, row temp, counter hoisting); compiler then hoists a records+r230*0x60 pointer and still puts this in ebp not ebx.
+// 2026-11-16 r24: read the per-car counter before the first record store (as the original does): this lands in ebx now, 86 -> 77 insns, 914 -> 918 bytes.
 // Loads the highscore file: the current format is the whole table, enciphered; the older formats are converted.
 void RecordTable::FUN_00490470(const char* file)
 {
@@ -290,9 +293,9 @@ void RecordTable::FUN_00490470(const char* file)
                         memcpy(record.splits, old.splits, sizeof(old.splits));
                         record.time = old.time;
                         record.unk5c = 0.0f;
-                        *(ScoreRecord*)(records + (((base + h) * 23) * 10 + e) * 0x60) = record;
                         char* count = &counts[record.unk1f - 1];
-                        unsigned char index = *count;
+                        unsigned int index = (unsigned char)*count;
+                        *(ScoreRecord*)(records + (((base + h) * 23) * 10 + e) * 0x60) = record;
                         *(ScoreRecord*)(records + (((base + h) * 23 + record.unk1f) * 10 + index) * 0x60) = record;
                         *count = index + 1;
                     }

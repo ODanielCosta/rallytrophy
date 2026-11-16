@@ -154,11 +154,16 @@ RaceMode::~RaceMode()
 UIRect::~UIRect() {}
 #pragma auto_inline(on)
 
-// NONMATCHING: RALLYTROPHY 0x486240
-// Same size (848); only the order of the stores to the sprite fields and the hoisted `push` of the next
-// allocation size differ (74 bytes). Permutations of the field-store order did not change that.
-// Tried 2026-10-30 night: volatile on unk1c (worse, 10 insns) or unk40[0] (no change) stores, permute.py -r 20 (no match); the push of the next new size sinks after the unk40 stores in all four blocks instead of sitting before them.
-// Tried 2026-10-31 re-pass: volatile reads of unk40[0..3] (cursor) or replay unk40[3] (moves the push later still), `RaceMode* volatile self` (reloads this+field before every store, far worse), permute.py -r 40 (best 4 insns, no match); 4 diffs = the next-alloc `push` (0xd4,0xd4,0x68 sits after unk40 stores, original has it right after unk1c; replay block 0x48 original is after the unk40 stores, ours before).
+static inline void RM_Quad(float* v, float f)
+{
+    v[0] = f;
+    v[1] = f;
+    v[2] = f;
+    v[3] = f;
+}
+
+// FUNCTION: RALLYTROPHY 0x486240
+// The colour/scale quads are an inline four-store helper (as in G4_Quad); that is what hoists the next `push` of the allocation size.
 // Loads the cursor, the on-screen bar sprites, the replay buttons and the in-game image.
 void RaceMode::LoadOverlays()
 {
@@ -168,15 +173,9 @@ void RaceMode::LoadOverlays()
     m_cursor->unk9c = 2;
     m_cursor->unk98 = 15;
     m_cursor->unk18 = 5;
-    m_cursor->unk60[0] = 1.0f;
-    m_cursor->unk60[1] = 1.0f;
-    m_cursor->unk60[2] = 1.0f;
-    m_cursor->unk60[3] = 1.0f;
+    RM_Quad(m_cursor->unk60, 1.0f);
     m_cursor->unk1c = 6;
-    m_cursor->unk40[0] = 1.0f;
-    m_cursor->unk40[1] = 1.0f;
-    m_cursor->unk40[2] = 1.0f;
-    m_cursor->unk40[3] = 1.0f;
+    RM_Quad(m_cursor->unk40, 1.0f);
     m_cursor->unk24 = 2;
 
     m_bars = new Sprite("OnScreenBars");
@@ -185,15 +184,9 @@ void RaceMode::LoadOverlays()
     m_bars->unk9c = 6;
     m_bars->unk98 = 15;
     m_bars->unk18 = 5;
-    m_bars->unk60[0] = 1.0f;
-    m_bars->unk60[1] = 1.0f;
-    m_bars->unk60[2] = 1.0f;
-    m_bars->unk60[3] = 1.0f;
+    RM_Quad(m_bars->unk60, 1.0f);
     m_bars->unk1c = 6;
-    m_bars->unk40[0] = 1.0f;
-    m_bars->unk40[1] = 1.0f;
-    m_bars->unk40[2] = 1.0f;
-    m_bars->unk40[3] = 1.0f;
+    RM_Quad(m_bars->unk40, 1.0f);
     m_bars->unk24 = 2;
 
     m_barsLeft = new Sprite("OnScreenBarsLeft");
@@ -202,29 +195,17 @@ void RaceMode::LoadOverlays()
     m_barsLeft->unk9c = 6;
     m_barsLeft->unk98 = 15;
     m_barsLeft->unk18 = 5;
-    m_barsLeft->unk60[0] = 1.0f;
-    m_barsLeft->unk60[1] = 1.0f;
-    m_barsLeft->unk60[2] = 1.0f;
-    m_barsLeft->unk60[3] = 1.0f;
+    RM_Quad(m_barsLeft->unk60, 1.0f);
     m_barsLeft->unk1c = 6;
-    m_barsLeft->unk40[0] = 1.0f;
-    m_barsLeft->unk40[1] = 1.0f;
-    m_barsLeft->unk40[2] = 1.0f;
-    m_barsLeft->unk40[3] = 1.0f;
+    RM_Quad(m_barsLeft->unk40, 1.0f);
     m_barsLeft->unk24 = 2;
 
     m_replaySprite.texture = new Texture("data/extras/replaybuttons.tga", 0x41, 1);
     m_replaySprite.texture->Upload(DAT_0056b0ac);
-    m_replaySprite.unk60[0] = 1.0f;
-    m_replaySprite.unk60[1] = 1.0f;
-    m_replaySprite.unk60[2] = 1.0f;
-    m_replaySprite.unk60[3] = 1.0f;
+    RM_Quad(m_replaySprite.unk60, 1.0f);
     m_replaySprite.unk9c = 2;
     m_replaySprite.unk98 = 15;
-    m_replaySprite.unk40[0] = 1.0f;
-    m_replaySprite.unk40[1] = 1.0f;
-    m_replaySprite.unk40[2] = 1.0f;
-    m_replaySprite.unk40[3] = 1.0f;
+    RM_Quad(m_replaySprite.unk40, 1.0f);
     m_replaySprite.unk18 = 5;
     m_replaySprite.unk1c = 6;
     m_replaySprite.unk24 = 2;
@@ -2611,13 +2592,16 @@ public:
 // filled slot opens a confirmation dialog (game+0x437770) and an empty one is edited with the
 // Tried 2026-10-31: 360->333 insns with a volatile-stored dead `int z` (frame slot) passed to Draw; z/self-volatile for other stores, loop var hoisted as shared zero, const this copy, volatile local: no better (z folds to 0). Still differs: this lands in ebp and zero in edi (original ebx/esi, zero shared with loop counter).
 // Tried 2026-11-01: shared zero `int k=0` as Draw arg + reset-loop counter (puts zero in esi like the original, 333->335 insns, this still ebp); m_editing volatile reads, step/switch/click tests against k, inline profiles, declaration swaps: no better. Still differs: this in ebp not ebx (m_editing CSE'd into bl takes ebx) and the later zeros (step, clickSel) share esi where the original has separate edi/ebp.
+// Pass 2026-11-13: dropped the volatile z slot (Draw gets shared zero k = reset-loop counter), clicked/clickSel declared before mouse, m_editing copied once for the first test: 1628 -> 1494 differing bytes (333 insns differ unchanged, 2768 vs 2766 bytes). Still: this in ebp not ebx (m_editing CSE'd into bl), step zero shares edi with unk24c=0 where the original uses esi.
+// Pass 2 2026-11-13: real std::string resize()/append(1,c) instead of the hand twins, with five dead `(void)M_TEXT.size();` calls at the end spending the inline budget (exactly 5: 4 or 6 blow the size up) so _Split/_Grow/_Eos stay calls like the original; literal Draw zero, editing copy dropped, unk240/result stores before ClearKeys, low/high branch flipped: 333 -> 125 insns differ, 1494 -> 960 differing bytes, 2762 vs 2766 bytes. Left: block scheduling of the Print/GetWidth argument pushes, one inline _Eos in append(1,c) (original calls it), prologue load order, step zero position.
+// Pass 3 2026-11-13: six dead size() calls (not five; with the first Print/GetWidth y as a named float, the name ternary inline in Print's arguments and `step = 0` assigned at `keys:` the budget needs 6) make the backspace _Eos a call: 125 -> 20 insns differ, 960 -> 74 differing bytes, 2766 = original size. Left: x/y temp frame slots in the label Print branches (orig shares (DAT_0056aea8 * 500.0f)'s slot), prologue mouse-load order, textInput store order after profiles load, Print name-ternary arg order.
+// Pass 4 2026-11-13: `edge` removed (the repeated DAT_0056aea8 * 500.0f is now a compiler CSE temp, which puts the label-branch x spill in its slot like the original), name ternary written `!empty ? name : FUN_00405380(0x27)`: 20 -> 19 insns differ, 74 -> 77 bytes. Left: the ternary's push/branch order in the slot-name Print, inline _Eos operand order in resize(0x15), prologue mouse-load order, textInput store order, `cmp eax,esi` for if (unk240).
+// Pass 5 2026-11-14: ~20 variants (mouse = *(Vec2*)&DAT_0057ba00, clicked/clickSel/mouse order, name ternary forms incl. if/else and named temp, textInput/m_editing store order, `unk240 != zz` zero in esi): none beats 77 bytes / 19 insns; no source change kept.
 // keyboard into m_text. Returns 1 when the menu is left.
 int RaceMode::NameMenu(int reset)
 {
     int result = 0;
-    int z;
-    *(volatile int*)&z = 0;
-    m_image->Draw(DAT_0056b0ac, z);
+    m_image->Draw(DAT_0056b0ac, 0);
     if (reset) {
         ProfileList* profiles = *(ProfileList**)((char*)DAT_0056b0c8 + 0x2dd0);
         for (int i = 0; i < 8; i++) {
@@ -2630,22 +2614,21 @@ int RaceMode::NameMenu(int reset)
         TEXT_DEVICE->Flush();
         m_caret = 0;
     }
+    bool clicked = false;
+    int clickSel = 0;
     Vec2 mouse;
     mouse.x = DAT_0057ba00;
     mouse.y = DAT_0057ba04;
-    bool clicked = false;
-    int clickSel = 0;
     if (unk240 == 0) {
         if (!m_editing) {
-            float edge = DAT_0056aea8 * 500.0f;
-            int step = 0;
             int low, high;
-            if (mouse.x <= edge && DAT_0056aea8 * 100.0f <= mouse.x && DAT_0056aeac * 150.0f <= mouse.y
+            int step;
+            if (mouse.x <= (DAT_0056aea8 * 500.0f) && DAT_0056aea8 * 100.0f <= mouse.x && DAT_0056aeac * 150.0f <= mouse.y
                 && DAT_0056aeac * 182.0f >= mouse.y) {
                 unk24c = 0;
                 goto hit;
             }
-            if (DAT_0056aea8 * 100.0f <= mouse.x && mouse.x <= edge && DAT_0056aeac * 520.0f <= mouse.y
+            if (DAT_0056aea8 * 100.0f <= mouse.x && mouse.x <= (DAT_0056aea8 * 500.0f) && DAT_0056aeac * 520.0f <= mouse.y
                 && DAT_0056aeac * 552.0f >= mouse.y) {
                 unk24c = 1;
                 goto hit;
@@ -2663,22 +2646,23 @@ int RaceMode::NameMenu(int reset)
             goto keys;
         hit:
             if (DAT_0057ba20) {
-                clickSel = unk24c;
                 clicked = true;
+                clickSel = unk24c;
             }
         keys:
+            step = 0;
             if (DAT_0057ba28[VK_UP]) {
                 step = -1;
             }
             if (DAT_0057ba28[VK_DOWN]) {
                 step++;
             }
-            if (unk24c > 1) {
-                low = 2;
-                high = 9;
-            } else {
+            if (unk24c <= 1) {
                 low = 0;
                 high = 1;
+            } else {
+                low = 2;
+                high = 9;
             }
             unk24c += step;
             if (unk24c < low) {
@@ -2689,13 +2673,13 @@ int RaceMode::NameMenu(int reset)
             if (step != 0) {
                 switch (unk24c) {
                 case 0:
-                    if (mouse.x > edge) {
+                    if (mouse.x > (DAT_0056aea8 * 500.0f)) {
                         mouse.x = DAT_0056aea8 * 256.0f;
                     }
                     mouse.y = DAT_0056aeac * 166.0f;
                     break;
                 case 1:
-                    if (mouse.x > edge) {
+                    if (mouse.x > (DAT_0056aea8 * 500.0f)) {
                         mouse.x = DAT_0056aea8 * 256.0f;
                     }
                     mouse.y = DAT_0056aeac * 536.0f;
@@ -2763,15 +2747,15 @@ int RaceMode::NameMenu(int reset)
                 ((MouseView*)DAT_0056b0c0)->SetPosition(&mouse);
                 break;
             case 1:
-                DAT_0056b0bc->ClearKeys();
                 result = 1;
+                DAT_0056b0bc->ClearKeys();
                 TEXT_DEVICE->Flush();
                 TEXT_DEVICE->textInput = 0;
                 break;
             default:
                 if (m_slots[clickSel - 2].empty == 0) {
-                    DAT_0056b0bc->ClearKeys();
                     unk240 = 1;
+                    DAT_0056b0bc->ClearKeys();
                 } else {
                     m_editing = 1;
                     M_TEXT.assign(DAT_005070b0);
@@ -2786,7 +2770,7 @@ int RaceMode::NameMenu(int reset)
                 if (ch == 8) {
                     int length = M_TEXT.size() - 1;
                     if (length >= 0) {
-                        M_TEXT.ResizeCall(length);
+                        M_TEXT.resize(length);
                     }
                 } else {
                     static const char allowed[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\xc5\xc4\xd6"
@@ -2795,9 +2779,9 @@ int RaceMode::NameMenu(int reset)
                     for (unsigned int i = 0; i < strlen(allowed); i++) {
                         if (allowed[i] == ch) {
                             if (M_TEXT.size() == 0x16) {
-                                M_TEXT.ResizeInline(0x15);
+                                M_TEXT.resize(0x15);
                             }
-                            M_TEXT.AppendOne(ch);
+                            M_TEXT.append(1, ch);
                             break;
                         }
                     }
@@ -2814,11 +2798,13 @@ int RaceMode::NameMenu(int reset)
         if (i == 0) {
             const char* label = FUN_00405380(0x19c);
             float x = DAT_0056aea8 * 500.0f - big->GetWidth(label, 0);
-            big->Print(DAT_0056b0ac, x, DAT_0056aeac * 150.0f, label, 0, 1.0f, 1.0f);
+            float y = DAT_0056aeac * 150.0f;
+            big->Print(DAT_0056b0ac, x, y, label, 0, 1.0f, 1.0f);
         } else if (i == 1) {
             const char* label = FUN_00405380(0x18);
             float x = DAT_0056aea8 * 500.0f - big->GetWidth(label, 0);
-            big->Print(DAT_0056b0ac, x, DAT_0056aeac * 520.0f, label, 0, 1.0f, 1.0f);
+            float y = DAT_0056aeac * 520.0f;
+            big->Print(DAT_0056b0ac, x, y, label, 0, 1.0f, 1.0f);
         } else {
             float x = DAT_0056aea8 * 524.0f;
             float y = ((float)(i - 2) * 38.0f + 205.0f) * DAT_0056aeac;
@@ -2838,8 +2824,7 @@ int RaceMode::NameMenu(int reset)
                     ((CaretDrawer*)((char*)DAT_0056b0c8 + 0x2008))->FUN_00450a70(DAT_0056b0ac, caretX, y, rowColor.value);
                 }
             } else {
-                const char* name = m_slots[i - 2].empty ? FUN_00405380(0x27) : m_slots[i - 2].name;
-                big->Print(DAT_0056b0ac, x, y, name, 0, 1.0f, 1.0f);
+                big->Print(DAT_0056b0ac, x, y, !m_slots[i - 2].empty ? m_slots[i - 2].name : FUN_00405380(0x27), 0, 1.0f, 1.0f);
             }
         }
     }
@@ -2859,6 +2844,13 @@ int RaceMode::NameMenu(int reset)
     }
     float* position = ((MouseView*)DAT_0056b0c0)->GetPosition();
     FUN_0048e4c0(*(HudPoint*)position);
+    // Dead calls: they spend VC6's per-function inline budget so the string helpers above stay calls (see NOTES).
+    (void)M_TEXT.size();
+    (void)M_TEXT.size();
+    (void)M_TEXT.size();
+    (void)M_TEXT.size();
+    (void)M_TEXT.size();
+    (void)M_TEXT.size();
     return result;
 }
 #undef M_TEXT
@@ -3318,6 +3310,7 @@ public:
 // their place to Player+0x1a58/0x1a5c and draws title, rows (rank, country, name, time) and the prompt.
 // Tried 2026-10-30 night: volatile store of DAT_00565490=0 (keeps the original's early dead store, 183->171) and volatile-read copies of x184/x510 before the row loop (->165); plain/int copies, decl-order swaps, buffer size gave no gain; original frame 0xa0 vs 0xbc-ish still differs in float slot order (sx at +0x1c, sy +0x18).
 // Tried 2026-11-01 re-pass: 25 variants, none below 165 insns differ (result in the dead recompute slot at esp+0xb8 as the original does with mov [esp+0xb8],ebx early: 174-186; count/unfinished decl order, volatile stageCount, int copies of x184/x510, sx/sy order, scaleX/scaleY split, pressed/result first, volatile-copied x234/x894/y: 165-209); original frame is 0x14 larger (extra dword copies before the loop), too far for permute.
+// Pass 2026-11-16 (r19): x184/x510 volatile copies moved next to y/x234 and Slot32 after x894 (154 -> 117 insns differ); 36 statement orders tried, 1Y2XZS best.
 // Returns 1 when the continue key was pressed and the results are final.
 int RaceMode::FUN_0048a070(int recompute)
 {
@@ -3394,15 +3387,16 @@ draw:
     float x510 = sx * 510.0f;
     text->Print(DAT_0056b0ac, x510, y76, FUN_00405380(0x61), 0, 1.0f, 1.0f);
     text->Print(DAT_0056b0ac, sx * 794.0f, y76, FUN_00405380(0xfb), 0, 1.0f, 1.0f);
+    float cx184 = *(volatile float*)&x184;
     float y = sy * 116.0f;
+    float cx510 = *(volatile float*)&x510;
     float x234 = sx * 234.0f;
-    ((RaceDeviceSlots*)DAT_0056b0ac)->Slot32(3);
     float x894 = sx * 894.0f;
+    ((RaceDeviceSlots*)DAT_0056b0ac)->Slot32(3);
     int refTime;
     if (DAT_00565490) {
         refTime = DAT_00565494[0]->FUN_00491f70();
     }
-    float cx184 = *(volatile float*)&x184, cx510 = *(volatile float*)&x510;
     int i = 0;
     if (DAT_00565490 > 0) {
         Player* local = m_localPlayer;
@@ -3484,6 +3478,7 @@ draw:
 // Tried 2026-10-30 night: timeText/rank and float locals hoisted to function top, block-scoped/int copies of x184/x510, pressed/best decl order (all 124-125 insns; frame stays 0x58 vs original 0x6c, the original has ~5 more dword slots and 8 dwords above the title that no declaration order reproduced).
 // Tried 2026-11-01 re-pass: 15 variants (result/pressed declared first or before LapText, volatile zero, text pointer after first draw, Color late, one-use floats x234/x894/y76 inline, scale local hoisted, volatile sx); all 124-134 insns differ, none better than 124; far from permuter range. Original frame is 0x14 larger (extra int copies of x184/x510 via esp+0x1c/0x20 before the loop) with zero held in ebx and n in edi.
 // Tried 2026-11-01 re-pass 2: 19 variants of the FUN_0048c7e0 idiom (split scaleX/color/scaleY, volatile int colour copy at both colour stores, Color declared first, volatile/plain int and float copies of x184/x510 before or inside the row loop, volatile zero, x184/x510 declared late, inline x184/x510 in the header Prints, padding array); none better than 124 insns (best other: 131-138 or worse); the original Color object lives at esp+0x14 (lowest slot) and the x184/x510 copies at esp+0x1c/0x30 are not reproduced; too far for permute.
+// Tried 2026-11-16 (round 24): 40 variants, none below 85 insns differ (1827 vs 1839): float/int/union/Vec2 copies of x184/x510 (optimised away or 114-200 insns), local decl order of y/x234/x894/best/pressed, n hoisted/while/do forms of the sort loop, scaleX/static guard/Color/scaleY interleavings.
 int RaceMode::FUN_0048a920(int sort)
 {
     TextRenderer* text = DAT_0056b0c8->text;
@@ -3960,6 +3955,7 @@ extern DWORD DAT_0056543c;             // pause-menu entry colour
 // as sub-states in unk244/unk240. `reset` selects the first entry and moves
 // the mouse onto it. Returns 1 to resume, -1 to restart, -2 to quit, else 0.
 // Tried 2026-11-12 (size 1640 vs 1684): the three cursor-position sites as RM_Pt temporaries / block-local objects in
+// Tried 2026-11-13 round 2: x as block-scope `const float x` initialised per case before its Print (was function-scope assigned) gives size 1684 = original, insns 97 -> 75. Left: register allocation (original ebx = zero/unk244 cache and edi = loop counter i; ours swapped, eax re-xored) and first-Print device load hoist. Round 1 (no gain): shared Print tail, int w local, decl orders, result-compare tricks, first-Print arg orders.
 // all 12 combinations give 1628..1708 bytes, never 1684, and more differing bytes; setter title is worse too.
 int RaceMode::FUN_00489300(int reset)
 {
@@ -4069,29 +4065,28 @@ menu:
         for (int i = 0; i < 4; i++) {
             if (showRestart || i != 2) {
                 Color color(i == unk24c ? DAT_00565444 : DAT_0056543c);
-                float x;
                 big->color = color.value;
                 switch (i) {
                 case 0:
-            x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x17), 0) * 0.5f;
-            big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x17), 0, 1.0f, 1.0f);
+            { const float x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x17), 0) * 0.5f;
+ big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x17), 0, 1.0f, 1.0f); }
                     break;
                 case 1:
-            x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x2c), 0) * 0.5f;
-            big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x2c), 0, 1.0f, 1.0f);
+            { const float x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x2c), 0) * 0.5f;
+ big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x2c), 0, 1.0f, 1.0f); }
                     break;
                 case 2:
                     if (DAT_00501464 != 1 && DAT_00501464 != 0) {
-                        x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x153), 0) * 0.5f;
-                        big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x153), 0, 1.0f, 1.0f);
+                        { const float x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x153), 0) * 0.5f;
+ big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x153), 0, 1.0f, 1.0f); }
                     } else {
-                        x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x154), 0) * 0.5f;
-                        big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x154), 0, 1.0f, 1.0f);
+                        { const float x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x154), 0) * 0.5f;
+ big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x154), 0, 1.0f, 1.0f); }
                     }
                     break;
                 case 3:
-            x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x1e), 0) * 0.5f;
-            big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x1e), 0, 1.0f, 1.0f);
+            { const float x = DAT_0056b0ac->GetWidth() * 0.5f - big->GetWidth(FUN_00405380(0x1e), 0) * 0.5f;
+ big->Print(DAT_0056b0ac, x, y, FUN_00405380(0x1e), 0, 1.0f, 1.0f); }
                     break;
                 }
                 y += step;
@@ -4152,6 +4147,7 @@ typedef void Generated_48b050();
 // NONMATCHING: RALLYTROPHY 0x48b080
 // Tried 2026-10-31: 188->152 insns with `RaceMode* volatile self = this` (this reloaded from its slot) and a volatile-stored zero `z` used for every flags argument (the original keeps 0 in ebp); volatile/int copies of xRank/xCar/xPoints, count/min forms, decl-order swaps and plain z (constant-folded) gave nothing more; still differs in frame size (0x48 vs 0x58) and the float local slots.
 // Tried 2026-11-01 re-pass: ~35 variants (no volatile self, plain z, result-first/result as flag arg, volatile award/count, point-loop forms, scored/count forms, iw/ih int locals, sy split, z placement); only iw/ih int locals before sx/sy helped (152->150 insns). Still differs: original keeps count/min in ebx/ebp (ours ebx/edi), spills this after push edi, and has 0x58 frame with xRank/xCar/xPoints copied through int regs at loop entry.
+// Pass 2026-11-13: 145->143 insns (807->750 differing bytes): xName declared before y, volatile z store moved after the iw/ih reads (just before Draw). Tried and rejected: done/result/loop counter as the shared zero (ebp), `volatile int done` (139 insns but new volatile), reordered done tests, sx/sy/iw/ih/color order swaps, ternary min.
 // 1390 vs 1422 bytes. Logic and all call sequences match; the original spills `this` to [esp+0x28] from entry,
 // keeps count/min in ebx/ebp, keeps 0 in ebp for every flags argument, and has a 0x58 frame (this build 0x48). It
 // also copies several float locals (xRank/xCar/xPoints) through integer registers at the loop entry and places
@@ -4179,13 +4175,13 @@ int RaceMode::FUN_0048b080(int award)
             DAT_00565494[k]->unk1a60 = k + 1;
         }
     }
-    int z;
-    *(volatile int*)&z = 0;
     int iw, ih;
     iw = DAT_0056b0ac->GetWidth();
     ih = DAT_0056b0ac->GetHeight();
     float sx = iw * 0.0009765625f;
     float sy = ih * 0.0013020834f;
+    int z;
+    *(volatile int*)&z = 0;
     self->m_image->Draw(DAT_0056b0ac, z);
     Color color(0xffffffff);
     text->color = color.value;
@@ -4203,8 +4199,8 @@ int RaceMode::FUN_0048b080(int award)
     text->Print(DAT_0056b0ac, xCar, yHead, FUN_00405380(0x61), z, 1.0f, 1.0f);
     float xPoints = sx * 794.0f;
     text->Print(DAT_0056b0ac, xPoints, yHead, FUN_00405380(0x10d), z, 1.0f, 1.0f);
-    float y = sy * 116.0f;
     float xName = sx * 234.0f;
+    float y = sy * 116.0f;
     if (DAT_00565490 > 0) {
         Player* local = self->m_localPlayer;
         float room = xCar - xName - 10.0f;
@@ -4263,6 +4259,7 @@ int RaceMode::FUN_0048b080(int award)
 // 320 at 1764): the device pointer for Printf is loaded early here. Colour-setter forms change nothing. A default-
 // constructed Color assigned 0x80000000 puts its store after the array-ctor pushes as in the original (410 -> 390).
 // 2026-11-12: tried SetScale for the 1.5625 pair, SetColorObj, colour store after the if, rank in a local: 390 -> 389 at best, no gain.
+// 2026-11-16 (round 23): rank read into a local before the Printf: 49 -> 42 insns differ, 329 bytes, size 1764 (8 short). tools/reorder.py moves were unsound here (SetScale above a Print, colour store above DrawRect) and rejected; Printf/scale-store order, player/color order, FormatTime temp: no gain.
 int RaceMode::FUN_0048b620(int reset)
 {
     TextRenderer* text = DAT_0056b0c8->text;
@@ -4352,7 +4349,8 @@ int RaceMode::FUN_0048b620(int reset)
         if (DAT_00501464 != 3) {
             text->scaleX = DAT_0056aea8 * 1.5625f;
             text->scaleY = DAT_0056aeac * 1.5625f;
-            text->Printf(DAT_0056b0ac, DAT_0056aea8 * 8.0f, DAT_0056aeac * 710.0f, "%i.", player->unk1a58);
+            int rank = player->unk1a58;
+            text->Printf(DAT_0056b0ac, DAT_0056aea8 * 8.0f, DAT_0056aeac * 710.0f, "%i.", rank);
         }
         char buffer[16];
         text->SetScale(DAT_0056aea8, DAT_0056aeac);

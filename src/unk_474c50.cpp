@@ -320,26 +320,38 @@ __declspec(naked) void SnowFall::InitParticles()
     __asm fstp dword ptr [eax+8]
 
 static __forceinline void CpV(Vec3& d, const Vec3& s){ d.x=s.x; d.y=s.y; d.z=s.z; }
+// Ctor-less matrix: identity stores written inline after the EH state store.
+struct SnowMatrix {
+    ~SnowMatrix() {}
+    float m[16];
+};
 // original: FUN_004751b0
 // NONMATCHING: RALLYTROPHY 0x4751b0
 // Tried 2026-10-31: kInvFixed written as the literal 1/65536 in the unit.x/y/z products fixes their fld/fmul order; register assignment (this/flake/vertex) and quad-corner temp slots still differ.
 // Tried 2026-11-01: CpV forceinline field copy of v->position (147->47 insns), cursors ca/cb declared after world.m stores, chained dot (dq) in asm order, p++ before i++, volatile float reads for fov/near/far (-> 21 insns differ); still differs: offX/offY memory-operand subs and phase/y load order in the flake loop, push 1.0f/fld fov order in vf51.
 // 1747 vs 1741 bytes, same instruction mix and EH states. Open: register assignment (original this=edi,
 // flake=ebx, vertex=esi) and the stack slot order of the quad corners / hidden-return Vec3 temporaries.
+// Pass 2026-11-15 (round 15): 21 -> 14 insns differ (1745 vs 1741). File-scope ctor-less SnowMatrix + inline identity stores, camera position copied as ints before it, cb/ca declared after `Vec3 right` (as RainEffect::Update). Open: offX/offY as memory operands + phase/y load order in the flake loop, push esi order, vf51 arg order.
 void SnowFall::Update(RenderDevice* device, Camera* camera, int a, int b, float dt)
 {
     if (DAT_00501428 == 0) {
         return;
     }
     Vec3* cresult;
-    WorldMatrix world;
-    world.m[12] = camera->position.x;
-    world.m[13] = camera->position.y;
-    world.m[14] = camera->position.z;
-    Vec3* cb = &camera->forward;
-    Vec3* ca = &camera->up;
+    int* cpi = (int*)&camera->position;
+    int c0 = cpi[0], c1 = cpi[1], c2 = cpi[2];
+    SnowMatrix world;
+    world.m[1] = world.m[2] = world.m[3] = 0.0f;
+    world.m[4] = world.m[6] = world.m[7] = 0.0f;
+    world.m[8] = world.m[9] = world.m[11] = 0.0f;
+    world.m[0] = world.m[5] = world.m[10] = world.m[15] = 1.0f;
+    ((int*)world.m)[12] = c0;
+    ((int*)world.m)[13] = c1;
+    ((int*)world.m)[14] = c2;
     Vec3 qa, qc, qb, qd;
     Vec3 right;
+    Vec3* cb = &camera->forward;
+    Vec3* ca = &camera->up;
     cresult = &right;
     CROSS();
     float s = size;
@@ -415,6 +427,7 @@ void SnowFall::Update(RenderDevice* device, Camera* camera, int a, int b, float 
     device->vf35(material);
     device->vf64(m);
 }
+
 
 // FUNCTION: RALLYTROPHY 0x475880
 // SYMBOL: _$E24

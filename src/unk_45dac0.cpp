@@ -72,6 +72,9 @@ struct SunMeshV { BYTE unk0[0x30]; std::vector<SunPart*> parts; };
 // order count, vertices, indices, tri. Left (44 insns): the original keeps i in ebx through the inner loop and the
 // record cursor in edx, here the cursor takes ebx. No gain: const/non-const operator[], rec[k]/idx[k*3] indexing
 // (125 insns), all fields through tri (907 bytes), h forms, count types, declaration placement.
+// 2026-11-16 (round 21): cand stored z, x, then y (y computed first) 44 -> 43 insns, 106 -> 105 bytes. No gain: ny via q[-5]
+// (66 insns), cursor recomputed per iteration, q/tri/idx increment order, unsigned short/for(;;)/--n>0 count, eps hoisted,
+// signed i, hit field-wise, cand = p.
 float Car::SunFactor(void* models)
 {
     SunModels* list = (SunModels*)models;
@@ -135,20 +138,21 @@ float Car::SunFactor(void* models)
                                 float t = h / q[-5];
                                 if (!(t > best)) {
                                     Vec3 cand;
-                                    cand.x = p.x;
+                                    float cy = p.y - t;
                                     cand.z = p.z;
-                                    cand.y = p.y - t;
+                                    cand.x = p.x;
+                                    cand.y = cy;
                                     const SunVertex* c = &verts[idx[2]];
                                     const SunVertex* b = &verts[idx[1]];
                                     const SunVertex* a = &verts[idx[0]];
                                     if (PointInTriangle(&cand, tri, a, b, c)) {
-                                        hit = cand;
                                         best = t;
                                         hitTri = tri;
                                         hitA = a;
                                         hitB = b;
                                         hitC = c;
                                         hits++;
+                                        hit = cand;
                                     }
                                 }
                             }

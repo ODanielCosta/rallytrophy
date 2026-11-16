@@ -235,25 +235,25 @@ struct QuadPoints {
     HudPoint uvs[2];
     DWORD tint;
     float alpha;
-    QuadPoints(DWORD c) { tint = c; alpha = 1.0f; }
+    QuadPoints() {}
+    void Init(DWORD c) { tint = c; alpha = 1.0f; }
     ~QuadPoints() {}
 };
 
-// NONMATCHING: RALLYTROPHY 0x4aa690
-// Wrapping and draw dispatch are complete; local lifetimes, stack layout and x87 scheduling differ (818 vs 816 bytes).
-// Tried 2026-10-30 night: memcpy(char-count) for the three word copies (now 816 bytes, 141->114 insns differ); memmove/char_traits/std::copy/wcsncpy/<<1/unsigned sizes, all 24 decl orders of positions/uvs/tint/alpha, POD/volatile tint; still differs: original copy is shr ecx,1/rep movsd/adc/rep movsw (we get shr 2/movsb), ColorArg EH state 2 vs original 1, register assignment ebp/ebx swapped.
-// 2026-11-04: FUN_004a94c0 is the dtor of a 0x28-byte quad {HudPoint positions[2]; uvs[2]; tint; alpha} (QuadPoints, ctor sets tint/alpha): 529->371 differing, frame 0x40 and EH states 0,1,2 now match; left: memcpy word form (shr 1/movsd/adc/movsw) and ebx/ebp swap.
-// Tried 2026-11-01 re-pass: wmemcpy/wmemmove/wcsncpy, memcpy(n*2 / n<<1 / unsigned / n+n / char*), 8-byte tint+alpha struct with dtor (837 bytes, 102 insns) or volatile POD tint/alpha in 7 layouts (806-820 bytes), all 6 start/out/i orders; none beat 114 insns differ. Original has tint(0x48)+alpha(0x4c) as dead stores above the arrays, EH state 1 as DWORD store (ours BYTE), i in ebp and out in ebx.
+extern "C" size_t __cdecl FUN_004c2414(const unsigned short* s);   // wcslen
+
+// FUNCTION: RALLYTROPHY 0x4aa690
+// 2026-11-14: matched; lw temp assigned inside the else branch (not in the condition), decl order float line, word then int start, out, i
 void WrappedGlyphFont::PrintWrapped(RenderDevice* device, float x, float y,
                                    const unsigned short* text, int flags, float sx, float sy)
 {
-    int n = wcslen((const wchar_t*)text);
+    int n = (int)FUN_004c2414(text);
     if (n) {
         device->vf35((Sprite*)((char*)this + 0x48));
-        QuadPoints quad(color);
-        int start = 0, out = 0, i = 0;
+        QuadPoints quad; quad.Init(color);
         float line = DAT_004e134c;
         float word = 0.0f;
+        int start = 0, out = 0, i = 0;
         for (; i < n; ++i) {
             unsigned short c = text[i];
             char separator = 0;
@@ -273,34 +273,25 @@ void WrappedGlyphFont::PrintWrapped(RenderDevice* device, float x, float y,
                 float lw;
                 if (word + fa >= wrapWidth) {
                     word = 0.0f;
-                    if (start < i) {
-                        memcpy(DAT_00577bcc + out, text + start, (i - start) * sizeof(unsigned short));
-                        out += i - start;
-                    }
+                    for (int k = start; k < i; k++) DAT_00577bcc[out++] = text[k];
                     DAT_00577bcc[out++] = 10;
                     start = i;
                     --i;
                     line = DAT_004e134c;
-                } else if ((lw = line + word) >= wrapWidth) {
+                } else if (line + word >= wrapWidth) {
                     DAT_00577bcc[out++] = 10;
                     line = DAT_004e134c;
                 } else {
+                    lw = line + word; word = 0.0f;
+                    for (int k = start; k < i; k++) DAT_00577bcc[out++] = text[k];
                     line = lw + fa;
-                    word = 0.0f;
-                    if (start < i) {
-                        memcpy(DAT_00577bcc + out, text + start, (i - start) * sizeof(unsigned short));
-                        out += i - start;
-                    }
                     DAT_00577bcc[out++] = text[i];
                     start = i + 1;
                 }
             } else word += (float)advance;
         }
         if (word + line >= wrapWidth) DAT_00577bcc[out++] = 10;
-        if (start < i) {
-            memcpy(DAT_00577bcc + out, text + start, (i - start) * sizeof(unsigned short));
-            out += i - start;
-        }
+        for (int k = start; k < i; k++) DAT_00577bcc[out++] = text[k];
         DAT_00577bcc[out] = 0;
         wrapping = 0;
         PrintWide(device, x, y, DAT_00577bcc, flags, sx, sy);
@@ -358,8 +349,12 @@ static __forceinline void BoxWorldPoint(Vec3* o, const float* p, const float* m,
 
 // NONMATCHING: RALLYTROPHY 0x4ad1d0
 // All 15 separating axes are implemented. Xform asm helper (BoxWorldPoint, x4) now gives the original ebp frame and the first 100 bytes exactly; 2853 -> 2526 differing bytes (built 2619 vs 3131; inner-scope worldA/worldB redeclared). Still differs: EH states / local layout (original frame 0xf4) and ~500 bytes of code not yet accounted for.
-// Tried 2026-10-30 night: flat "if (fabs(p) > sum) return 0;" chain (all 15 tests), float/double temps for sum/fabs, !(<=) and empty-then forms, volatile r/a locals: 617-653 insns differ, worse than nested form (573). Original is an OBB-OBB test (not image code) whose compares are fxch/fcomp st(1)/fstp st(0), a00..a22 and r00..r22 in real frame slots (-0xb4.., -0xfc..) and fail blocks cross-jumped in groups of three; none of that reproduced.
+// Tried 2026-10-30 night: flat "if (fabs(p) > sum) return 0;" chain (all 15 tests), float/double temps for sum/fabs, !(<=) and empty-then forms, volatile r/a locals: 617-653 insns differ, worse than nested form (573). Original is an OBB-OBB test (not image code) whose compares are fxch/fcomp st(1)/fstp st(0), a[0]..a[8] and r[0]..r[8] in real frame slots (-0xb4.., -0xfc..) and fail blocks cross-jumped in groups of three; none of that reproduced.
 // Tried 2026-11-01 re-pass: reusing outer worldA/worldB for the center transform (no inner redeclare) 573->504 insns differ; plain float[] for axes/centers/extents/projected (no EH objects) drops built to 2223 bytes and 718 insns (original has EH states 0,2,3 and 0xf4 frame, so some Vec3 locals are needed); hoisting all Vec3 to function scope, a/r arrays, a-before-r order: no gain. Gap is ~500 bytes of code (a/r in frame slots), far from permuter range.
+// Pass 2026-11-13 (agent): 597 -> 407 insns differ (2741 -> 2917 bytes of 3131): r/a as float r[9]/a[9] (frame slots now exact), centerB hoisted to function scope after worldB (slot -0x48 exact; EH state order now differs), t/ra/rb locals for compares (cross tests give the fadd st,st(1) form; the original's fxch/fcomp st(1)/fstp st(0) compare still not reproduced). Open: fcomp form, x,z,y term order of r00/r02 (VC6 emits z,y,x), missing inline return-0 cleanups (original has 7 dtor pairs, we 3).
+// Pass 2026-11-16 (agent): 407 -> 150 insns differ (2917 -> 2971 bytes of 3131): original test order is A axes, B axes, then 9 cross tests; named sum (float sm = ...; float s = ra; s += rb;) gives the fcomp st(1)/fstp form and fadd st,st(1); r0/r2/r3/r5/r6/r8 as C + (B + A) without the q temp. Open: original keeps 6 cloned return-0 epilogues (tests 1,2,3 and 13,14,15; tests 4-12 jump back to the first three), we merge to 2 (160 bytes); no source lever found (see REPORT).
+// Pass 2026-11-16 round 28: 97 -> 33 insns differ (3133 -> 3131 bytes, size exact): dropped the inner scope braces and trailing return 0 (arrays, centerA, centerB now function scope after the radius test; centerB declared with its initializer, so the EH states match). Open: centerA/centerB init scheduling (~15 insns); r0/r2/r3/r5/r6/r8 term order x,z,y vs our z,x,y (operand swaps and assoc permutations make no difference).
+// Pass 2026-11-16 round 30: 33 -> 28 insns differ (size exact): centerA built as `Vec3 centerA; centerA.x = boxA[0]; centerA.y = boxA[1]; centerA.z = boxA[2];` (x stays on the x87 stack, y/z int-copied like the original). r-term order already matches; only the centerA/centerB init schedule hunk remains (original does fadd x straight after fld; ours hoists the int loads into the gap). Tried: e/g/d/f variants (x via float temp, x add before/after copies, B before A) all lose the y/z reload or shrink 12 bytes.
 int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
                  float* positionA, float* positionB)
 {
@@ -373,8 +368,8 @@ int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
     delta.y = worldA.y - worldB.y;
     delta.z = worldA.z - worldB.z;
     float radius = boxA[9] + boxB[9];
-    if (delta.z * delta.z + delta.y * delta.y + delta.x * delta.x <= radius * radius) {
-        Vec3 axisA[3];
+    if (delta.z * delta.z + delta.y * delta.y + delta.x * delta.x > radius * radius) return 0;
+    Vec3 axisA[3];
         Vec3 axisB[3];
         axisA[0].x = matrixA[0];
         axisA[0].y = matrixA[1];
@@ -394,7 +389,7 @@ int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
         axisB[2].x = matrixB[8];
         axisB[2].y = matrixB[9];
         axisB[2].z = matrixB[10];
-        Vec3 centerA = *(Vec3*)boxA;
+        Vec3 centerA; centerA.x = boxA[0]; centerA.y = boxA[1]; centerA.z = boxA[2];
         Vec3 centerB = *(Vec3*)boxB;
         centerA.x += boxA[3];
         centerA.y += boxA[4];
@@ -422,47 +417,45 @@ int FUN_004ad1d0(float* boxA, float* boxB, float* matrixA, float* matrixB,
         extentB.y = boxB[4] - boxB[1];
         extentB.z = boxB[5] - boxB[2];
         struct F3 projected;
-        float r00, r01, r02, r10, r11, r12, r20, r21, r22;
-        float a00, a01, a02, a10, a11, a12, a20, a21, a22;
-        { float q = axisB[0].x * axisA[0].x; q = axisA[0].z * axisB[0].z + q; r00 = axisA[0].y * axisB[0].y + q; }
-        r01 = axisB[1].z * axisA[0].z + axisB[1].y * axisA[0].y + axisB[1].x * axisA[0].x;
-        { float q = axisB[2].x * axisA[0].x; q = axisB[2].z * axisA[0].z + q; r02 = axisB[2].y * axisA[0].y + q; }
+        float r[9];
+        float a[9];
+        r[0] = axisA[0].y * axisB[0].y + (axisA[0].z * axisB[0].z + axisB[0].x * axisA[0].x);
+        r[1] = axisB[1].z * axisA[0].z + axisB[1].y * axisA[0].y + axisB[1].x * axisA[0].x;
+        r[2] = axisB[2].y * axisA[0].y + (axisB[2].z * axisA[0].z + axisB[2].x * axisA[0].x);
         projected.x = axisA[0].z * delta.z + axisA[0].y * delta.y + axisA[0].x * delta.x;
-        a00 = fabs(r00);
-        a01 = fabs(r01);
-        a02 = fabs(r02);
-        if (fabs(projected.x) > a02 * extentB.z + a01 * extentB.y + a00 * extentB.x + extentA.x) return 0;
-        { float q = axisB[0].x * axisA[1].x; q = axisA[1].z * axisB[0].z + q; r10 = axisA[1].y * axisB[0].y + q; }
-        r11 = axisB[1].z * axisA[1].z + axisB[1].y * axisA[1].y + axisB[1].x * axisA[1].x;
-        { float q = axisB[2].x * axisA[1].x; q = axisB[2].z * axisA[1].z + q; r12 = axisB[2].y * axisA[1].y + q; }
+        a[0] = fabs(r[0]);
+        a[1] = fabs(r[1]);
+        a[2] = fabs(r[2]);
+        { float t = fabs(projected.x); float sm = a[2] * extentB.z + a[1] * extentB.y + a[0] * extentB.x + extentA.x; if (t > sm) return 0; }
+        r[3] = axisA[1].y * axisB[0].y + (axisA[1].z * axisB[0].z + axisB[0].x * axisA[1].x);
+        r[4] = axisB[1].z * axisA[1].z + axisB[1].y * axisA[1].y + axisB[1].x * axisA[1].x;
+        r[5] = axisB[2].y * axisA[1].y + (axisB[2].z * axisA[1].z + axisB[2].x * axisA[1].x);
         projected.y = axisA[1].z * delta.z + axisA[1].y * delta.y + axisA[1].x * delta.x;
-        a10 = fabs(r10);
-        a11 = fabs(r11);
-        a12 = fabs(r12);
-        if (fabs(projected.y) > a12 * extentB.z + a11 * extentB.y + a10 * extentB.x + extentA.y) return 0;
-        { float q = axisB[0].x * axisA[2].x; q = axisA[2].z * axisB[0].z + q; r20 = axisA[2].y * axisB[0].y + q; }
-        r21 = axisB[1].z * axisA[2].z + axisB[1].y * axisA[2].y + axisB[1].x * axisA[2].x;
-        { float q = axisB[2].x * axisA[2].x; q = axisB[2].z * axisA[2].z + q; r22 = axisB[2].y * axisA[2].y + q; }
+        a[3] = fabs(r[3]);
+        a[4] = fabs(r[4]);
+        a[5] = fabs(r[5]);
+        { float t = fabs(projected.y); float sm = a[5] * extentB.z + a[4] * extentB.y + a[3] * extentB.x + extentA.y; if (t > sm) return 0; }
+        r[6] = axisA[2].y * axisB[0].y + (axisA[2].z * axisB[0].z + axisB[0].x * axisA[2].x);
+        r[7] = axisB[1].z * axisA[2].z + axisB[1].y * axisA[2].y + axisB[1].x * axisA[2].x;
+        r[8] = axisB[2].y * axisA[2].y + (axisB[2].z * axisA[2].z + axisB[2].x * axisA[2].x);
         projected.z = axisA[2].z * delta.z + axisA[2].y * delta.y + axisA[2].x * delta.x;
-        a20 = fabs(r20);
-        a21 = fabs(r21);
-        a22 = fabs(r22);
-        if (fabs(projected.z) > a22 * extentB.z + a21 * extentB.y + a20 * extentB.x + extentA.z) return 0;
-        if (fabs(projected.z * r10 - r20 * projected.y) > (a20 * extentA.y + a10 * extentA.z) + (a01 * extentB.z + a02 * extentB.y)) return 0;
-        if (fabs(projected.z * r11 - r21 * projected.y) > (a21 * extentA.y + a11 * extentA.z) + (a00 * extentB.z + a02 * extentB.x)) return 0;
-        if (fabs(projected.z * r12 - r22 * projected.y) > (a22 * extentA.y + a12 * extentA.z) + (a00 * extentB.y + a01 * extentB.x)) return 0;
-        if (fabs(r20 * projected.x - projected.z * r00) > (a20 * extentA.x + a00 * extentA.z) + (a11 * extentB.z + a12 * extentB.y)) return 0;
-        if (fabs(r21 * projected.x - projected.z * r01) > (a21 * extentA.x + a01 * extentA.z) + (a10 * extentB.z + a12 * extentB.x)) return 0;
-        if (fabs(r22 * projected.x - projected.z * r02) > (a22 * extentA.x + a02 * extentA.z) + (a10 * extentB.y + a11 * extentB.x)) return 0;
-        if (fabs(projected.y * r00 - r10 * projected.x) > (a10 * extentA.x + a00 * extentA.y) + (a21 * extentB.z + a22 * extentB.y)) return 0;
-        if (fabs(projected.y * r01 - r11 * projected.x) > (a11 * extentA.x + a01 * extentA.y) + (a20 * extentB.z + a22 * extentB.x)) return 0;
-        if (fabs(projected.y * r02 - r12 * projected.x) > (a12 * extentA.x + a02 * extentA.y) + (a20 * extentB.y + a21 * extentB.x)) return 0;
+        a[6] = fabs(r[6]);
+        a[7] = fabs(r[7]);
+        a[8] = fabs(r[8]);
+        { float t = fabs(projected.z); float sm = a[8] * extentB.z + a[7] * extentB.y + a[6] * extentB.x + extentA.z; if (t > sm) return 0; }
         float pb0 = axisB[0].x * delta.x; pb0 = delta.z * axisB[0].z + pb0; pb0 = delta.y * axisB[0].y + pb0;
-        if (fabs(pb0) > a20 * extentA.z + a10 * extentA.y + a00 * extentA.x + extentB.x) return 0;
-        if (fabs(axisB[1].z * delta.z + axisB[1].y * delta.y + axisB[1].x * delta.x) > a21 * extentA.z + a11 * extentA.y + a01 * extentA.x + extentB.y) return 0;
+        { float t = fabs(pb0); float sm = a[6] * extentA.z + a[3] * extentA.y + a[0] * extentA.x + extentB.x; if (t > sm) return 0; }
+        { float t = fabs(axisB[1].z * delta.z + axisB[1].y * delta.y + axisB[1].x * delta.x); float sm = a[7] * extentA.z + a[4] * extentA.y + a[1] * extentA.x + extentB.y; if (t > sm) return 0; }
         float pb2 = axisB[2].x * delta.x; pb2 = axisB[2].z * delta.z + pb2; pb2 = axisB[2].y * delta.y + pb2;
-        if (fabs(pb2) > a22 * extentA.z + a12 * extentA.y + a02 * extentA.x + extentB.z) return 0;
+        { float t = fabs(pb2); float sm = a[8] * extentA.z + a[5] * extentA.y + a[2] * extentA.x + extentB.z; if (t > sm) return 0; }
+        { float t = fabs(projected.z * r[3] - r[6] * projected.y); float ra = a[6] * extentA.y + a[3] * extentA.z; float rb = a[1] * extentB.z + a[2] * extentB.y; float s = ra; s += rb; if (t > s) return 0; }
+        { float t = fabs(projected.z * r[4] - r[7] * projected.y); float ra = a[7] * extentA.y + a[4] * extentA.z; float rb = a[0] * extentB.z + a[2] * extentB.x; float s = ra; s += rb; if (t > s) return 0; }
+        { float t = fabs(projected.z * r[5] - r[8] * projected.y); float ra = a[8] * extentA.y + a[5] * extentA.z; float rb = a[0] * extentB.y + a[1] * extentB.x; float s = ra; s += rb; if (t > s) return 0; }
+        { float t = fabs(r[6] * projected.x - projected.z * r[0]); float ra = a[6] * extentA.x + a[0] * extentA.z; float rb = a[4] * extentB.z + a[5] * extentB.y; float s = ra; s += rb; if (t > s) return 0; }
+        { float t = fabs(r[7] * projected.x - projected.z * r[1]); float ra = a[7] * extentA.x + a[1] * extentA.z; float rb = a[3] * extentB.z + a[5] * extentB.x; float s = ra; s += rb; if (t > s) return 0; }
+        { float t = fabs(r[8] * projected.x - projected.z * r[2]); float ra = a[8] * extentA.x + a[2] * extentA.z; float rb = a[3] * extentB.y + a[4] * extentB.x; float s = ra; s += rb; if (t > s) return 0; }
+        { float t = fabs(projected.y * r[0] - r[3] * projected.x); float ra = a[3] * extentA.x + a[0] * extentA.y; float rb = a[7] * extentB.z + a[8] * extentB.y; float s = ra; s += rb; if (t > s) return 0; }
+        { float t = fabs(projected.y * r[1] - r[4] * projected.x); float ra = a[4] * extentA.x + a[1] * extentA.y; float rb = a[6] * extentB.z + a[8] * extentB.x; float s = ra; s += rb; if (t > s) return 0; }
+        { float t = fabs(projected.y * r[2] - r[5] * projected.x); float ra = a[5] * extentA.x + a[2] * extentA.y; float rb = a[6] * extentB.y + a[7] * extentB.x; float s = ra; s += rb; if (t > s) return 0; }
         return 1;
-    }
-    return 0;
 }

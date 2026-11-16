@@ -1539,6 +1539,7 @@ CarBody::~CarBody()
 // NONMATCHING: statement scheduling differs (8 insns: vtable store and EH-state store placement around the SetScale arg copy; EH temp now matches)
 // Tried 2026-10-30 night: explicit inertia stores (not loop) + DWORD* up copy took 89->19 insns; ~14 variants of the SetScale temp (local DV3, brace init, hoisted, reordered) not better; original copy is interleaved with the zero stores and registers an EH temp slot ([esp+0x4c]=esp) that we never emit.
 // Tried 2026-10-31 re-pass: DV3 got an inline copy ctor (fixes the [esp+0x4c]=esp EH temp, 19->9 insns); volatile on force2.x gives 8; 30 other volatile/order/ctor-body variants and permute -r 40 gave nothing; vtable store and the 0x15 EH-state store still land after the arg copy instead of before/after the zero stores.
+// Tried 2026-11-16 (round 21): 12 more reorders (SetScale before invMass, zero-store groups moved past SetScale, explicit DV3 temp, id/mass moved, inline inv) -> none below 8 insns; no kept change.
 CarBody::CarBody(const CarBody* proto, float m, const DWORD* s, const DWORD* u)
 {
     float inv = DAT_004e1348 / m;

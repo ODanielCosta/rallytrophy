@@ -219,6 +219,7 @@ void Sky::Render(SkyDevice* device, Camera* camera)
 // 1437 vs 1441 bytes; call sequence, FPU algorithm and all 18 EH states match. Remaining: camera/this register swap (ebx/esi),
 // the original keeps inv = 1/len in the dead device argument slot, a different scheduling of the argument pushes around the four
 // vertex expressions, and about 110 of 441 instructions differ by order or stack slot (stack slots of P/A/B/vw/vh).
+// Tried 2026-11-16 r24: no gain (105 insns kept). Sub x2 via POD twin PV (alternatename to S414Vec3::Sub; calls.py then matches) 107 insns/1427 bytes; Sub into Vec3/named temps/PV->Vec3 copies 135-188; camera/this register swap unmoved by hasLens/fov reads, slot-order and operand-order tweaks.
 // Tried 2026-11-01 re-pass: Length sum written z,x,y (emits y,x,z like the original) and phase as separate px/py 116->105; vw/vh/vx/vy declaration permutations (all 24), n.y/inv operand flips, hasLens order, k in prev slot gave nothing; still differs: GetViewport vw/vh slots swapped, k/y slots, camera/this regs, push order around Project/Length call.
 // Tried 2026-10-30 night: ~40 variants; iw/ih reorder (int iw, float w, int ih, float h) and kEight global fixed registers 179->116; still differs: Length() sum order (z,x,y emitted vs y,x,z), Vec3 temp/quad stack slots, 12 bytes short, EH-state store placement in the quad block.
 void Sky::Update(SkyDevice* device, Camera* camera, SkyWorld* world, float dt)

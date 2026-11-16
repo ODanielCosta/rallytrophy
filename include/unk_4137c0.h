@@ -36,10 +36,10 @@ public:
         unsigned int n = strlen(s);
         if (std::string::npos - len <= n)
             Xlen();
-        if (n != 0) {
+        if (n > 0) {
             unsigned int newLen = len + n;
             if (Grow(newLen, false)) {
-                memcpy(ptr + len, s, n);
+                char* d = ptr + len; memcpy(d, s, n);
                 len = newLen;
                 ptr[len] = 0;
             }

@@ -279,13 +279,8 @@ static const float C1_SLIP2_LO = 4.0f, C1_SLIP2_HI = 35.0f;   // 0x4e219c, 0x4e2
     __asm fstp dword ptr [eax+8] \
     __asm fstp dword ptr [eax+4]
 
-// NONMATCHING: RALLYTROPHY 0x4799f0
-// 1376 vs 1382 bytes; same instruction mix. Open: the original keeps the float/int scratch slot
-// at ebp-0x10 above the n1 home slot (ebp-0x14), here they come the other way round (no declaration
-// order or block scope changes it); and a few schedule differences (pool head store, x/y velocity
-// jitter adds with a CSE'd velocity.x, epilogue pop order).
-// Tried 2026-10-30 night: split alpha sum, `t2 = n3 + n2`, `Vec3 local` copied before the pool-pop stores (77->64 insns); decl order of r/t2/n1, local/age placement, yv split and `j + v` jitter forms no better. Still open: float scratch slot ebp-0x10 vs n1 home ebp-0x14 swapped, original pops pool before loading s_car, 1377 vs 1382 bytes.
-// Tried 2026-10-31 re-pass: SpawnCore3/4 pool-pop recipe applied (pop, int copy of age, unk0/lifetime, then position copy; 125->99 diff lines); SpawnCore2 volatile j1/yv jitter form and slipLong in dead age slot made it worse (101/137), n1/slip decl-order sweeps worse (123). Still open: n1 home ebp-0x14 vs scratch ebp-0x10 swapped, j1 not in its own slot, slipLong push order.
+// FUNCTION: RALLYTROPHY 0x4799f0
+// Matched 2026-11-16 (slot study): slip/speed/lat are ONE float scratch `v` (as in SpawnCore2). Three separate floats get a lower count each, so the n1 home sorted below them instead of above.
 // Spawn core 1: emits one particle with a probability from the slips and the body speed.
 float CarEmitterB::SpawnCore1(float scale, float age)
 {
@@ -295,26 +290,26 @@ float CarEmitterB::SpawnCore1(float scale, float age)
     int n1 = 0;
     int n2 = 0;
     int n3 = 0;
-    float slip = (float)fabs(s_car->slipLong);
-    if (slip < C1_SLIP_HI) {
-        if (slip > C1_SLIP_LO) {
-            n1 = FloatToInt((slip - C1_SLIP_LO) * kSlip * 256.0f);
+    float sv = (float)fabs(s_car->slipLong);
+    if (sv < C1_SLIP_HI) {
+        if (sv > C1_SLIP_LO) {
+            n1 = FloatToInt((sv - C1_SLIP_LO) * kSlip * 256.0f);
         }
     } else {
         n1 = 256;
     }
-    float speed = s_body->vel.Length();
-    if (speed < C1_SPEED_HI) {
-        if (speed > C1_SPEED_LO) {
-            n2 = FloatToInt((speed - C1_SPEED_LO) * kSpeed * 256.0f);
+    sv = s_body->vel.Length();
+    if (sv < C1_SPEED_HI) {
+        if (sv > C1_SPEED_LO) {
+            n2 = FloatToInt((sv - C1_SPEED_LO) * kSpeed * 256.0f);
         }
     } else {
         n2 = 256;
     }
-    float lat = (float)fabs(s_car->slipLat);
-    if (lat < C1_SLIP2_HI) {
-        if (lat > C1_SLIP2_LO) {
-            n3 = FloatToInt((lat - C1_SLIP2_LO) * kSlip2 * 256.0f);
+    sv = (float)fabs(s_car->slipLat);
+    if (sv < C1_SLIP2_HI) {
+        if (sv > C1_SLIP2_LO) {
+            n3 = FloatToInt((sv - C1_SLIP2_LO) * kSlip2 * 256.0f);
         }
     } else {
         n3 = 256;
@@ -329,10 +324,10 @@ float CarEmitterB::SpawnCore1(float scale, float age)
     if (!((rand() & 0xff) < total / 2)) {
         return ratio;
     }
+    int r = t2;
     if (n1 > 256) {
         n1 = 256;
     }
-    int r = t2;
     if (r > 256) {
         r = 256;
     }
@@ -366,14 +361,17 @@ float CarEmitterB::SpawnCore1(float scale, float age)
     vel->x = v.x;
     vel->y = v.y;
     vel->z = v.z;
-    *vel -= s_body->Forward() * s_car->slipLong * 0.15f;
-    p->velocity.y *= 0.5f;
+    float sl = s_car->slipLong;
+    *vel -= s_body->Forward() * sl * 0.15f;
+    float yv = p->velocity.y * 0.5f;
+    p->velocity.y = yv;
     float j1 = (float)((rand() & 0x3fff) - 0x1fff) * 9.1552734375e-5f;
-    float j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
-    vel->x = j1 + *(volatile float*)&vel->x; // field re-read like the original (fadd [ebx]); the original also spills j1 to float across the 2nd rand(), which VC6 sinks below this store here
-    p->velocity.y += j2;
-    p->size = 0.2f;
+    double j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
+    p->velocity.x = j1 + p->velocity.x;
+    p->velocity.y = yv + j2;
+    p->velocity.y = yv + j2; // duplicate store pins j1/j2 at their definitions (VC6 drops the second store)
     p->velocity.z += (float)((rand() & 0x3fff) - 0x1fff) * 9.1552734375e-5f;
+    p->size = 0.2f;
     p->gravity = (rand() & 0x3ff) * 9.765625145519e-5f + 0.5f;
     p->frame = (rand() & 3) | 0x110;
     p->color = 0xffffffff;
@@ -405,7 +403,8 @@ static const float C3_grav = 0.000683593738f;                     // 0x4e2244
 static const float C3_jit = 3.0517578125e-5f;                     // 0x4e2248
 static const float C3_mixB = 0.00253906241f, C3_mixA = 0.00134765625f; // 0x4e224c, 0x4e2250
 
-// NONMATCHING: RALLYTROPHY 0x479f60
+// FUNCTION: RALLYTROPHY 0x479f60
+// Matched 2026-11-16 (FPU study): plain float j1, double j2, and the velocity.y store written twice so j1/j2 are evaluated at their definitions.
 // 1368 vs 1376 bytes. Frame, SEH states, statics, ramps, TRANSFORM_POINT block, the three Vec3 calls and the
 // rand chain match. Open: n2/total land in esi/edi swapped (original total=esi, n2=edi), so the mix terms are
 // emitted r-first; the y-velocity temp lives at [ebp-0x20] (original reuses [ebp-0x14]) and the x jitter is not
@@ -417,6 +416,7 @@ static const float C3_mixB = 0.00253906241f, C3_mixA = 0.00134765625f; // 0x4e22
 // rand terms as by-value arguments of an inline helper forces the spill and fixes the function tail (5 insns, 1372
 // bytes) but evaluates the y term first; 40 helper signatures/bodies/returns did not give x-first with the spill.
 // 2026-11-12: volatile write of j2 as well as j1 fixes the yv/j1 slots and the x-add order (9 -> 3 insns differ, 1369 -> 1378 bytes vs 1376); j2 should stay on the x87 stack (fadd st,st(1); fstp st(0)) but is spilled to [ebp+0xc]; non-volatile j2 variants (15) all store x before the second rand().
+// 2026-11-15 r13 pass: 40 more j2 forms (non-volatile j2, comma/ternary, double, JitXY helper with by-value args) all 7-11 insns; the helper with args (jy,jx) in source order loses the spill, (jx,jy) evaluates y first. Kept the 2026-11-12 form (3 insns).
 // Spawn core 2 (tyre-slip dust): emission amount from slip, speed and lateral slip, one particle.
 float CarEmitterB::SpawnCore2(float a, float b)
 {
@@ -499,12 +499,11 @@ float CarEmitterB::SpawnCore2(float a, float b)
     p->velocity -= s_body->Forward() * slip * 0.15f;
     float yv = p->velocity.y + 0.1f;
     p->velocity.y = yv;
-    float j1;
-    *(volatile float*)&j1 = (float)((rand() & 0x3fff) - 0x1fff) * C_jit;
-    float j2;
-    *(volatile float*)&j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
+    float j1 = (float)((rand() & 0x3fff) - 0x1fff) * C_jit;
+    double j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
     p->velocity.x = j1 + p->velocity.x;
     p->velocity.y = yv + j2;
+    p->velocity.y = yv + j2;   // duplicate store pins j1/j2 at their definitions (VC6 drops the second store)
     p->velocity.z = (float)((rand() & 0x3fff) - 0x1fff) * C_jit + p->velocity.z;
     p->size = 0.2f;
     p->gravity = (float)(rand() & 0x3ff) * C_spinScale + 0.3f;

@@ -391,6 +391,7 @@ extern float DAT_004e1338;
 // NONMATCHING: RALLYTROPHY 0x4013c0. Sampling/playback behavior matches the observed PE paths; current candidate is 558/579 bytes with 451 differing bytes, primarily frame and register allocation. Plain PE/object comparison.
 // Tried 2026-10-30 night: volatile self copy of this (spill slot), else-arm cur=0, volatile c->time compare, >=0x28 (169->59 insns); still differs: car/clock registers swapped (ebx/ebp), 'mov dl' byte load vs dword, so the Lerp8 arg reloads differ.
 // Tried 2026-11-01 re-pass: ~30 variants (m0 read before self store, volatile mode/clock/car/player reads, local copies of car/clock, named Lerp8 temps per call, volatile 0x1350 byte store, early/late player load, extra clock uses); none moved the ebx/ebp swap (use-count driven) or the Lerp8 byte-arg register order; best 57 vs 59 insns differ, not an improvement in kind.
+// Pass 2026-11-16 (r21): 59 -> 41 insns differ (158 bytes) by storing 0x134c (r) after the last Lerp8 store; ~140 variants (named Lerp8 temps x32, store permutations, typed Car members, extra clock uses) did not move car/clock to ebp/ebx (only a redundant `&& clock >= *nx` loop test flips it, +2 bytes) nor delay the Lerp8 fstp as the original does.
 void RecPool::Push(Car* car, int clock)
 {
     RecPool* volatile self = this;
@@ -436,10 +437,10 @@ void RecPool::Push(Car* car, int clock)
         CARF(car, 0x1338) = Lerp8(t, c->data[4], nx->data[4]);
         car->FUN_0045da60(Lerp8(t, c->data[5], nx->data[5]));
         CARF(car, 0x1340) = Lerp8(t, c->data[5], nx->data[5]);
-        CARF(car, 0x134c) = r;
         *((BYTE*)car + 0x1350) = 1;
         CARF(car, 0x20a0) = Lerp8(t, c->data[0x56], nx->data[0x56]);
         CARF(car, 0xf80) = Lerp8(t, c->data[7], nx->data[7]);
+        CARF(car, 0x134c) = r;
         int tm = *(int*)(c->data + 0x58);
         if ((float)(clock - tm) < DAT_004e133c)
             ((Player*)player)->FUN_00491110(1, tm);

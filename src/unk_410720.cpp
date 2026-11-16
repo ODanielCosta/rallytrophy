@@ -25,6 +25,7 @@ extern "C" int __cdecl FUN_004ce290(const char* a, const char* b);   // case-ins
 #define PV (*(int* volatile*)&p)
 // Tried 2026-10-30 night: p reads via volatile pointer (PV) + kindv re-read in waterfall block gave 167->126; kind still not in edi (any non-volatile kind folds the cascade), 2-3 block store order/ push 0x30 placement and Vec2 copy order differ.
 // Tried 2026-11-01 re-pass: kind re-read as local in waterfall cmp, shared goto STORE tail for the 3 TexScroller blocks (126->106); address-taken/volatile-ptr kind, volatile-store kind, water-block tail variants no help; still differs: kind not in edi in prologue/cascade, 2/3-river store order (zero stores sit before ds loads in original), water block own store tail merges here, name-string ctor Vec2 copy order.
+// 2026-11-16 r26: water loop `int lo = i % 10;` first + `slot[i] =` (idiom: remainder before quotient, no slot++) 106->89 insns, loop now exact; reorder.py found nothing; river2 local texture loads, kind0/kindv init orders (3+3 variants) worse.
 void StageScene::LoadEffect(int* p)
 {
     int* m = (int*)p[0];                               // the mesh's material
@@ -129,10 +130,10 @@ void StageScene::LoadEffect(int* p)
             AT(int, 0x880) = 1;
             Texture** slot = (Texture**)((BYTE*)this + 0x884);
             for (int i = 0; i < 0x20; i++) {
+                int lo = i % 10;
                 DAT_004f3ba0[len - 6] = (char)(i / 10) + '0';
-                DAT_004f3ba0[len - 5] = (char)(i % 10) + '0';
-                *slot = LOADER->Load(DAT_004f3ba0, 0x40);
-                slot++;
+                DAT_004f3ba0[len - 5] = (char)lo + '0';
+                slot[i] = LOADER->Load(DAT_004f3ba0, 0x40);
             }
             AT(int, 0x904) = AT(int, 0x884);
             Config cfg;

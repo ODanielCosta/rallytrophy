@@ -333,11 +333,11 @@ void Player::FUN_00491130()
         setup = (BYTE*)DAT_0056b0c8 + 0x139404;
     }
     if (unk40 == 2) {
-        setup = 0;
-        flag = 0;
         b = 0;
-        mode = 4;
         a = 0;
+        mode = 4;
+        flag = 0;
+        setup = 0;
     }
     car = new Car(setup, unk2c, index, b, flag, a, mode);
     car->player = this;
@@ -481,6 +481,7 @@ int Player::FUN_00491f70()
 // NONMATCHING: RALLYTROPHY 0x491c10
 // Tried 2026-10-30 night: bool/int copy of copyFrom, inline slopes (worse), ternary offset temps (worse), volatile copy (worse); the mov ecx,[esp+30h]/test still sits after the fsub/fmul pair instead of before them.
 // Tried 2026-10-31 re-pass: volatile copyFrom read at 8 positions (best case moves mov+test one slot too early, 2 insns), split slope decls, plain int copy; permute.py -r 40 found nothing better than the (2,8) baseline.
+// 2026-11-16 (round 32): ~45 more variants (copyFrom copy local at every statement boundary incl. const/!!/unsigned/const param, slopes inline/declared per store, product order, two-if split, goto): all stay at 2 insns; the test position never moves.
 // 473 vs 473 bytes, 8 bytes differ: the original loads and tests copyFrom (mov ecx,[esp+30h]; test)
 // one FPU op earlier than any source ordering tried (temps, copy local, reordered stores).
 // Turns the u8 fields of two samples into per-field slopes (per ms) and offsets. cdecl.
@@ -551,6 +552,7 @@ void Player::FUN_00491620(const void* packet)
 // the Stage lives in ebp and is spilled around the idiv).
 // Tried 2026-10-30 night: ~25 variants (decl order, size reuse, case 4 as length=3;break); length=3;break took 36->25 insns differ (380 vs 388 bytes); case 2 still allocates time/total swapped and the original spills the Stage into the size arg slot [esp+0x18], not reproduced.
 // Tried 2026-10-31 re-pass: ~34 more variants (volatile spill of Stage into the size slot via *(Stage* volatile*)&size, element-in-local for the delta sub, case 3 temp/volatile-store copies, decl/statement order of total/distance/time, size-as-return); none beat 25 insns differ; the volatile spill gets the [esp+0x18] store but then total/time registers and the idiv-region ordering diverge (stage ends in ecx/eax not ebp).
+// 2026-11-15 (round 17): case 3 load-order locals, if-form/goto/pointer-out/combined-expression delta: none below 16 insns.
 // Handles one network message about this player and returns its length.
 // 2026-11-11: the lap delta as `delta -= sections > 0 ? unk1884[...] : 0` puts time in edi and total in esi as in the
 // original (25 -> 16 insns, 384 vs 388). Left: the original keeps delta in eax across the test, computes the index in
@@ -804,22 +806,20 @@ void Player::FUN_00491950(int t)
     c->unk1350 = 1;
 }
 
-// NONMATCHING: RALLYTROPHY 0x491e20
-// Tried 2026-10-30 night: ~25 variants (pointer-stepped loops, bi temp, regrouping, declaration order) stay at 15 insns. Swapping target/base scores 13 but is wrong: the original reads t from unk250c ([ebp-4]) and base from unk24e4.
-// Tried 2026-10-31 re-pass: explicit byte-offset base (off = base - target) and tp++ walkers (18 insns, shrinks to 324 bytes), base/target declaration reorders (18-20), volatile target read, permute.py -r 40 (best stays 15/42); VC6 still picks the 0x24e4 array as the induction pointer.
-// 331 vs 331 bytes, 42 differ: same code, but VC6 picks the other array as the primary induction
-// variable of the loop (original steps the 0x250c array and adds a runtime offset to reach 0x24e4).
 // Computes the stage times of a simulated opponent from its skill table: each of the ten
 // splits is the reference split scaled by the skill, plus random error, rounded to 10 ms.
+// Matched 2026-11-13: target[i] written out twice (raises its use weight so VC6 steps the 0x250c array and
+// reaches 0x24e4 by runtime offset); base read first, target after the unk1a50 store.
+// FUNCTION: RALLYTROPHY 0x491e20
 void Player::FUN_00491e20(Stage* stage)
 {
     int rally = stage->unk0;
     unk30 = 1;
     unk1a1c = 1;
-    int* target = stage->unk250c;
+    int* base = stage->unk24e4;
     int index = stage->stageCount;
     unk1a50 = index;
-    int* base = stage->unk24e4;
+    int* target = stage->unk250c;
     float* ai = aiTable;
     unk1a18 = 10;
     float skill = ai[rally * 8 + index + 1] * 0.01f;
@@ -835,7 +835,7 @@ void Player::FUN_00491e20(Stage* stage)
     for (i = 0; i < 10; i++) {
         float t = (float)target[i];
         float r = (float)(rand() & 0x3ff) * (1.0f / 1023);
-        t = r * t * error + ((float)base[i] + t * rest);
+        t = r * (float)target[i] * error + ((float)base[i] + t * rest);
         if ((rand() & 0x3fff) < fatalLimit) {
             t += (float)(rand() & 0xfff);
         }

@@ -438,3 +438,256 @@ followed by M calls to an inline function:
   push_back is unaffected by `#pragma inline_depth` 8..255. 0x43df70: 52 -> 48 via SetScale for the final restore.
 - sizegap.py limits: it disassembles switch jump tables after `ret` as code (bogus top hunk on 0x43df70) and can
   misalign a hunk onto a matching EH-state store (0x4b0e90); confirm a hunk with insdiff before acting on it.
+
+## Corpus lookup and a dead lever (2026-11-13)
+
+- `tools/idiom.py` indexes the 1500 byte-exact functions (original instruction -> source line, from `/FAcs`
+  listings) so a NONMATCHING hunk can be looked up instead of guessed: e.g. `lea R,[R+N]; mov R2,R` (the copy
+  0x461a40 lacks) comes from `SpeechItem item = queue.front();` and from `for (int j = 0; j < 7; j++)` loops.
+- Corpus survey over all 169 NONMATCHING functions (shape-aligned hunks): 5721 hunks, 2595 with an exact-text hit in
+  the corpus; the big "size" functions get the most leads (Stage::Stage 119 of 262 hunks, StageScreen::Layout 98/164).
+- **Runs of four identical stores are an inline helper** (`static inline void Quad(float* v, float f)`): that is what
+  hoists the next allocation's `push <size>` above the quad stores (0x486240 LoadOverlays matched, from the corpus hit
+  on G4_Quad in unk_4303e0.cpp). Swept over the other six functions with such runs: no change, so it only matters next
+  to a `new`.
+- **Stale `volatile` workarounds**: a `*(volatile T*)&x = e` or `T volatile x` added in an earlier pass can be what
+  blocks the function now (0x469a20: plain `float kk = ...` 17 -> 6 bytes). Swept over all 57 NONMATCHING functions
+  that carry one (one site at a time and all at once): closer in 8 (applied), same or worse elsewhere.
+- Local NAMES do not matter either: 12 random renamings of 0x436250's locals gave identical bytes.
+- Neutral reference-count rewrites swept mechanically (`if (A || B)` -> `if (A) {} else if (B) {}` with the same
+  body; `v = e;` moved into both arms of a following if/else) over the 38 functions that have such sites: no match,
+  noise-level gains only in two 5-10 KB functions. These forms matter only where the slot order is the last difference.
+- Declaration count is NOT a general lever: forcing 1..32 extra global typedefs into unk_4303e0, unk_43a390,
+  unk_452b20 and unk_490950 changed no byte in any of their 19 NONMATCHING functions. The winmain flip was a
+  one-off.
+
+## Big-function rounds (2026-11-13)
+
+- **Chained assignment = load once, copy registers.** `a.x = b.x = c.x = d.x = lo.x;` reproduces the original's
+  `mov ecx,eax; mov edx,eax` fan-out where per-field stores reload (0x470940 corner block now exact).
+- **A named temporary re-addressed with `lea` is a sign the original passed the call result straight through**
+  (`dst.Assign(Plus(a, b))` instead of `T tmp = Plus(a, b); dst.Assign(tmp);`): 0x4418d0, seven 7-byte hunks.
+- **Register roles follow use weight, so lower the weight of the wrong winner**: reading `m_game->text` in two blocks
+  instead of the `text` local fixed 0x421fa0's ebx/edi swap; testing `info == rally` instead of `r == 0` fixed
+  0x4418d0's. Adding uses to the intended winner rarely works; removing uses from the wrong one does.
+- **`fcompp` vs `fcomp; fstp st(0)`**: write the compare as one expression with the sum on the left
+  (`if (d.z*d.z + d.y*d.y + d.x*d.x <= r*r)`), not via a named d2.
+- **Literal constants as named file statics** (`static const float K262 = 262.0f;`, used `K262 * sy`) give the
+  original's `fld [const]; fmul [local]` order and stop folding of `25 + 575` (0x421fa0).
+- Unexplained: in 0x411600 the score moves with the number of unused `__forceinline` helpers defined in the file
+  (0, 2 -> 124 insns; 1, 3 -> 127; 4 -> 121). Same family as the winmain declaration-count flip; not used.
+- FillCells 0x40f390: the inline-asm RoundF costs register allocation (plain casts free esi/edi/ebx but call
+  __ftol, which the original lacks). `/QIfist` on the cast form does not reproduce the original either (2128 bytes
+  vs 2101 without); how the original rounds inline without asm demoting registers is open.
+- x87 operand order (toy compiles, 0x470940): VC6 canonicalises commutative fmul/fadd operands; local-struct x
+  global always emits `fld global; fmul local`, whatever the source order, helper or alias. A one-expression sum is
+  emitted z,y,x; a statement chain (`t = c.x*D.x; t += c.z*D.z; t += c.y*D.y`) keeps source order. Where the original
+  is local-first, the local term is probably a different kind of node (e.g. produced by an inline `+=` through a member
+  path); unresolved.
+- Unrolled loops: where the original has N copies of a small search with no loop counter, write N copies (a macro is
+  fine); `while (1) { if (a) break; if (b) break; e++; }` stays top-tested where `for (; cond;)` gets rotated
+  (0x419f30, 490 -> 362 insns with the e[] fixup also unrolled).
+- **`/Oa` caches a plain pointer field across calls**: a `m->name` load is CSE'd through a chain of strcmp calls.
+  Reading it through a string-like sub-object (`struct { const char* ptr; int len; ...; c_str() { return ptr ? ptr : ""; } }`)
+  reloads it per use as the original does (0x45e480, ~300 insns of the glow/window chain).
+- **Right-to-left setters**: `fld b; fld a; fstp d0; fstp d1` is an inline `Set2f(d, a, b)` call (arguments evaluated
+  right to left), not two stores (0x45e480).
+- **Identity matrices**: a struct without a constructor, stores written inline right after the declaration, puts the
+  EH state store before the identity stores as in the original (0x493650 IdentityMatrix, 0x473470 RainMatrix).
+- **Stale volatiles keep paying**: removing `volatile BYTE* hit` aliasing in 0x45cc30 was its biggest single gain.
+- **A named local/helper can renumber `_$E` static initialisers** (0x45bc20: `Vec3 f = vel * -down;` or a helper broke
+  two matched `_$E` functions in unk_45ad10.cpp). Always rerun match.py on the whole file, not only the target.
+- **Vector-style `size()` stops VC6 hoisting a base pointer** (`first == 0 ? 0 : last - first` as an inline member):
+  0x417540 got the original's register map. Arrays instead of scalar locals give the original's real frame slots
+  (0x4ad1d0 r[9]/a[9]).
+- **Inline budget mystery solved (0x443790)**: `#pragma inline_depth(1)` forbids the second level a by-value struct
+  copy needs (implicit copy ctor -> string copy ctor). With depth 2 VC6 inlines _Tidy + assign as the original does
+  (standalone probe confirms). Check any file that sets inline_depth(1) where the original inlines string copies.
+- **Tail merging of identical leaves**: VC6 cross-jumps textually different but identical-code blocks. Regrouping with
+  parens (`(e + e + dist) + c`, same value) stops a merge without changing bytes elsewhere (0x4b3800); a cast on a
+  late arm (`(float)(v1 - v0)`) does the same (0x4b59b0).
+- **bool vs int parameters**: an `int` parameter receiving a bool emits `and edx,0xff; push edx`, a `bool` one does not
+  (0x443790 DrawSelector).
+- **Re-read the member, do not cache it in a local**: `MakeTexture(F(int,0))` per call instead of `int f = F(int,0)`
+  fixed BinkVideo::BinkVideo's register map (0x4097a0 MATCHED).
+- **Color by value puts -1 in edi**: `DrawQuad(pos, uv, color, 1, 1)` with a `Color color(0xffffffff)` local passed by
+  value reproduces the original's shared -1 register (0x40a0f0 MATCHED, lead from MenuScreen::DrawIconCell via idiom.py).
+- **Expressions written out per use let VC6 make its own CSE temps** (`w * 0.5f` at every use instead of an `x` local):
+  that is where the original's fld/fst temp slots come from (0x40a0f0).
+- **Budget padding, re-swept**: one discarded value-returning inline call pushes the first throw's string copy out of
+  line (0x4b91c0 MATCHED with K=1 after struct copies were added; K was 10 before). Re-sweep K after any change that
+  adds or removes inline calls.
+- **Struct copies of a ScenePoint give the original's two-pointer induction** (d and d+0x14) and the for-increment
+  order (`d++, sa++, sb++, n++`) can swap two spilled registers in a loop tail (0x4b91c0).
+- **Word copy loops**: `shr ecx,1; rep movsd; adc ecx,ecx; rep movsw` is VC6 turning a plain `for (k...) dst[out++] = src[k];` loop over unsigned shorts into a string copy; no memcpy form gives it (0x4aa690, lead from FillTriangle 0x472710).
+- **Raise a variable's weight with a second written-out use** (not an unused copy, which does nothing): `r * (float)target[i] * error` instead of reusing `t` made VC6 step `target` as the induction pointer (0x491e20 MATCHED).
+
+## Scheduler and register tie-break study (2026-11-15, synthetic VC6 experiments, ~270 compiles)
+
+Proven (each reproduced in several independent synthetic functions):
+- **Callee-saved register order is esi, edi, ebx, ebp by use weight** (loop uses weigh more). Equal-weight ties go to
+  the variable whose *defining assignment* comes first in flow order; the last-defined one is spilled. Declaration
+  order and first-use order have no effect. Between parameters, the later parameter wins a tie. To swap two
+  registers, reorder the defining assignments (when independent) or change use weight.
+- **`lea r,[r2]` vs `mov r,r2` for a counter copy:** `while (n--)` (post-decrement in the condition) gives `lea`;
+  `for(;n;n--)`, `for(;n>0;n--)`, `do{}while(--n)` give `mov` or no copy. Switching form also moves stack slots.
+- **Loop tail:** the counter `dec` is hoisted right after the independent ALU ops and independent stores sink to just
+  before the branch (`add; dec; store; jne`). A store stays before `dec` only with a real dependence or a real
+  conditional block boundary between them; labels/goto and folded conditions do not split the block.
+- **Constant initialisers** are emitted in source assignment order (`a=0; b=1` vs `b=1; a=0` swaps xor/mov);
+  declaration order does not matter. Constants the allocator re-materialises after an inlined destructor
+  (0x436250 back-edge) follow no source lever found.
+- **x87 gap filling:** ready integer instructions are hoisted into the gap between an `fld` and its dependent
+  `fadd`. A named accumulator (`float a = K; a += x;`) lets an independent int load move above the final `fadd`; a
+  single expression tree (`K + x`) keeps it after. Frame/global loads hoist across fst/fstp; loads through a pointer
+  did not.
+- **`lea [a+b]` base/index:** source operand order never changes it; in register cases the base is the later-defined
+  operand. Inside std::string inlines it flipped with the stack string object's member layout.
+
+Residuals explained but not fixed: 0x41b270 (store-before-dec order has no plain-tie source form; idiom.py finds 0
+matched examples), 0x436250, 0x4ae4b0 (needs `while(n--)` for lea but that loop's slot layout), 0x477690 (one-tree
+form gets the schedule but VC6 then emits `fld x; fadd K`, 2 insns).
+Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
+- Sweep test (2026-11-15, 7 "registers" triage rows): the defining-order rule moved none of them. In 5 the diff was
+  not a register tie at all (lea operand order inside std::string appends, a load scheduled above a multiply, spill
+  slots, a strength-reduced loop pointer that takes the leftover register). Gains came from ordinary statement-order
+  edits: TrackSelectMenu::Run 8 -> 4 insns, AIDriver 0x4a1050 18 -> 17. The triage "registers" label overstates how
+  many residuals are pure allocation ties.
+
+## Rounds 13-16 levers (2026-11-15)
+- A local alias of a just-allocated member (`T* W = new ..; member = W;` then `W[i]`) holds a callee-saved register;
+  storing straight to the member and indexing it (`member = new ..; member[i]`) freed edi for the original's zero
+  (ColModel ctor 213 -> 46 insns).
+- Use the out-of-line helper the original calls (calls.py): VC6 `vector::erase(begin,end)` body, `Sub` returning its
+  out pointer (use the returned pointer as the next call's argument), the file's std::string model (`assign`,
+  `AppendStd`, `AppendInl`) instead of `operator=`/`+=`.
+- Float accumulators: `sum += (double)x` gives `fld; faddp st(N)` pairs (exact widening; result still stored float).
+- `?:` as a call argument -> two calls in an if/else; an index expression into its own statement first; an early
+  `return` turned into a nesting `if` around the tail; an element pointer recomputed from the member slot after a call.
+- A global known to hold 1.0f (DAT_004e1348) may be an immediate `1.0f` in the original; check the data before using it.
+
+## Inline budget for vector push_back (2026-11-16, synthetic study + 2 matches)
+- With N `push_back`s on one vector in a function, only the LAST site is expanded inline; earlier ones stay
+  `call insert(P,1,X)`. How fully the last one expands depends on R = the number of real push_back sites:
+  R=3 none of the growth-arm size() calls out of line, R=5 one before `new` and one after `delete`, R=6 2/1,
+  R=7-8 3/1, R>=9 the last site is not expanded either. Extern calls, non-inline wrappers and discarded inlines cost 0.
+- To lower R without changing behaviour, route the first k sites through a layout-compatible twin class with a
+  declared-only `insert(P, unsigned, const T&)` (`((Twin&)v).insert(((Twin&)v).end(), 1, x)`) - same thiscall to
+  the same out-of-line insert, budget cost 0 (precedent: H2c_Vector in unk_427600.cpp). A local
+  `std::vector<T>& items = member;` also costs budget, so its position matters.
+- BuildRects (8 sites, twin 3-5) and LoadLayout (14 sites, twin exactly 4, keep its Bal(1)) both MATCH this way.
+  inline_depth/inline_recursion pragmas do not help; Bal() padding only raises the count.
+- Limits (2026-11-16): the rule is for runs of real `push_back` on one vector. StageScreen::LoadLayout 0x422fc0 (7
+  push_back + one hand-expanded 8th site) did not fit: twinning a prefix made the next real site expand too (2-3
+  out-of-line size() calls before `new`); the original's shape sits between k=0 and k=7, so the hand expansion stays.
+  Stage::Stage has only out-of-line inserts (17 vs our 18: the original cross-jumps two identical sign_ tails).
+- Float copies: when the original copies a 3-float vector with fld/fstp, use the float copy helper (G_Copy) rather than
+  an int-bits copy (G_Copy3); that alone matched Car::FUN_00452eb0.
+
+## Exit-path cleanup and epilogue cloning (2026-11-16 study, 2 matches)
+- Inline budget is per inline call site, spent from the end of the function backwards: the ctor's Tidy(false) goes
+  out of line first, then the textually earliest exit. To get "failure exit calls _Tidy(true) out of line, success
+  exit inline", the failure `return` must come before the success one, the destructor must be `~T(){ Tidy(true); }`
+  with Tidy defined inline in the class, and discarded `Bal()` calls before the success cleanup spend the budget
+  (Load needs >=10, LoadSlot >=27).
+- The `mov [state],-1` before the out-of-line Tidy call is dropped if the same Tidy was already compiled earlier in
+  the TU; a per-function twin class (ReplayPath, FB2_LoadPath) restores it.
+- SkidMarks ctor matched (cloned per-return epilogues) after moving SetQuality below it in the file. The general rule
+  "only the first emitted function clones epilogues" is NOT confirmed: a follow-up sweep found synthetic EH and non-EH
+  functions cloning at every return in any position, and moving LoadRelay / FUN_004ad1d0 first changed nothing.
+  Function order can matter in a specific file; treat it as a variant to try, not a rule.
+
+## Exit tail-merge rules (2026-11-16 study)
+- Default is to clone every `if (t) return 0;` exit (with epilogue/dtors); distance, function size, pop count alone
+  never trigger merging.
+- A trailing return identical to the test exits (`if (c) {...return 1;} return 0;`, else-return, flat trailing
+  `return 0`) merges ALL of them into it. Early-return form `if (!c) return 0; {...}` keeps them cloned.
+- Exits with vector-dtor calls clone in a fixed pattern: first 2-3 and last 3 get own exits, the middle ones jump to the
+  exit three tests earlier; distinct copies cap at ~6 (one dtor array) / 5 (two).
+- `if (a || (read, b)) { delete f; return 0; }` lets later delete[] exits tail-merge into it; split into two plain ifs
+  to keep them cloned (LoadRelay 119 -> 75).
+- Unexplained: some dtor-call counts (k=3,6,9) merge everything, k=5 clones everything; int vs x87 compare can flip it.
+- Translation-unit boundaries matter (2026-11-16): ReplayFiles::SaveReplay 0x404100 matched only after its file was
+  merged into src/unk_403270.cpp (the replay loader TU at 0x403270-0x403ca0). As the first emitted function of its own
+  TU it cloned an epilogue; any emitted function before it (even a trivial extern one) made it share the epilogue as
+  the original does. When a function at the start of a .cpp differs only in epilogue cloning, check whether the
+  original's TU actually started earlier (address-contiguous neighbours) and merge files accordingly.
+- TU-boundary sweep (2026-11-16): of 29 NONMATCHING functions first in their .cpp with an address-contiguous
+  neighbour in another .cpp, real merges helped three, by small amounts: StageGrid::Build (into unk_40f390.cpp,
+  StageGrid unified in unk_40fcc0.h), StageConfigLoader::LoadConfig (into unk_411170.cpp) and SweepQuery::Cast (into
+  unk_418570.cpp, at its address position). Plain concatenations elsewhere changed nothing; neighbours separated
+  by an atexit `_$E` stub are genuine TU ends.
+
+## x87 keep-vs-spill rules (2026-11-16 study; matched SpawnCore2)
+- A float local used once is just its expression: VC6 evaluates it at the use. A second reference (a real use, or the
+  same store written twice - the duplicate store is deleted but its effect stays) pins evaluation at the definition,
+  so the value is spilled across a later call as the original does. Dead assignments / (void)x do not pin.
+- Held-then-popped (`fld yv; fadd st,st(1); fstp [m]; fstp st(0)`) needs the duplicate store PLUS a `double` local.
+- Across a call a float is always spilled; later plain copies become int movs from the slot.
+- FPU depth: ~6-7 live values stay on the stack; a spill with fewer live values means a pinned value, not depth.
+- Struct copies / field copies into a struct / by-value inline struct args are int movs; separate float locals give
+  the mixed copy (multiply-used component fld'd and kept, others int-copied). A 2-float struct temp gives
+  int copy-in, fld/fadd/fstp temp, int copy-out.
+- Statement chains spill per step only on a local struct member; on float locals or fused they stay on the FPU.
+
+## Int ops in x87 gaps (2026-11-16 study; matched WheelSpray::Render)
+- Independent int instructions fill x87 stall gaps (after fld/fsub/fadd/fmul), ~1-2 per gap; a load takes one gap and
+  the store using it the next. Source (param/local/global/member) does not matter; stores through a pointer are not
+  a barrier.
+- How far an int climbs depends non-monotonically on the block's instruction count; extra independent int stores
+  before a chain move the landing one gap earlier.
+- fcos/fsin take exactly one int ahead of them.
+- A `double` local (stored to memory only through a `(float)` cast store) moves the following int one slot LATER
+  without changing the x87 ops - the lever that matched WheelSpray (atlasU/atlasV). No lever found to move an int
+  EARLIER (FUN_00491c10, LoadCarIni's push-before-fcos).
+
+## Stack slot allocation (2026-11-16 study; matched CarEmitterB::SpawnCore1)
+- Slots are ordered by per-variable reference count (higher count = lower address); ties go to the first-referenced
+  variable, not the first declared. A variable read several times in one expression counts once if loaded once.
+- Counts are per VARIABLE, not per slot: disjoint scratch floats sharing a slot keep separate counts, while one
+  reused variable sums them. Merging or splitting scratch locals therefore moves slot order (SpawnCore1 matched by
+  reusing one `sv` for slip/speed/lat as SpawnCore2 does).
+- An int living in a register but read by `fild` gets a home slot ranked only by its home stores and fild reads.
+- A local whose lifetime starts after a parameter's last use takes that dead parameter slot (highest-count local
+  wins); if the parameter is used later, the local gets a fresh slot.
+- Disjoint lifetimes share slots even in one scope (float+double share an 8-byte slot). A call result held in a
+  register gets no slot; a float held across a call always spills; `$T` slots come from fistp/fild casts and EH new.
+
+## Zero-constant register (2026-11-16 study; no match yet)
+- A constant 0 gets a register only after enough zero STORES: 4 stores trigger `xor reg,reg`, 3 do not; push 0 /
+  mov eax,0 args never trigger it but use the register once it exists. Int/short/pointer zero stores share it.
+- Once it exists, `test r,r` for p==0 / h>0 becomes `cmp r,zero`; the zero is hoisted to the dominator of its uses.
+- Zero (Z stores) beats a parameter pointer with K simple uses when Z >= 2K+3 (thiscall needs more); ties go to the
+  earlier-defined. First-use order and 0/NULL/(T*)0/!p spelling do not matter.
+- A byte zero store forces the zero into ebx (xor bl,bl) and the other zeros share ebx; a 16-bit zero uses esi.
+- `int r=0; ... if(c) r=2; return r;` with an early `return r` and no calls between uses puts the entry zero in eax
+  and inlines the early epilogue (ColBody::Collide's original shape); calls between uses push it to edx.
+- The original re-materialises zero (split ranges), so only the first range's weight decides the register.
+
+## x87 commutative operand choice (2026-11-16 study)
+- For one product, source operand order never decides the fld (except two locals / two global-pointer derefs,
+  where the RIGHT source operand is fld'd).
+- The operand with the larger address tree gets the fld; a constant offset (p[1], p->f) outweighs one extra
+  indirection, two indirections outweigh *p. So only the x term (offset 0) flips in many dot products.
+- Equal trees: lower-numbered param wins; a global beats a stack local/param; a plain-copy float local reverses that.
+- A pointer already shared in a register counts as a one-node tree and loses to an operand with an offset.
+- A hidden tie-break exists (an extra unused param or an alias local flips some terms); renames change nothing.
+- One-expression sums emit the written last term first; statement chains keep source order (ParallelShadow plane sum).
+
+## EH unwind states and frames (2026-11-16 study)
+- Each constructed destructible object gets one unwind entry, numbered in construction (code) order; empty or
+  inline destructors count the same; PODs add nothing.
+- A state store is emitted only if a throwing call follows; constructions with no call between merge into one store
+  of the last index. A first store of N means N earlier silent constructions, not missing stores.
+- A destructible temporary gets an entry only if a throwing call runs while it is alive (`useref(a+b)` yes,
+  discarded `mk(); g();` no). `V c = a+b+a` gives entries a, b, T, c, c'.
+- By-value parameter: entry 0 at [ebp+8] in the callee, none in the caller. A sole named return value lives in the
+  hidden return slot with no state stores.
+- An object whose fields are never touched has an entry but no frame slot; destructible objects follow the
+  ref-count slot rule, `$T` temps sort above named objects, siblings share slots.
+- Recipe for reading an original map: same [ebp-X] + same parent = sibling blocks / reused slot; a parent chain =
+  one block in declaration order; an entry sharing a slot with a call's out-pointer is that call's result.
+- Findings: AIDriver 0x49ffa0/0x4a0420 maps already match (frame gaps are scalar slots); PhysicsStep's original has
+  9 entries (drag function-scope, wp2 in the speed2 block, f before arm2) - the map-exact variant scores worse
+  on insns, so not adopted; ColModel 0x41a890 entry 8 is the first Sub's P3 temporary (map-exact form re-allocates
+  the whole function, not adopted).
