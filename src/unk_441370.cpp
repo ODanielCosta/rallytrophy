@@ -3809,6 +3809,7 @@ public:
 // Inlining depth 2: depth 1 kept the by-value RallyInfo name/description copies out of line (nested copy ctor = depth 2).
 #pragma inline_depth(2)
 // NONMATCHING: RALLYTROPHY 0x443790
+// 2026-11-16 round 11: inline getters for scaleX/scaleY, earlier oldY reads, a refetch of text through a helper after DrawRallyV and accumulator/commuted y forms: none below 3 insns.
 // 2026-11-16 (F8, ~140 variants): `float ny = 0.85f; ny *= oldY;` (accumulator, constant first) 4 -> 3 insns (10 -> 8 bytes; fixes the lea-after-fmul hunk). No gain: accumulator/const-first forms of nx, LISTY y, NAMEX/NAMEY (b1-b3 add 4 bytes), read-both-first orders, y hoisted before DrawRallyV/DrawTrackBook. Left: esi/ebp reload order after DrawRallyV, eax/ecx order of scaleX/scaleY loads.
 // 2026-11-16 (F2): still 4 insns / 10 bytes. Tried oldY-first/oldX-first read orders (7-27 insns), colour-first/last, m_selected cached, y/i hoists, cond swap, text alias after DrawRallyV, tools/reorder.py (49 orders): none beat 4 insns.
 // 2026-11-15 (reg_D, ~100 compiles): colour store hoisted above the scale reads and nx/ny written as `float nx = oldX; nx *= 0.85f;` (oldX block first, then oldY): 8 -> 4 insns (36 -> 10 bytes). Left: scaleX/scaleY load order, one lea slot, and the esi/ebp reload order after the DrawRallyV call; loop-head forms (y order, i forms, cond order) do not move it.
