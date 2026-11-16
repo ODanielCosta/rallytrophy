@@ -23,9 +23,9 @@ Instruction-multiset view: 43 functions are pure register/scheduling permutation
 | 0x40a850 | src/unk_40a850.cpp | U40A850Prop::Fn | size | 2088 | 2098 | 1475 | 54 | `xor    eax,eax` | `mov    DWORD PTR [ebp-0x84],esi` |  |
 | 0x40c9b0 | src/unk_40c9b0.cpp | Stage::Stage | size | 8648 | 8656 | 5273 | 130 | `sub    esp,0x258` | `sub    esp,0x250` | eh 11,12,30,31,32,33,34,35,37,38,44,45,46,47,48,49,51,52,53,54,55,56,57,58,59,60,59,61,59,62,64,65,64,59,66,67,68,67,69,59,70,59,71,72,73,72,78,72,75,77,79,72,80,72,71,59,58,57,56,55,54,53,52,51 vs 11,12,30,31,32,33,34,35,37,38,44,45,46,47,48,49,51,52,53,54,55,56,57,58,59,60,59,61,59,62,59,63,59,64,59,65,59,66,59,67,68,69,68,74,68,70,71,70,72,73,72,75,68,76,68,67,59,58,57,56,55,54,53,52,51 |
 | 0x40f390 | src/unk_40f390.cpp | StageGrid::FillCells | size | 2402 | 2340 | 2188 | 158 | `sub    esp,0x78` | `sub    esp,0x7c` |  |
-| 0x40fcc0 | src/unk_40fcc0.cpp | StageGrid::Build | size | 1709 | 1716 | 1191 | 6 | `mov    DWORD PTR [ebp-0x1c],edi` | `mov    DWORD PTR [ebp-0x20],edi` |  |
+| 0x40fcc0 | src/unk_40f390.cpp | StageGrid::Build | size | 1709 | 1716 | 1176 | 6 | `mov    DWORD PTR [ebp-0x1c],edi` | `mov    DWORD PTR [ebp-0x20],edi` |  |
 | 0x410720 | src/unk_410720.cpp | StageScene::LoadEffect | size | 2111 | 2128 | 954 | 10 | `mov    eax,DWORD PTR [esi+0xa8]` | `push   edi` |  |
-| 0x411600 | src/unk_411600.cpp | StageConfigLoader::LoadConfig | size | 8615 | 8628 | 490 | 84 | `mov    ecx,DWORD PTR [eax]` | `fld    DWORD PTR [ebx+0x1d0]` |  |
+| 0x411600 | src/unk_411170.cpp | StageConfigLoader::LoadConfig | size | 8615 | 8628 | 487 | 84 | `mov    ecx,DWORD PTR [eax]` | `fld    DWORD PTR [ebx+0x1d0]` |  |
 | 0x4137c0 | src/unk_4137c0.cpp | SceneSetup::FUN_004137c0 | size | 2879 | 2914 | 1859 | 30 | `je     0x413cd7` | `je     0x413cbf` |  |
 | 0x4150b0 | src/unk_414fe0.cpp | StageSounds::FUN_004150b0 | size | 689 | 697 | 131 | 11 | `jb     0x415361` | `jb     0x415359` |  |
 | 0x415370 | src/unk_415370.cpp | StageSoundLoader::LoadSounds | other | 3209 | 3209 | 248 | 16 | `jle    0x4156d6` | `mov    DWORD PTR [ebp-0x2c],ebx` |  |
@@ -33,7 +33,7 @@ Instruction-multiset view: 43 functions are pure register/scheduling permutation
 | 0x416f30 | src/unk_416f30.cpp | PropStage::Load | size | 1280 | 1270 | 636 | 17 | `jne    0x41740d` | `jne    0x417417` |  |
 | 0x417540 | src/unk_417540.cpp | Stage::FUN_00417540 | size | 2292 | 2332 | 1929 | 107 | `sub    esp,0x90` | `sub    esp,0xac` |  |
 | 0x417ee0 | src/unk_416f30.cpp | ?Ins@PropVec@@QAEXPAUStageProp@@IABU2@@Z | size | 804 | 818 | 391 | 30 | `mov    ecx,edi` | `mov    edx,edi` |  |
-| 0x418b90 | src/unk_418b90.cpp | SweepQuery::Cast | size | 2157 | 2054 | 1802 | 53 | `je     0x418c12` | `je     0x418c25` |  |
+| 0x418b90 | src/unk_418570.cpp | SweepQuery::Cast | size | 2138 | 2054 | 1793 | 47 | `jmp    0x41937e` | `jmp    0x4193d2` |  |
 | 0x4193a0 | src/unk_418570.cpp | TriCollector::Closest | size | 962 | 974 | 901 | 12 | `push   esi` | `mov    ebp,DWORD PTR [esp+0x7c]` | eh 2,4,4 vs 2,2 |
 | 0x419770 | src/unk_418570.cpp | TriCollector::Contact | size | 1094 | 1130 | 1000 | 53 | `fmul   DWORD PTR [esp+0xa8]` | `mov    edi,DWORD PTR [esp+0xac]` | eh 3,7,3 vs 7 |
 | 0x419be0 | src/unk_418570.cpp | TriCollector::ContactList | size | 730 | 748 | 602 | 25 | `mov    DWORD PTR [esp+0x1c],0x0` | `mov    DWORD PTR [esp+0x14],0x0` | eh 5 vs 1,5,1 |
