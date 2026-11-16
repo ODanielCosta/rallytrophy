@@ -548,3 +548,8 @@ Residuals explained but not fixed: 0x41b270 (store-before-dec order has no plain
 matched examples), 0x436250, 0x4ae4b0 (needs `while(n--)` for lea but that loop's slot layout), 0x477690 (one-tree
 form gets the schedule but VC6 then emits `fld x; fadd K`, 2 insns).
 Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
+- Sweep test (2026-11-15, 7 "registers" triage rows): the defining-order rule moved none of them. In 5 the diff was
+  not a register tie at all (lea operand order inside std::string appends, a load scheduled above a multiply, spill
+  slots, a strength-reduced loop pointer that takes the leftover register). Gains came from ordinary statement-order
+  edits: TrackSelectMenu::Run 8 -> 4 insns, AIDriver 0x4a1050 18 -> 17. The triage "registers" label overstates how
+  many residuals are pure allocation ties.
