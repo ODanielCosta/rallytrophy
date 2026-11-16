@@ -617,3 +617,15 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   StageGrid unified in unk_40fcc0.h), StageConfigLoader::LoadConfig (into unk_411170.cpp) and SweepQuery::Cast (into
   unk_418570.cpp, at its address position). Plain concatenations elsewhere changed nothing; neighbours separated
   by an atexit `_$E` stub are genuine TU ends.
+
+## x87 keep-vs-spill rules (2026-11-16 study; matched SpawnCore2)
+- A float local used once is just its expression: VC6 evaluates it at the use. A second reference (a real use, or the
+  same store written twice - the duplicate store is deleted but its effect stays) pins evaluation at the definition,
+  so the value is spilled across a later call as the original does. Dead assignments / (void)x do not pin.
+- Held-then-popped (`fld yv; fadd st,st(1); fstp [m]; fstp st(0)`) needs the duplicate store PLUS a `double` local.
+- Across a call a float is always spilled; later plain copies become int movs from the slot.
+- FPU depth: ~6-7 live values stay on the stack; a spill with fewer live values means a pinned value, not depth.
+- Struct copies / field copies into a struct / by-value inline struct args are int movs; separate float locals give
+  the mixed copy (multiply-used component fld'd and kept, others int-copied). A 2-float struct temp gives
+  int copy-in, fld/fadd/fstp temp, int copy-out.
+- Statement chains spill per step only on a local struct member; on float locals or fused they stay on the FPU.
