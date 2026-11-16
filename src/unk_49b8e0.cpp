@@ -1275,6 +1275,7 @@ extern float DAT_004e1348, DAT_004e27c0;
 // zero stores away), and keeps the look-ahead sums in memory instead of the FPU stack.
 // Tried 2026-10-30 night: ~50 variants; CopyXZ for dir2 (tail-merges the three operator- calls like the original), volatile k (separate k1) gave 372->319; original keeps phase/k1/acc/dir2 spill slots above pts and car above fwd (frame 0xe8 vs 0xf0) and no declaration order/volatile combination reproduced that layout.
 // Tried 2026-11-01 re-pass: 13 variants making dir.y/dir2.y zero stores and the segLen/len2 y terms volatile (keeps the 3-term sums, builds 2520 vs 2631 bytes) all scored 383-415 insns differ vs 319 for the base because the shifted spill layout misaligns the rest; float sum orders (look, segLen z+x+y, len2, dots) match the original.
+// 2026-11-16 r29: Sub/Eval call sites already match structurally (only the callee symbol differs); SubV/PV for dir/dir2/unk60/unkc8/unkd4 (all combos), t/len2 reorders, unk48 temps all 145-490 insns vs 144; kept sideways.z negated after the subtract (144 -> 140 insns).
 float AIDriver::FUN_0049d970()
 {
     Vec3Slot sideways;
@@ -1462,8 +1463,9 @@ float AIDriver::FUN_0049d970()
     unk48.x = m * lateral.x + unk140.x;
     unk48.z = m * lateral.z + unk140.z;
     sideways.y = 0;
-    sideways.z = -(unk48.x - ((CarBodyV*)car->body)->position.x);
+    sideways.z = unk48.x - ((CarBodyV*)car->body)->position.x;
     sideways.x = unk48.z - ((CarBodyV*)car->body)->position.z;
+    sideways.z = -sideways.z;
     float inv2 = 1.0f / (float)sqrt(sideways.z * sideways.z + sideways.x * sideways.x);
     sideways.x = inv2 * sideways.x;
     sideways.z = inv2 * sideways.z;
