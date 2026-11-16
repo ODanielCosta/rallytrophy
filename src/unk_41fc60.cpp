@@ -87,14 +87,15 @@ inline void CrossAsm(float* o, const float* a, const float* b)
 // Tried 2026-10-30 night: 17 variants (function-scope Vec3 for EH state 1, v write-back in loop 1, Vec3 copies of n/v/imp/pt, n passed as *(Vec3*)c->n, dot/decl/loop-form changes) only moved 393 to 387-402 insns; original keeps loop-1 accumulators on the FPU stack, copies n/v/imp/pt through Vec3 temps (EH states 5,7,0xa) and is 185 bytes larger, needs a whole-function Vec3-operator rewrite.
 // Tried 2026-11-01 re-pass: fixed dot/pen/denominator/lp/ln/torque sums and the spd data (imp, not v) to the original's fadd order and fields, n passed as c->n; 10 more loop-1 v-copy/writeback variants (Vec3 copies, int-routed v1/v2, holder Vec3, volatile reads) stayed at 379-393 insns; still needs the whole-function Vec3 rewrite (built 1677 vs 1861 bytes).
 // Tried 2026-11-13 pass: kept neg.y = neg.z = DAT and lp/ln as constructed Vec3(x,y,z) (397 -> 385 insns, 1732 -> 1727 bytes); r2/j as Vec3 copy of pt/n then scaled in place gives bigger size (1749-1755) but 408+ insns; rejected loop-count forms (i = cnt; i--), k<cnt loop 2, Vec3 copy of v, unsigned/int/float-compare tests on dot, k134c local (all 393-404 insns).
+// Tried 2026-11-16 pass (r31): reorder.py hill climb on the pos/neg reciprocal stores (385 -> 382 insns, 1727 -> 1738 bytes); scalar px..nz accumulators, V3i (copy-ctor-less Vec3) copies of v/n in loop 1 stayed or got worse (385-421 insns).
 void U40A850Body::FUN_0041fc60(void* stage, void* unused)
 {
     unsigned cnt = *(unsigned*)((char*)this + 0x23c);
     if (cnt == 0) {
         return;
     }
-    ImpStage* st = (ImpStage*)stage;
     Vec3 pos, neg;
+    ImpStage* st = (ImpStage*)stage;
     pos.x = 0.0f; pos.y = 0.0f; pos.z = 0.0f;
     neg.x = 0.0f; neg.y = neg.z = DAT_004e134c;
     float thresh = (st == 0) ? 1000.0f : F(st, 0x1080);
@@ -121,12 +122,12 @@ void U40A850Body::FUN_0041fc60(void* stage, void* unused)
     if (DAT_004e1448 < neg.x) neg.x = -0.001f;
     if (DAT_004e1448 < neg.y) neg.y = DAT_004e1448;
     if (DAT_004e1448 < neg.z) neg.z = DAT_004e1448;
-    neg.x = DAT_004e1348 / neg.x;
     neg.y = DAT_004e1348 / neg.y;
-    neg.z = DAT_004e1348 / neg.z;
-    pos.x = DAT_004e1348 / pos.x;
-    pos.y = DAT_004e1348 / pos.y;
     pos.z = DAT_004e1348 / pos.z;
+    neg.z = DAT_004e1348 / neg.z;
+    neg.x = DAT_004e1348 / neg.x;
+    pos.y = DAT_004e1348 / pos.y;
+    pos.x = DAT_004e1348 / pos.x;
 
     c = base;
     for (unsigned k = 0; k < *(unsigned*)((char*)this + 0x23c); k++, c++) {
