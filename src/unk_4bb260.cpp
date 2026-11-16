@@ -630,6 +630,7 @@ int SkySampleBit(SkyTexOwner*, const unsigned short*, int, float*)
 // NONMATCHING: RALLYTROPHY 0x4bbb30 (not tuned; 684 vs 646 bytes)
 // Tried 2026-10-31: literals (65536.0f, 1/65536, 0.5f) not globals, m=0 then obj?map, early return, int masks, 60 shuffled decl orders; 34 insns differ, remaining is int reg allocation (u1/row0/r0 in wrong regs, r0/r1 spill).
 // Tried 2026-10-31 re-pass: fx/fy as refs to dead tri/t param slots (worse, 52-64), 40 random statement-order shuffles (best 36), volatile r0/r1/acc, operand swaps (best 33); original computes fx and fy back to back with one hoisted zero and r0 in eax, r1 in the verts slot, but ours hoists the r0/r1 imuls early and spills both.
+// Tried 2026-11-16 (round 22): p1 as a running copy of m->bits (p1 += u1 >> 3) 34 -> 31 insns (659 bytes); 110 more decl-order shuffles, inline row0/r0/r1, early fx/fy, row1 local, branch neighbour all worse; r0/r1 imuls still hoisted before the fx/fy filds.
 float SkySampleBilinear(SkyTexOwner* t, const unsigned short* tri, int verts, float* point)
 {
     SkyShadeMap* m;
@@ -675,10 +676,11 @@ float SkySampleBilinear(SkyTexOwner* t, const unsigned short* tri, int verts, fl
         double acc = DAT_004e134c;
         int r1 = ((m->height - 1U) & (row0 + 1)) * m->pitch;
         unsigned char* p0 = m->bits + (col0 >> 3);
+        unsigned char* p1 = m->bits;
         int b0 = 1 << (col0 & 7);
         if (p0[r0] & b0)
             acc = (DAT_004e1348 - (double)fx) * (DAT_004e1348 - (double)fy);
-        unsigned char* p1 = m->bits + (u1 >> 3);
+        p1 += u1 >> 3;
         int b1 = 1 << (u1 & 7);
         if (p1[r0] & b1)
             acc = (DAT_004e1348 - (double)fy) * (double)fx + acc;
