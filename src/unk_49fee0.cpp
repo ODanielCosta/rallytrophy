@@ -190,6 +190,7 @@ void AIDriver::FUN_0049ffa0()
 // NONMATCHING: RALLYTROPHY 0x4a0420
 // 2026-11-04 (ws-I): EH states and frame (0xb0) now exact. The missing 4th persistent object is a function-scope RotMatrix (empty dtor, state 0) re-initialised by the out-of-line 0x4b5760 (rot.Set(&up,..)); `up` is a block-local Vec3 destroyed before the multiply; Vec3*Rot (0x4b5850) and Sub return plain structs read through eax; p is a Vec3 declared before the Sub call. Left: scheduling/register differences.
 // 2026-11-16 (r29): 208 -> 123 insns differ, 2583 -> 2615 bytes (size exact), 2156 -> 188 differing bytes: best/leftSum/rightSum declared before `rot` (immediate zero stores), separate len2/k2 for axis, `Vec3 up(0,1,0)`, `Vec3 t(*(Vec3*)&unkd4); t.y = 0` and p/dir stores x,z then y, `if (!calls) again = 0` (no `more` temp), first limit branch split into `if (!f) .. else if (!local)`. Left: p lea ecx hoist / register picks in the p loop, `found` mov ebx,1 ordering, dotV term fld order.
+// 2026-11-16 (r30): reorder.py statement order (rightSum decl first, unk104/best, p.x, dir.x/z/y stores): 129 -> 124 insns differ (188 -> 192 bytes, size exact); found/best store order, early lea hoist (Vec3* alias, const ref, found placement) not movable by source.
 // Current: 2546/2615 bytes, 2189 differing bytes, instruction-multiset delta 54. The target frame is 0xb0 vs 0xa4.
 // Its unwind map arms separate cleanups for the argument/result Vec3 temporaries and the two branch-local rotation
 // axes. Branch-local Vec3 `up` gives candidate states 4/5/6/7; the exact frame/register schedule still differs.
@@ -198,9 +199,9 @@ void AIDriver::FUN_0049ffa0()
 // Tried 2026-11-01 re-pass: 14 more variants (unused/dead-store/volatile/copy-init extra function-scope Vec3 at 6 positions, branchy `more` forms); best 250->243 insns (extra Vec3 pre with dead stores) but bytes grow and frame/EH states still differ; unreferenced Vec3 gets elided, and the 12-byte slot is still unidentified.
 void AIDriver::FUN_004a0420()
 {
+    float rightSum = 0.0f;
     float best = 0.0f;
     float leftSum = 0.0f;
-    float rightSum = 0.0f;
     RotMatrix rot;
     SubPod rs;
     MulPod tmp;
@@ -235,8 +236,8 @@ void AIDriver::FUN_004a0420()
             float r = FUN_004a0e60(o, &t);
             if (r != -1.0f) {
                 if (best < r) {
-                    unk104 = i;
                     best = r;
+                    unk104 = i;
                 }
                 found = 1;
                 o->side = 1;
@@ -253,10 +254,10 @@ void AIDriver::FUN_004a0420()
         if (o->valid && o->side != 1) {
             Vec3 p;
             SubP(*(Vec3*)&o->unk0, ((CarBodyV*)car->body)->position, &rs);
-            p.x = unkd4.z;
             p.y = 0.0f;
             p.z = -unkd4.x;
             rs.y = 0.0f;
+            p.x = unkd4.z;
             if (rs.z * p.z + rs.x * p.x < 0.0f) {
                 o->side = 2;
             } else {
@@ -265,9 +266,9 @@ void AIDriver::FUN_004a0420()
         }
     }
 
-    dir.x = unkd4.x;
-    dir.z = unkd4.z;
     dir.y = 0.0f;
+    dir.z = unkd4.z;
+    dir.x = unkd4.x;
     do {
         again = 0;
         leftSum += FUN_004a1050(&obstacles[unk104], (Vec3*)&dir, 1);
