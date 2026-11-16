@@ -4232,6 +4232,7 @@ struct G15_Str {
 };
 
 // NONMATCHING: RALLYTROPHY 0x437220
+// Tried 2026-11-16 (r21, sibling 0x4309d0 pattern): early `if (closed) return v->confirmSel/sel; return -1;` plus the inline SetColorObj(Color(DAT_00508c04)) final store (as matched 0x437770) cuts it to 25 insns but still 1384 bytes: both returns get a full epilogue and `or eax,-1` is scheduled between pops (original shares one epilogue, `or` before it); also no v alias, no sel local, color/x order, !closed, ?: (1309 bytes, 23), if/else, goto, `r` var: no gain over 23 insns/1311.
 // Tried 2026-10-31 re-pass: 18 more tail shapes (ternary, switch, do/break, goto, nested-block returns, bit-mask select, volatile-free sel reuse); all 23 (single cleanup, 1309-1326 bytes) or 29-43 (duplicated epilogue); original shares one epilogue yet duplicates the string cleanup per return, still unreproduced.
 // Tried 2026-10-30 night: 14 return-shape variants (goto/result var/ternary/braced string scope); `int r = -1; if (closed) r = sel; return r;` gives 34->23 (single cleanup, 1311 vs 1346 bytes); original duplicates the string cleanup per return yet shares one epilogue, which no source shape reproduced. Retried with the twin's shape (early `if (closed) return sel/v->confirmSel; return -1;`, `!closed` form, ternary, no sel local, color/x order, decl order): 30-43 insns and 1384 bytes (cleanup and epilogue both duplicated), worse than 23.
 // original: FUN_00437220 (fastcall; confirmation dialog, -1 while open, else the chosen answer)
