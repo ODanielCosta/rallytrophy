@@ -512,6 +512,7 @@ inline void Cross(float* o,const float* a,const float* b)
 // Tried 2026-10-30 night: 319->146 insns via preloaded axis values, shared product temps pu1/pu2 (u1*u0,u2*u0) reused by INTERVAL, x reused as running max with (float)bits(y)>x, final arm as D2==0?Coplanar:arm; still differs: arms 2 and 5 laid out-of-line (VC6 merges the duplicated V1/V2 arms), Vec3 direction at -0x40 not -0x48 (frame 0x34 vs 0x3c), tail x87 store slots.
 // Tried 2026-11-01 re-pass: 146->105 insns by restructuring INTERVAL tail as else-if D1==0 with nested D2==0 Coplanar test then the V1 arm last (breaks VC6 arm merging), V2 arm in that branch storing X1 before X0; ~25 more variants (Moller-style D1!=0/D2!=0/else Coplanar = 188, v0 normal[0]-first sum and volatile/temp chains, no effect on fld order) failed; still differs: Coplanar block placed inline not after arm6, Vec3 direction at -0x40 not -0x48 (frame 0x34 vs 0x3c), tail x87 store slots; sums already match the asm order.
 // 2026-11-13 pass: Moller NEWCOMPUTE_INTERVALS order (V2,V1,V0 arms then D1!=0 V1, D2!=0 V2, else Coplanar; second interval has no Coplanar), and (float)(a-b) around xx0 / yy1 in the late arms: VC6 otherwise merges them with the early arms (-> 1381 bytes), the cast keeps them separate. 119 -> 59 insns (u2 as Dot(t->n,c)), 1381 -> 1512 bytes; left: tail x87 temp slots, fabs hunk order, dot sum operand order, Coplanar 'mov ecx,esi' before fstp.
+// 2026-11-16 pass: 59 -> 57 insns, 1512 -> 1525 bytes via lo/hi if/else range selection (hi=..;lo=.. order) instead of tmp swaps; operand-order swaps of the v dot x-terms, fabs/axis init order and an extra u2!=0 arm made no gain (VC6 canonicalises the first two; the arm blew up to 211 insns). Left: i/j temps reuse param slots (frame 0x34 vs 0x3c).
 int Tri3::Overlap(const float* a,const float* b,const float* c,const float* normal,float plane)
 {
     TriangleProjection* t=(TriangleProjection*)this;
@@ -552,9 +553,11 @@ int Tri3::Overlap(const float* a,const float* b,const float* c,const float* norm
     float i0=yy*xx1*bb+base,i1=yy*xx0*cc+base;
     base=yy*xx*dd;
     float j0=xx*yy1*ee+base,j1=xx*yy0*ff+base;
-    if(i1<i0) {float tmp=i0;i0=i1;i1=tmp;}
-    if(j1<j0) {float tmp=j0;j0=j1;j1=tmp;}
-    return j0<=i1 && i0<=j1;
+    float lo,hi;
+    if(i1<i0) {hi=i0;lo=i1;} else {hi=i1;lo=i0;}
+    float lo2,hi2;
+    if(j1<j0) {hi2=j0;lo2=j1;} else {hi2=j1;lo2=j0;}
+    return lo2<=hi && lo<=hi2;
 }
 
 // FUNCTION: RALLYTROPHY 0x4b5fc0
