@@ -14,12 +14,14 @@ struct LV { int pad; float x, y, z; LV() {} ~LV() {} };
 struct LT { char pad[0x40]; LT() {} ~LT() {} };
 struct LL { float x, y, z; LL() {} ~LL() {} };
 #define T(k) (((CT*)tris)[k])
+struct V3D { float x, y, z; float* Sub(float* out, const float* o) const; }; // 0x414330
 
 // NONMATCHING: RALLYTROPHY 0x41a890
 // reason: original uses an ebp frame (cause unknown; ours is esp-based) and reuses arg slots as temps; logic complete, tri loop/EH states approximated
 // Tried 2026-10-31: locals V/W + chained float stores (429->226 insns), volatile pad24/ints/zero, z-pointer/ptr-increment copy loops, loop counters in dead mesh/b slots; still differs: original keeps 0 in edi (cmp eax,edi, immediate 1s) while ours puts 1 in a register, and the tri loop temps/regs swap.
 // Tried 2026-11-01: 25 variants of the entry (zero as register var feeding root/b==/cnt, volatile or plain pad24, plain 1-store placement, bb=b first); all stay at 227-231 insns differ: original keeps 0 in edi (no stack zero slot, W null path needs no xor, 1s stay immediates) while ours CSEs 1 into edi and zero into ebx, which cascades through the whole function.
 // Pass 2026-11-13: S414Vec3::Sub calls (as original) instead of P3 operator-, t->v[0]->z/y/x * t->nz/ny/nx plane dot, no zero local, plain ints store: 226 -> 213 insns differ, size +16 -> +1; entry still keeps 1 (not 0) in edi, tri loop temps/regs differ.
+// Pass 2026-11-15 (r16): Sub via float*-returning V3D (as original), wverts member instead of W local (frees edi for zero: 208 -> 62 insns), x,z,y copy order, m=p[2];m+=p[5], b=0 inside the if: 213 -> 46 insns differ, size +1 -> -20; open: original's state-8 dtor object on the first Sub out buffer (any dtor local here explodes allocation), copy-loop pointer/order, SetTriple arg load order.
 ColModel::ColModel(void* mesh, int a, int b)
 {
     float* p = (float*)mesh;
@@ -30,7 +32,7 @@ ColModel::ColModel(void* mesh, int a, int b)
         nTris = 12;
         nInts = 18;
         ColVert* V = (ColVert*)new LV[8]; verts = V;
-        ColVert* W = (ColVert*)new LV[8]; wverts = W;
+        wverts = (ColVert*)new LV[8];
         ColTri* TT = (ColTri*)new LT[12]; tris = TT;
         centers = (ColLocal*)new LL[12];
         float* vf = (float*)V;
@@ -41,9 +43,9 @@ ColModel::ColModel(void* mesh, int a, int b)
         vf[3] = vf[7] = vf[0xb] = vf[0xf] = p[5];
         vf[0x13] = vf[0x17] = vf[0x1b] = vf[0x1f] = p[2];
         for (int i = 0; i < 8; i++) {
-            W[i].x = V[i].x;
-            W[i].y = V[i].y;
-            W[i].z = V[i].z;
+            wverts[i].x = V[i].x;
+            wverts[i].z = V[i].z;
+            wverts[i].y = V[i].y;
         }
         int* ip = new int[18]; ints = ip;
         ColVert* wv = wverts;
@@ -125,7 +127,7 @@ ColModel::ColModel(void* mesh, int a, int b)
         nTris = 8;
         nInts = 12;
         ColVert* V = (ColVert*)new LV[6]; verts = V;
-        ColVert* W = (ColVert*)new LV[6]; wverts = W;
+        wverts = (ColVert*)new LV[6];
         ColTri* TT = (ColTri*)new LT[8]; tris = TT;
         centers = (ColLocal*)new LL[8];
         float* vf = (float*)V;
@@ -135,13 +137,13 @@ ColModel::ColModel(void* mesh, int a, int b)
         vf[10] = vf[0xe] = vf[0x12] = vf[0x16] = p[1];
         vf[0xb] = vf[0xf] = p[5];
         vf[0x13] = vf[0x17] = p[2];
-        float m = (p[2] + p[5]) * DAT_004e138c;
+        float m = p[2]; m += p[5]; m *= DAT_004e138c;
         vf[7] = m;
         vf[3] = m;
         for (int i = 0; i < 6; i++) {
-            W[i].x = V[i].x;
-            W[i].y = V[i].y;
-            W[i].z = V[i].z;
+            wverts[i].x = V[i].x;
+            wverts[i].z = V[i].z;
+            wverts[i].y = V[i].y;
         }
         int* ip = new int[12]; ints = ip;
         ColVert* wv = wverts;
@@ -196,9 +198,9 @@ ColModel::ColModel(void* mesh, int a, int b)
     }
     int& cnt = *(int*)&mesh;
     cnt = 0;
-    b = 0;
     if (0 < nTris) {
         int& cb = b;
+        cb = 0;
         int off = 0;
         do {
             Tri* t = (Tri*)((char*)tris + off);
@@ -206,9 +208,8 @@ ColModel::ColModel(void* mesh, int a, int b)
             ((SceneSphere*)t)->SetTriple((ScenePoint*)&t->v[0]->x, (ScenePoint*)&t->v[1]->x, (ScenePoint*)&t->v[2]->x);
             float* n = &t->nx;
             float s2[3]; float s1[3];
-            ((S414Vec3*)&t->v[2]->x)->Sub(s2, &t->v[0]->x);
-            ((S414Vec3*)&t->v[1]->x)->Sub(s1, &t->v[0]->x);
-            float* l20 = s2; float* l28 = s1;
+            float* l20 = ((V3D*)&t->v[2]->x)->Sub(s2, &t->v[0]->x);
+            float* l28 = ((V3D*)&t->v[1]->x)->Sub(s1, &t->v[0]->x);
             X87Cross(n, l28, l20);
             char* tb = (char*)tris;
             float* ci = (float*)centers;
