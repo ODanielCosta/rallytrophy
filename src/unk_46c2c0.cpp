@@ -306,6 +306,7 @@ void Wheel::Reset()
 static inline void WheelAddTorque(float* t, const Vec3& v) { float x = t[0]; t[0] = x + v.x; t[1] = v.y + t[1]; t[2] = v.z + t[2]; }
 // NONMATCHING: RALLYTROPHY 0x46c790
 // original: FUN_0046c790
+// Pass 2026-11-16 (L1): lon sqrt argument written as y*y+z*z+lx2 (not CSE'd with lonLen2, which is z*z+y*y then +lx2; same sums, commuted operands); 388->385 insns differ, 3501->3509 bytes. Tried: lat sqrt recompute (insns 387-391, bytes 3525), g4 reassociated sum (rejected, changes order).
 // Pass 2026-11-13: ld assigned inside the && condition, torque add via inline WheelAddTorque(FUN_004203e0(...)) (uses the returned eax), arm built as a Vec3 argument temp; 412->388 insns differ, 3511->3501 bytes.
 // Re-pass 2026-11-01: float-sum audit vs original fadd order; fixed latVel/lonVel (x,z,y chain), latLen2 (y,x,z chain), blendSpeed and slip relax (K before unk2ec); all other sums and field reads already agree; 420->414 insns differ, rest is frame size 0xfc vs 0xe4 and x87 lifetimes.
 // Tried 2026-10-30 night: ~16 variants (load int local 433->420, vel field-wise, Vec3/array localPos, decl order, volatile S/ld, slip copy, fy/L2 split); remaining diff is frame size 0xfc vs 0xe4 (asm pointer temps share float slots in the original), missing EH-state store timing, and x87 lifetimes.
@@ -349,11 +350,11 @@ void Wheel::UpdateForces()
 
         // Ground-plane directions: longitudinal = axle x normal, lateral = normal x forward.
         lon = FUN_004203e0(axleW, normal);
-        float lx2 = lon.x * lon.x; float lonLen2; lonLen2 = lon.y * lon.y + lon.z * lon.z; lonLen2 = lonLen2 + lx2;
+        float lx2 = lon.x * lon.x; float lonLen2; lonLen2 = lon.y * lon.y; lonLen2 = lon.z * lon.z + lonLen2; lonLen2 = lonLen2 + lx2;
         if (lonLen2 < 0.0001f) {
             lon = forwardW;
         } else {
-            float inv = 1.0f / (float)sqrt(lon.y * lon.y + lon.z * lon.z + lon.x * lon.x);
+            float inv = 1.0f / (float)sqrt(lon.y * lon.y + lon.z * lon.z + lx2);
             lon.x = inv * lon.x;
             lon.y = inv * lon.y;
             lon.z = inv * lon.z;
