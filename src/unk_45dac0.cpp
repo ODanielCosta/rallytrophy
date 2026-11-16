@@ -146,13 +146,13 @@ float Car::SunFactor(void* models)
                                     const SunVertex* b = &verts[idx[1]];
                                     const SunVertex* a = &verts[idx[0]];
                                     if (PointInTriangle(&cand, tri, a, b, c)) {
-                                        hit = cand;
                                         best = t;
                                         hitTri = tri;
                                         hitA = a;
                                         hitB = b;
                                         hitC = c;
                                         hits++;
+                                        hit = cand;
                                     }
                                 }
                             }

@@ -333,11 +333,11 @@ void Player::FUN_00491130()
         setup = (BYTE*)DAT_0056b0c8 + 0x139404;
     }
     if (unk40 == 2) {
-        setup = 0;
-        flag = 0;
         b = 0;
-        mode = 4;
         a = 0;
+        mode = 4;
+        flag = 0;
+        setup = 0;
     }
     car = new Car(setup, unk2c, index, b, flag, a, mode);
     car->player = this;

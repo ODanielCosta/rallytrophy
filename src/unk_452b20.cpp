@@ -1166,8 +1166,8 @@ void Car::FUN_00454d10()
         *(volatile float*)&v.z = v.z * k;
     } else if (len2 < 4.0f) {
         v.x = 0.0f;
-        v.y = 0.0f;
         v.z = 0.0f;
+        v.y = 0.0f;
     } else {
         float len = (float)sqrt(len2);
         v.x = v.x * (len2 = (len - 2.0f) / (len * 12.0f));

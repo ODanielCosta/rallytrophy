@@ -3766,8 +3766,8 @@ struct G13_WarpPoint {
 int GameObj::FUN_00436250(MenuScreen* screen)
 {
     float x, y;
-    int wait = 0;
     int choice = 1;
+    int wait = 0;
     int first = 1;
     Color color;
     DAT_0056b0bc->ClearKeys();
@@ -3861,8 +3861,8 @@ int GameObj::FUN_00436250(MenuScreen* screen)
         DAT_0056b0ac->Present();
     }
     DAT_0056b0bc->ClearKeys();
-    DAT_0057ba20 = 0;
     DAT_0057ba24 = 0;
+    DAT_0057ba20 = 0;
     return choice == 0;
 }
 

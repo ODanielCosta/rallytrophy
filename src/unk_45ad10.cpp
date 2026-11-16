@@ -1110,9 +1110,9 @@ void Car::UpdateSteering(float dt)
     w->row1[0] = sx * ca0;
     w->row1[2] = -(sx * sa0);
     {
+        float* cresult = w->row0;
         float* ca = w->row1;
         float* cb = w->row2;
-        float* cresult = w->row0;
         W3_CROSS();
     }
 
@@ -1154,8 +1154,8 @@ void Car::UpdateSteering(float dt)
         v->wheel[3].row1[1] = r->y;
         v->wheel[3].row1[2] = r->z;
     } else {
-        float cb = v->camberBase;
         float sp2 = v->spring[2].value;
+        float cb = v->camberBase;
         float s3 = v->spring[3].value; float cb0 = v->camberBase;
         float x2, y2;
         dt = v->rearRef[v->tuning];
@@ -1184,8 +1184,8 @@ void Car::UpdateSteering(float dt)
         w2->row2[0] = 0;
         w2->row1[0] = (float)sin(-y2);
         {
-            float* ca = w2->row1;
             float* cb = w2->row2;
+            float* ca = w2->row1;
             float* cresult = w2->row0;
             W3_CROSS();
         }
