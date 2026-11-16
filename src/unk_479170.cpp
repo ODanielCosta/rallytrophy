@@ -417,6 +417,7 @@ static const float C3_mixB = 0.00253906241f, C3_mixA = 0.00134765625f; // 0x4e22
 // rand terms as by-value arguments of an inline helper forces the spill and fixes the function tail (5 insns, 1372
 // bytes) but evaluates the y term first; 40 helper signatures/bodies/returns did not give x-first with the spill.
 // 2026-11-12: volatile write of j2 as well as j1 fixes the yv/j1 slots and the x-add order (9 -> 3 insns differ, 1369 -> 1378 bytes vs 1376); j2 should stay on the x87 stack (fadd st,st(1); fstp st(0)) but is spilled to [ebp+0xc]; non-volatile j2 variants (15) all store x before the second rand().
+// 2026-11-15 r13 pass: 40 more j2 forms (non-volatile j2, comma/ternary, double, JitXY helper with by-value args) all 7-11 insns; the helper with args (jy,jx) in source order loses the spill, (jx,jy) evaluates y first. Kept the 2026-11-12 form (3 insns).
 // Spawn core 2 (tyre-slip dust): emission amount from slip, speed and lateral slip, one particle.
 float CarEmitterB::SpawnCore2(float a, float b)
 {
