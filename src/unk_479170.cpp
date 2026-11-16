@@ -280,6 +280,7 @@ static const float C1_SLIP2_LO = 4.0f, C1_SLIP2_HI = 35.0f;   // 0x4e219c, 0x4e2
     __asm fstp dword ptr [eax+4]
 
 // NONMATCHING: RALLYTROPHY 0x4799f0
+// 2026-11-16 r18: int r = t2 above the n1 clamp (slot swap fixed) and slipLong into a local: 51 -> 31 insns. The SpawnCore2-style volatile jitter locals reach 24 but add new volatile, not taken; left: j2 kept on the x87 stack in the original.
 // 1376 vs 1382 bytes; same instruction mix. Open: the original keeps the float/int scratch slot
 // at ebp-0x10 above the n1 home slot (ebp-0x14), here they come the other way round (no declaration
 // order or block scope changes it); and a few schedule differences (pool head store, x/y velocity
@@ -329,10 +330,10 @@ float CarEmitterB::SpawnCore1(float scale, float age)
     if (!((rand() & 0xff) < total / 2)) {
         return ratio;
     }
+    int r = t2;
     if (n1 > 256) {
         n1 = 256;
     }
-    int r = t2;
     if (r > 256) {
         r = 256;
     }
@@ -366,7 +367,8 @@ float CarEmitterB::SpawnCore1(float scale, float age)
     vel->x = v.x;
     vel->y = v.y;
     vel->z = v.z;
-    *vel -= s_body->Forward() * s_car->slipLong * 0.15f;
+    float sl = s_car->slipLong;
+    *vel -= s_body->Forward() * sl * 0.15f;
     p->velocity.y *= 0.5f;
     float j1 = (float)((rand() & 0x3fff) - 0x1fff) * 9.1552734375e-5f;
     float j2 = (float)((rand() & 0x3fff) - 0x1fff) * 6.103515625e-5f;
