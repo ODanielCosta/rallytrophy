@@ -55,6 +55,7 @@ static __forceinline bool In(float a, float b, float lo, float hi) { return a >=
 
 // original: FUN_0041ca70
 // NONMATCHING: RALLYTROPHY 0x41ca70
+// 2026-11-16 r27 (not kept): literal `return 0` early exits + late `result` gave 695 -> 683 insns but left the exact size (3423 -> 3408) and +6 bytes. Original has 4 ret: its first exit reuses the entry `xor eax,eax` zero in eax, so its epilogue differs and is not merged; ours keeps zero in edx, exits merge (2 ret). Lever: get the entry zero into eax.
 // NONMATCHING: size now equal (3423) but frame is 8 bytes smaller (0x170 vs 0x178) and register roles differ (original keeps &ax in edi and &pos in a spill slot, t in memory, hit in esi)
 // 2026-11-13: flat `while (it != end)` + `if (head == 0) return 0;` (early epilogue now inline like the original), mask pass fixed (c0/c1 = Mask result, `while (cur)`), top-level `int result`, hit/mt/nTris/t/cnt/gen decl order: +47 -> 0 bytes, 711 -> 695 insns differ; pl[] stays at -0xfc vs -0x100, op*/op+ plane code still differs
 // Tried 2026-10-31: base pointer bp=&box->mn for mn/mx/ctr/rad (b+4 as in the original), mn/mx select-then-store form, extra Vec3 (EH state 5 before pl), decl-order sweeps of mn/mx/ex/ey/ez/bp; 772->752 insns; still differs: frame 12 bytes smaller (original keeps sphR, one more spill, locals at different slots), early b==0 return is an inline epilogue (original has 4 separate return epilogues, ours merges them).
