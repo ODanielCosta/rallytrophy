@@ -461,6 +461,7 @@ fail:
 }
 
 // NONMATCHING: RALLYTROPHY 0x44deb0
+// 2026-11-16 r27 (not kept): `return level < 0;` (always false) unmerges exit 3 (119 -> 111 insns, 1318 bytes) but emits test/setl where the original has xor eax,eax, so it is a fake gain. Exits 1/2 still merge; original returns int (xor eax,eax), ours bool (xor al,al) - the header's return type is a lead (check unk_4303e0.cpp caller).
 // The target deletes the file (dtor 0x4a4d90 + operator delete, no Close call) on bad headers; it Closes only on success.
 // Candidate is 1259/1321 bytes with 947 differing bytes. The target uses a 0x48 frame and local failure epilogues;
 // candidate uses a 0x44 frame and merges the three failure exits into one shared tail. Both use the per-player 10-dword stack temporary.
