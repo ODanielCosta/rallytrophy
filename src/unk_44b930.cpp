@@ -332,6 +332,7 @@ void ReplayMenu::BuildRects()
 }
 
 // NONMATCHING: RALLYTROPHY 0x44c580
+// 2026-11-16 round 11: inline helpers for rally (taking rec), the Game table read after the multiply, and later rec uses in the subtract statement were all folded or forced a reload; still 4 insns.
 // Identical size and instruction mix; only the register for the rally index in the "v -= table[rally]" step differs
 // (original edx with the Game load after the multiply, mine esi with the Game load hoisted; 13 bytes).
 // Named offsets, factored multiplication, an inline rally accessor, and a volatile Game* all emit worse or unchanged code.
