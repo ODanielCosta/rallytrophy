@@ -64,22 +64,22 @@ void ModelCacheState::Add(void* mesh)
 // Register allocation, list unlink scheduling and vector resize inlining differ.
 // Tried 2026-10-30 night: out-of-line Size()/Erase() resize twins (ResizeB for the two-call sites), PopHead with hoisted prev, per-site node/count vars, loop shapes, one permute run (no MATCH); still differs: phase-2 count/entries regs (esi/edi vs edi/ebp), prologue push order, lea vs mov+add in count sums, unlink cmp scheduling.
 // Tried 2026-10-31 re-pass: 20 variants (local decl order, count/flags after first loop, operand order of count sums, short-width temp, volatile self, field-assign order); all stay at 40 insns differ or worse (count/flags moved after loop 1 gives 141); regalloc (count/flags in ebp/edi, phase-2 count in edi, entries ptr in ebp) unmoved.
+// Tried 2026-11-16 round 22: count/flags after `pending`, no nextCount temp (`count += w`), `tri = w*3` temp and count2 declared before loop 2: 40 -> 12 insns differ; left: m_head store sched in PopHead (phase 1), edx/ecx/eax picks in phase 2 and the ResizeB/Build* arg setup; PopHead rewrites (hoisted next/prev, reordered stores) and PopHead-before-Insert all worse.
 void ModelCacheState::Reload(RenderDevice* renderer)
 {
     device = renderer;
+    CachePendingList pending;
     unsigned count = 0;
     int flags = -1;
-    CachePendingList pending;
     List<void*>::Node* node;
     for (node = entries.m_head; node; node = node->next) { void* d = node->data; pending.AddTail(d); }
     CacheBatch batch;
     while (pending.m_head) {
         void* mesh = pending.m_head->data;
         int nextFlags = *(int*)((char*)mesh + 0x1c);
-        unsigned nextCount;
         if ((flags == nextFlags || flags == -1) &&
-            (nextCount = count + *(unsigned short*)((char*)mesh + 0xc)) < 65000) {
-            count = nextCount;
+            count + *(unsigned short*)((char*)mesh + 0xc) < 65000) {
+            count += *(unsigned short*)((char*)mesh + 0xc);
             flags = nextFlags;
             batch.Insert(batch.end(), mesh);
             pending.PopHead();
@@ -91,12 +91,13 @@ void ModelCacheState::Reload(RenderDevice* renderer)
         }
     }
     BuildVertices(count, (unsigned char)flags, &batch);
-    for (node = entries.m_head; node; node = node->next) { void* d = node->data; pending.AddTail(d); }
     unsigned count2 = 0;
+    for (node = entries.m_head; node; node = node->next) { void* d = node->data; pending.AddTail(d); }
     batch.ResizeB(0);
     while (pending.m_head) {
         void* mesh = pending.m_head->data;
-        unsigned nextCount = count2 + *(unsigned short*)((char*)mesh + 0xe) * 3;
+        unsigned tri = *(unsigned short*)((char*)mesh + 0xe) * 3;
+        unsigned nextCount = count2 + tri;
         if (nextCount < 65000) {
             count2 = nextCount;
             batch.Insert(batch.end(), mesh);
