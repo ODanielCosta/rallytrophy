@@ -76,6 +76,19 @@ public:
         m_freeCount++;
         m_count--;
     }
+    // Phase 2 twin: next is read once into a local and stored to m_head before the tail test; prev is read per arm.
+    void PopHeadC()
+    {
+        Node* node = m_head;
+        Node* nx = node->next;
+        m_head = nx;
+        if (node == m_tail) { Node* p = node->prev; m_tail = p; } else { Node* p = node->prev; node->next->prev = p; }
+        node->next = m_free;
+        node->prev = 0;
+        m_free = node;
+        m_freeCount++;
+        m_count--;
+    }
 };
 class CacheBufferDevice {
 public:

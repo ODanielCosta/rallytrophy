@@ -320,6 +320,7 @@ void Car::FUN_004691e0(int cockpit)
     }
 }
 
+
 // NONMATCHING: RALLYTROPHY 0x4693a0
 // Same size (543); restore branch and damaged-loop stores follow the target order. 18 register-assignment bytes remain.
 // Tried 2026-10-30 night: ~25 variants (a/b decl order, loop forms while/for/swapped cond, o declared late/hoisted/inlined, const locals for 1/2, volatile barriers); always 16-17 insns differ, original puts a=edx,b=esi,2=ebp,1=edi,o=ebp but we get a=esi,b=edi,2=edx,1=ebp.
@@ -328,6 +329,7 @@ void Car::FUN_004691e0(int cockpit)
 // 2026-11-16 const-weight pass: 13 more (cond order, o first/hoisted m,o, a/b load order, advance order, early next, b->data in test, for(;;) break, unk98 first) none better; same 18 bytes/17 insns.
 // 2026-11-16 weight pass 2: 16 more (a pre-loop test, a split a0/a, do-while, early next, b break-in-loop, cond via break either order, o declared outside, b->data in test); none better (a2 while(b){if(!a)break;} gives 16 insns but 20 bytes).
 // 2026-11-16 pass 3 (~45 compiles): kept while(b){if(!a)break;} (16 insns, 20 bytes, same size; was 17/18). Also none better: flat int stores for quads, shared a/b decls, early next, chained 1/2 stores, for(;;) breaks, a-first/b-first orders. Original ranks b>1>2>a; a stays above 2.
+// 2026-11-16 pass 4 (~45 compiles): const locals one/two in all 24 def orders, duplicate stores, inline-helper stores (St4/St6/St7): zero effect (16 insns/20 bytes). Original tests a (nodes1) first and loads it first; `while(a){if(!b)break;}` with the else branch loading b first gives that shape but 17 insns/18 bytes (same rotation), so kept while(b){if(!a)break;}. With the else branch loading a first the nodes1 load is hoisted above the damaged test (537 bytes).
 void Car::FUN_004693a0(int mode)
 {
     CarModelView* v = (CarModelView*)this;
