@@ -553,3 +553,15 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   slots, a strength-reduced loop pointer that takes the leftover register). Gains came from ordinary statement-order
   edits: TrackSelectMenu::Run 8 -> 4 insns, AIDriver 0x4a1050 18 -> 17. The triage "registers" label overstates how
   many residuals are pure allocation ties.
+
+## Rounds 13-16 levers (2026-11-15)
+- A local alias of a just-allocated member (`T* W = new ..; member = W;` then `W[i]`) holds a callee-saved register;
+  storing straight to the member and indexing it (`member = new ..; member[i]`) freed edi for the original's zero
+  (ColModel ctor 213 -> 46 insns).
+- Use the out-of-line helper the original calls (calls.py): VC6 `vector::erase(begin,end)` body, `Sub` returning its
+  out pointer (use the returned pointer as the next call's argument), the file's std::string model (`assign`,
+  `AppendStd`, `AppendInl`) instead of `operator=`/`+=`.
+- Float accumulators: `sum += (double)x` gives `fld; faddp st(N)` pairs (exact widening; result still stored float).
+- `?:` as a call argument -> two calls in an if/else; an index expression into its own statement first; an early
+  `return` turned into a nesting `if` around the tail; an element pointer recomputed from the member slot after a call.
+- A global known to hold 1.0f (DAT_004e1348) may be an immediate `1.0f` in the original; check the data before using it.
