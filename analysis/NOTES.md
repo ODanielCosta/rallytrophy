@@ -607,3 +607,8 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
 - `if (a || (read, b)) { delete f; return 0; }` lets later delete[] exits tail-merge into it; split into two plain ifs
   to keep them cloned (LoadRelay 119 -> 75).
 - Unexplained: some dtor-call counts (k=3,6,9) merge everything, k=5 clones everything; int vs x87 compare can flip it.
+- Translation-unit boundaries matter (2026-11-16): ReplayFiles::SaveReplay 0x404100 matched only after its file was
+  merged into src/unk_403270.cpp (the replay loader TU at 0x403270-0x403ca0). As the first emitted function of its own
+  TU it cloned an epilogue; any emitted function before it (even a trivial extern one) made it share the epilogue as
+  the original does. When a function at the start of a .cpp differs only in epilogue cloning, check whether the
+  original's TU actually started earlier (address-contiguous neighbours) and merge files accordingly.
