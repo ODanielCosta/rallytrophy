@@ -497,14 +497,9 @@ __declspec(naked) CreditText::~CreditText()
 }
 
 // original: FUN_00425e50 (credits screen main loop)
-// NONMATCHING: RALLYTROPHY 0x425e50
-// 1106 vs 1108 bytes: only one instruction differs (the original copies the post-incremented DAT_005089a8 through
-// eax: `mov eax,ecx; mov eax,[esi+eax*4]`; every other difference is a shifted jump offset).
-// Tried 2026-10-31: begin()[a8++] as operator[], pointer arithmetic, int/unsigned k temps, a line local, split increment
-// and permute.py -r 20 (best 17 insns, no MATCH); none produces the extra register copy.
-// Tried 2026-10-31 re-pass: 20 variants (local k temp/copy j, k++ vs ++k, unsigned k, pointer b[k], cl temp before/after
-// the store, modulo hoisted before/after the a8 load, volatile k/a8, a8 stored via k+1 or directly) all stay at 1106 bytes
-// or worse; permute.py -r 40 best 17 insns, no MATCH. The `mov eax,ecx` copy of the held a8 never appears.
+// FUNCTION: RALLYTROPHY 0x425e50
+// Matched 2026-11-15: the ring index is computed into a local first (`int idx = (slot + 1) % 25;`), then the
+// store reads `DAT_005089b0[DAT_005089a8++]`; that statement order gives the `mov eax,ecx` copy of the held a8.
 // The font string at 0x4f6940 is a guess (not read from rdata).
 void __fastcall FUN_00425e50(MenuGame* game)
 {
@@ -538,7 +533,8 @@ void __fastcall FUN_00425e50(MenuGame* game)
         int slot = FloatToInt((float)floor(oldPos));
         int crossed = now - slot;
         while (crossed > 0) {
-            DAT_00508944[(slot + 1) % 25] = DAT_005089b0.begin()[DAT_005089a8++];
+            int idx = (slot + 1) % 25;
+            DAT_00508944[idx] = DAT_005089b0[DAT_005089a8++];
             if (DAT_005089b0.begin() == 0 || !((unsigned)DAT_005089a8 < (unsigned)DAT_005089b0.size()))
                 DAT_005089a8 = 0;
             crossed--;
