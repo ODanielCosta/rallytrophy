@@ -1687,6 +1687,7 @@ inline float W6_Rd(const float* p) { return *p; }
 // Tried 2026-10-30 night: Surface() args fixed to nz-2/nz+0x78/4/nz+0x48/4 (original disasm: base-8,+0x48,+0x78; was off by 8 bytes); rideHeight int-copy, lx/lz int-copy loads, local/world hoisted, dir default-ctor, swapped surfP/nz decls, nz-2 cast forms: no gain (176 insns); still differs: orig keeps only nz (not nz-2) as loop pointer, EH state 3 at Trace (ours 2), dist<rideTop branch layout without hoisted xor ecx.
 // Tried 2026-11-01 re-pass: W6_Body::depth was at 0x234 (bogus pad), fixed to 0x230; volatile loop pointers surfP/nz (original reloads both from slots, no hoisted nz-2) and a volatile int copy of rideHeight after rideTop took 176->136 insns; ~35 variants of body->depth/comp order, empty-dtor locals, dist flag layout, rideHeight/radius slot forms gave no more; still differs: radius/loadForce slot numbers, EH state 3 at Trace (ours 2), original loads depth first in comp (fld depth; fld st(1)), dist<rideTop branch without hoisted xor ecx.
 // Pass 2026-11-13: 114 -> 103 insns differ (1134 -> 1152 bytes, orig 1144): W6_Rd() inline read of r[-3] reproduces the original's `fld min; fld ly; fsub st,st(1)`, local.y set after the t compute (local.x/z first), `dir.x *= (k = -t)`, vNew = V - (s*dt)*invMass. Open: a variant dropping the `ly` local (use wp[-1]) and caching Surface's nz in a local is structurally closer (582 vs 670 differing bytes, 1140 bytes) but shifts one frame slot (127 raw insns); original keeps vNew and t in separate slots.
+// Pass 2026-11-16: 103 -> 95 insns differ (1152 -> 1132 bytes): surfP no longer volatile (declared after nz), ly re-read as wp[-1] in the two comparisons. Open: one frame slot short (dropping `ly` entirely gives 586 bytes but 126 insns; a live t across vNew would fix it but needs a behaviour-changing use).
 // Per wheel: ground ray cast, suspension integration step (explicit spring/damper/bump stop), surface lookup.
 void Car::UpdateWheelContact()
 {
@@ -1695,8 +1696,8 @@ void Car::UpdateWheelContact()
     float loadForce = c->loadScale * c->body->rotation[5] * 9.81f;
     float* r = &c->spring[0].vel;
     float* wp = &c->wheel[0].pos[2];
-    int* volatile surfP = &c->wheelSurface[0];
     float* volatile nz = &c->hitNormal[0][2];
+    int* surfP = &c->wheelSurface[0];
     for (int i = 0; i < 4; i++) {
         float rideTop = r[-2] + c->rideHeight;
         int rhi = *(volatile int*)&c->rideHeight;
@@ -1753,7 +1754,7 @@ void Car::UpdateWheelContact()
         float a = (t2 - prev) * c->invDt;
         float vel;
         if (t2 < pNew) {
-            if (pNew <= ly - W6_Rd(&r[-3])) {
+            if (pNew <= wp[-1] - W6_Rd(&r[-3])) {
                 t2 = pNew;
                 ((int*)wp)[0x16c / 4] = 0;
                 vel = vNew;
@@ -1763,7 +1764,7 @@ void Car::UpdateWheelContact()
                 t2 = ly - W6_Rd(&r[-3]);
             }
         } else {
-            if (t2 > ly - W6_Rd(&r[-3])) {
+            if (t2 > wp[-1] - W6_Rd(&r[-3])) {
                 if (a < 0.0f) {
                     a = 0.0f;
                 } else if (a > 10.0f) {
