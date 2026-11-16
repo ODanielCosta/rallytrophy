@@ -15,12 +15,12 @@ _Updated 2026-11-16 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1935 / 2084 (92.85%) | 446,097 / 742,276 (60.10%) |
-| Written, not yet exact | 149 | 296,179 |
+| Byte-exact | 1936 / 2084 (92.90%) | 447,106 / 742,276 (60.23%) |
+| Written, not yet exact | 148 | 295,170 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   ██████████████████░░░░░░░░░░░░ 60.10% of code bytes
+exact   ██████████████████░░░░░░░░░░░░ 60.23% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -72,7 +72,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Car sounds | `0x4666a0`–`0x468720` | 9 / 11 / 11 | 22.4% | 100.0% | `████████████` |
 | Car race state | `0x468720`–`0x468c40` | 8 / 8 / 8 | 100.0% | 100.0% | `████████████` |
 | Car model parts | `0x468c40`–`0x469630` | 6 / 7 / 7 | 78.4% | 100.0% | `████████████` |
-| Car render and effects | `0x469630`–`0x46a8a0` | 11 / 13 / 13 | 67.2% | 100.0% | `████████████` |
+| Car render and effects | `0x469630`–`0x46a8a0` | 12 / 13 / 13 | 89.0% | 100.0% | `████████████` |
 | Drivetrain | `0x46a8a0`–`0x46bb90` | 23 / 23 / 23 | 100.0% | 100.0% | `████████████` |
 | Car snapshots | `0x46bb90`–`0x46c2c0` | 7 / 7 / 7 | 100.0% | 100.0% | `████████████` |
 | Wheel and tyre forces | `0x46c2c0`–`0x46d720` | 9 / 11 / 11 | 24.4% | 100.0% | `████████████` |
