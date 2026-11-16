@@ -1163,6 +1163,7 @@ static const float kTwo = 2.0f;          // 0x4e1b44
 
 // original: FUN_004721b0
 // NONMATCHING: RALLYTROPHY 0x4721b0
+// 2026-11-15 reg sweep (27 compiles, none better than 30 insns): mesh takes esi and the k-loop pointer edx (original: mesh edx, pointer esi). Immune to vc/idx/fc hoists, re-evaluation, pointer/while/do loop forms, mesh outside the loop.
 // Tried 2026-10-30 night: 159->43 insns differ (1372/1372 bytes): v0/v1/v2 pointers up front, then `Vec3 e1 = *v1; Vec3 e2 = *v2;`
 // (copy-constructed, e1 first), non-volatile h with volatile reads at its later uses and ((volatile float*)m)[12] += h.
 // Re-pass 2026-11-01: x/y projection sums for v0/v1 as chained temps in asm order (v0 x,y,z; v1 z,y,x) 43->34 insns; d-dot order, e1/e2 hoisted decls, volatile mesh, m12 forms (20+ variants) did not help.
