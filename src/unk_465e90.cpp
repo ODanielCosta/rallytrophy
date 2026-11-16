@@ -296,6 +296,7 @@ static inline int Bal(int a) { return a + 1; }
 // Left: the stepped pointer sits at record+0x14 (original +0x18) and the x scale of each vector is fld scale/fmul
 // value in the original; `*=` and `scale * cp[k]` forms (115), cp shifted by 1-2 floats, and all 7 mixes of
 // cp/record destinations for the first vector copy leave the offset at +0x14 or +0x10.
+// 2026-11-16: per-element multiply form (scale-held-in-local `{ float c_ = scale; cp[k] = c_ * cp[k]; }` on x[1],x[2],c[1],xF[1]) flips fld operand order like the original: 89 -> 77 bytes, 46 -> 44 insns. Still open: z-vector int-store/fmul interleave and scale-first order on z[0], x[0], c[0], xF[0].
 void Car::FUN_00465e90(int value)
 {
     CarSetupView* v = (CarSetupView*)this;
@@ -363,15 +364,15 @@ void Car::FUN_00465e90(int value)
             *(int*)&cp[3] = r.i[2];
         }
         { float c_ = cp[1]; cp[1] = scale->xStiffness.v[0] * c_; }
-        { float c_ = cp[2]; cp[2] = scale->xStiffness.v[1] * c_; }
-        { float c_ = cp[3]; cp[3] = scale->xStiffness.v[2] * c_; }
+        { float c_ = scale->xStiffness.v[1]; cp[2] = c_ * cp[2]; }
+        { float c_ = scale->xStiffness.v[2]; cp[3] = c_ * cp[3]; }
         {
             const TyreF2& r = *(const TyreF2*)&config.GetVector2(cStiffness);
             *(int*)&cp[4] = r.i[0];
             *(int*)&cp[5] = r.i[1];
         }
         { float c_ = cp[4]; cp[4] = scale->cStiffness.v[0] * c_; }
-        { float c_ = cp[5]; cp[5] = scale->cStiffness.v[1] * c_; }
+        { float c_ = scale->cStiffness.v[1]; cp[5] = c_ * cp[5]; }
         {
             const TyreF2& r = *(const TyreF2*)&config.GetVector2(zFriction);
             *(int*)&cp[6] = r.i[0];
@@ -385,7 +386,7 @@ void Car::FUN_00465e90(int value)
             *(int*)&cp[9] = r.i[1];
         }
         { float c_ = cp[8]; cp[8] = scale->xFriction.v[0] * c_; }
-        { float c_ = cp[9]; cp[9] = scale->xFriction.v[1] * c_; }
+        { float c_ = scale->xFriction.v[1]; cp[9] = c_ * cp[9]; }
     }
     Bal(1); Bal(1); Bal(1); Bal(1); Bal(1); Bal(1);
 }
