@@ -245,9 +245,7 @@
 <rect x="744.6" y="120" width="1.4" height="36" fill="#e3b341"/>
 <rect x="746.0" y="120" width="0.6" height="36" fill="#3fb950"/>
 <rect x="746.5" y="120" width="1.4" height="36" fill="#e3b341"/>
-<rect x="748.0" y="120" width="2.7" height="36" fill="#3fb950"/>
-<rect x="750.7" y="120" width="1.8" height="36" fill="#e3b341"/>
-<rect x="752.5" y="120" width="9.9" height="36" fill="#3fb950"/>
+<rect x="748.0" y="120" width="14.4" height="36" fill="#3fb950"/>
 <rect x="762.5" y="120" width="1.8" height="36" fill="#3fb950"/>
 <rect x="764.3" y="120" width="2.1" height="36" fill="#e3b341"/>
 <rect x="766.4" y="120" width="9.2" height="36" fill="#3fb950"/>
@@ -863,9 +861,8 @@
 <text x="1018" y="1696" fill="#e6edf3">49% exact / 100% written</text>
 <text x="260" y="1722" text-anchor="end" fill="#e6edf3">58. Wheel spray</text>
 <rect x="270" y="1708" width="740" height="18" rx="2" fill="#484f58"/>
-<rect x="270" y="1708" width="451.5" height="18" fill="#3fb950"/>
-<rect x="721.5" y="1708" width="288.5" height="18" fill="#e3b341"/>
-<text x="1018" y="1722" fill="#e6edf3">61% exact / 100% written</text>
+<rect x="270" y="1708" width="740.0" height="18" fill="#3fb950"/>
+<text x="1018" y="1722" fill="#e6edf3">100% exact / 100% written</text>
 <text x="260" y="1748" text-anchor="end" fill="#e6edf3">59. Exhaust smoke</text>
 <rect x="270" y="1734" width="740" height="18" rx="2" fill="#484f58"/>
 <rect x="270" y="1734" width="740.0" height="18" fill="#3fb950"/>
