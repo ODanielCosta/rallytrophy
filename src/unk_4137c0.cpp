@@ -89,6 +89,7 @@ static __forceinline void SetF(float& d, float v) { d = v; }
 // Re-pass 2026-11-01: 13 variants (num[32] in nested block/top/mid scope, key arrays reordered/resized, skid block, Vector2/3 order, volatile sky, layer decl order): none below 314 insns differ (base); VC6 does not overlap num with the if-scope arrays, frame stays 0x24 larger; too far (724 diff lines) for permute.
 // 2026-11-10 (after /YX: built 2878 vs 2914, now 36 bytes short): ring digits via char/int locals or separate stores, path c_str hoisted/removed/hand-written, c_str as `ptr == 0 ? "" : ptr`: no real change. Original keeps the divisor 10 in edi and pushes AssignTmp's npos/0 between the two digit stores; its c_str stores "" first and overwrites when ptr is set.
 // 2026-11-13 pass: 251 -> 198 insns differ (2878 -> 2879 bytes): ring digits via t/o char locals, c_str as `lp = ""; if (ptr) lp = ptr` locals (path, layer), Add() `n > 0` (jbe), `if (x != 0) switch`, sprite rect floats via SetF (fld/fstp). Open: fstp/int-store interleave (SetV3, sprites), EH state-store placement, tail register roles.
+// 2026-11-16 pass: 198 -> 147 insns differ (2879 -> 2899 bytes): skid is FlareStringInl (both string dtors inline as the original), sprite a addressed through the member (reloaded, as 0x9dc), Load result stored after the skid-state block, FlareStringBase::Add copies into a `char* d = ptr + len` local.
 void SceneSetup::FUN_004137c0(const FlareString& dir)
 {
     if (AT(int, 0x218) != 0) {
@@ -142,9 +143,9 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
         break;
     }
 #define loader ((TextureLoader*)&AT(char, 0xd4))
-    FlareString skid;
+    FlareStringInl skid;
     skid.AssignTmp(MissingText2(dir, "SkidMark1.tga"), 0, std::string::npos);
-    AT(Texture*, 0x908) = loader->Load(skid.c_str(), 0x40);
+    Texture* sk = loader->Load(skid.c_str(), 0x40);
     AT(int, 0x974) = 0;
     SetV3(AT(float, 0x968), AT(float, 0x96c), AT(float, 0x970), AT(float, 0x1b8), AT(float, 0x1bc), AT(float, 0x1c0));
     AT(int, 0x978) = 0;
@@ -155,6 +156,7 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
     AT(int, 0x95c) = 0;
     AT(int, 0x960) = 0;
     AT(int, 0x964) = 0;
+    AT(Texture*, 0x908) = sk;
     AT(int, 0x92c) = 4;
     AT(int, 0x9a0) = 0xd;
     AT(int, 0x9a4) = 2;
@@ -178,24 +180,23 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
     env.AssignTmp(AT(TmpString, 8), 0, std::string::npos);
     env.Add("textures/particles.tga");
     FlareRect rc = AT(FlareRect, 0x1f8);
-    Sprite* a = new Sprite;
-    AT(Sprite*, 0x9dc) = a;
-    ATP(a, Texture*, 0) = loader->Load(env.c_str(), 0x40);
-    SetF(ATP(a, float, 0x60), rc.v[0]);
-    ATP(a, int, 0x98) = 0xd;
-    ATP(a, int, 0x9c) = 2;
-    SetF(ATP(a, float, 0x64), rc.v[1]);
-    ATP(a, int, 0x18) = 5;
-    ATP(a, int, 0x1c) = 2;
-    SetF(ATP(a, float, 0x68), rc.v[2]);
-    ATP(a, int, 0x6c) = 0;
-    ATP(a, int, 0x70) = 0;
-    ATP(a, int, 0x74) = 0;
-    ATP(a, int, 0x78) = 0;
-    ATP(a, int, 0x7c) = 0;
-    ATP(a, int, 0x24) = 4;
+    AT(Sprite*, 0x9dc) = new Sprite;
+    ATP(AT(Sprite*, 0x9dc), Texture*, 0) = loader->Load(env.c_str(), 0x40);
+    SetF(ATP(AT(Sprite*, 0x9dc), float, 0x60), rc.v[0]);
+    ATP(AT(Sprite*, 0x9dc), int, 0x98) = 0xd;
+    ATP(AT(Sprite*, 0x9dc), int, 0x9c) = 2;
+    SetF(ATP(AT(Sprite*, 0x9dc), float, 0x64), rc.v[1]);
+    ATP(AT(Sprite*, 0x9dc), int, 0x18) = 5;
+    ATP(AT(Sprite*, 0x9dc), int, 0x1c) = 2;
+    SetF(ATP(AT(Sprite*, 0x9dc), float, 0x68), rc.v[2]);
+    ATP(AT(Sprite*, 0x9dc), int, 0x6c) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x70) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x74) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x78) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x7c) = 0;
+    ATP(AT(Sprite*, 0x9dc), int, 0x24) = 4;
     Sprite* b = new Sprite;
-    ATP(b, Texture*, 0) = ATP(a, Texture*, 0);
+    ATP(b, Texture*, 0) = ATP(AT(Sprite*, 0x9dc), Texture*, 0);
     SetF(ATP(b, float, 0x60), rc.v[0]);
     ATP(b, int, 0x98) = 0xd;
     ATP(b, int, 0x9c) = 2;

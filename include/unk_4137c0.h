@@ -39,7 +39,7 @@ public:
         if (n > 0) {
             unsigned int newLen = len + n;
             if (Grow(newLen, false)) {
-                memcpy(ptr + len, s, n);
+                char* d = ptr + len; memcpy(d, s, n);
                 len = newLen;
                 ptr[len] = 0;
             }
