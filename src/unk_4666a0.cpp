@@ -388,6 +388,7 @@ static __forceinline float LengthYZX(const Vec3& a)
 // and the x*x+y*y+z*z order of the second speed block. Not resolved after ~35 variants.
 // Tried 2026-10-30 night: 26 try_variants (local decl order of rpm/volume/i/fade, fade via temps/volatile, rpm split, wheel-sum forms, best/bestId order); all 283-299 insns, none improve; rpm slot is -0x1c in the original vs -0x14 here and the fade[0] store follows the next call's this-load, which no declaration shuffle changed.
 // Tried 2026-11-01 re-pass: SURFACE_BLOCK entry/sample hoisted to function-scope locals (fixes the rpm slot -0x1c, 284->249 insns); ~45 more variants (hoisted ints, decl order of i/volume/rpm/Vec3 positions, float q=0 for sum68, best at function scope) did not help; still differs: loop-index/float-temp slot swap in the engine loops, enginePos/exhaustPos slots, `xor edi,edi` before the local test, wheel-sum fxch pattern.
+// Round 16 (2026-11-15): wheel sums accumulate (double)w->v64/v6c/v70 (fld+faddp form), nIds hoisted so the local test is `local != nIds` (xor edi,edi; cmp ecx,edi); 183 -> 175 insns differ. Tried ~40 variants (zero var, best/bestId hoists, k loop counters, sum decl orders): loop-index/float-temp slot swap (-0x20/-0x24) still unmoved.
 // Car::UpdateSounds(dt): per-frame update of the speech/crash one-shots, the engine and exhaust layers and the surface loops.
 void Car::FUN_00467440(int dt)
 {
@@ -538,12 +539,12 @@ void Car::FUN_00467440(int dt)
         v->layer[4 + i].source.SetPosition((const Vector3*)&exhaustPos);
     }
 
-    if (v->player->local) {
+    int nIds = 0;
+    if (v->player->local != nIds) {
         int best = 0;
         int bestId = -1;
         int counts[4];
         int ids[4];
-        int nIds = 0;
         for (i = 0; i < 4; i++) {
             if (v->wheel[i].contact && v->wheelSurface[i] < 15) {
                 int surf = v->wheelSurface[i];
@@ -593,9 +594,9 @@ void Car::FUN_00467440(int dt)
             SoundWheel* w = &v->wheel[i];
             if (w->contact) {
                 sum68 += w->v68;
-                sum64 += w->v64;
-                sum6c += w->v6c;
-                sum70 += w->v70;
+                sum64 += (double)w->v64;
+                sum6c += (double)w->v6c;
+                sum70 += (double)w->v70;
                 n++;
             }
         }
