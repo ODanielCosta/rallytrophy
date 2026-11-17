@@ -364,11 +364,13 @@ struct PlaceRec {
 __forceinline const char* CS(PlaceStr* s) { return s->ptr ? s->ptr : ""; }
 
 // NONMATCHING: RALLYTROPHY 0x4150b0
+// 2026-11-17 (Claude): dst before ext.x (all 120 orders of the five setup statements tried) and pd declared before the scale: 1 insn left - the pd slot store is hoisted into the dir -= start block (orig: after fmul [eax+4]). pd via a ScaleRet helper, SetP helper, decl/assign splits, inv local: no better.
 // Tried 2026-10-31: CS() forceinline helper (reloads the name pointer), no pos local, ext.z before ext.y, n+1 temp: 72 -> 31 insns.
 // Tried 2026-10-31 re-pass: ~30 variants (ext init order, brace init, pos/dir copy forms, Length as named double/temps, n+1 forms, inline-order); only pos copy via PlaceVec* p/q helped, 31 -> 29. Remaining: inlined-asm arg slot order, dir copy via mov ecx,eax, ext.y/z kept on FPU across Length.
 // 2026-11-15 r17: dir copy via PlaceVec* d/s with x,y,z stores (not struct assign) 29 -> 24 insns; Length/ext-init/up-init/n+1 variants no gain.
 // 2026-11-17: size now exact (697), 24 -> 5 hunks: ext.y/z as doubles + (y*y+z*z) grouping reproduces the FPU-resident Length; PlaceCross/PlaceTransform
-// args via pointer locals (pd/pu/dst/pm). Left: asm arg-slot store order in 2 PlaceTransform calls, pd setup placed in dir -= start instead of mid-scale.
+// args via pointer locals. Round 2: pointer locals declared in order m,t,e,d for each PlaceTransform, pd/pu after up init: 5 -> 2 hunks.
+// Left: first call stores [ebp-0x24]=ecx before [ebp-0x8]=edi (orig after); scale fstp/arg-slot scheduling. Scale forms/ext.x moves no gain.
 void StageSounds::FUN_004150b0(PlaceObj* o)
 {
     if (strlen(CS(&o->name)) < 8)
@@ -379,13 +381,19 @@ void StageSounds::FUN_004150b0(PlaceObj* o)
         PlaceVec ext;
     ext.z = 0.0f;
     ext.y = 0.0f;
-    ext.x = o->f[40];
     float* dst = &rec->start.x;
-    PlaceTransform(&ext.x, &o->f[8], dst, &o->f[5]);
+    ext.x = o->f[40];
+    float* pt1 = &o->f[5];
+    float* pm1 = &o->f[8];
+    float* pe1 = &ext.x;
+    PlaceTransform(pe1, pm1, dst, pt1);
     rec->start.y = o->f[6];
     ext.x = o->f[43];
     float* pm = &o->f[8];
-    PlaceTransform(&ext.x, pm, &rec->end.x, &o->f[5]);
+    float* pt = &o->f[5];
+    float* pe = &ext.x;
+    float* pd2 = &rec->end.x;
+    PlaceTransform(pe, pm, pd2, pt);
     rec->end.y = o->f[6];
     { PlaceVec* p=(PlaceVec*)&o->f[5]; PlaceVec* q=&rec->pos; q->x=p->x; q->y=p->y; q->z=p->z; }
     { PlaceVec* d=&rec->dir; PlaceVec* s=&rec->end; d->x=s->x; d->y=s->y; d->z=s->z; }
