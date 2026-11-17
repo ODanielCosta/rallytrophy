@@ -283,6 +283,31 @@ ConfigKey TyreKeys[270] = {
 extern char DAT_005093f8[];            // scratch buffer for the set number
 
 static inline int Bal(int a) { return a + 1; }
+static __forceinline void Put3(float* d, const TyreF3& r, const float* k)
+{
+    *(int*)&d[0] = r.i[0];
+    *(int*)&d[1] = r.i[1];
+    *(int*)&d[2] = r.i[2];
+    { float c_ = k[0]; d[0] = c_ * d[0]; }
+    { float c_ = d[1]; d[1] = k[1] * c_; }
+    { float c_ = d[2]; d[2] = k[2] * c_; }
+}
+static __forceinline void Put3x(float* d, const TyreF3& r, const float* k)
+{
+    *(int*)&d[0] = r.i[0];
+    { float c_ = k[0]; d[0] = c_ * d[0]; }
+    *(int*)&d[1] = r.i[1];
+    *(int*)&d[2] = r.i[2];
+    { float c_ = k[1]; d[1] = c_ * d[1]; }
+    { float c_ = k[2]; d[2] = c_ * d[2]; }
+}
+static __forceinline void Put2y(float* d, const TyreF2& r, const float* k)
+{
+    *(int*)&d[0] = r.i[0];
+    *(int*)&d[1] = r.i[1];
+    { float c_ = k[0]; d[0] = c_ * d[0]; }
+    { float c_ = k[1]; d[1] = c_ * d[1]; }
+}
 // original: FUN_00465e90
 // NONMATCHING: RALLYTROPHY 0x465e90
 // 1649 vs 1644 bytes. Strings (PathString: out-of-line _Tidy, inline assign), the nine key-template copies, the
@@ -297,6 +322,7 @@ static inline int Bal(int a) { return a + 1; }
 // value in the original; `*=` and `scale * cp[k]` forms (115), cp shifted by 1-2 floats, and all 7 mixes of
 // cp/record destinations for the first vector copy leave the offset at +0x14 or +0x10.
 // 2026-11-16: per-element multiply form (scale-held-in-local `{ float c_ = scale; cp[k] = c_ * cp[k]; }` on x[1],x[2],c[1],xF[1]) flips fld operand order like the original: 89 -> 77 bytes, 46 -> 44 insns. Still open: z-vector int-store/fmul interleave and scale-first order on z[0], x[0], c[0], xF[0].
+// 2026-11-17: cp = &zStiffness.v[1] (indices shifted -1) gives the original +0x18 bias (44 -> 10 insns); __forceinline Put3 (z) / Put3x (x) / Put2y (xFriction) helpers (copy0, scale0 scale-first, copy rest, scale rest) fix z[0], x[0] and xF[0] operand order: -> 4 insns. Left: x[0] fstp sits after the lea of the next temp (orig before), c[0] fld/fmul order (c0 scale-first or Put2x/Put2y both worse).
 void Car::FUN_00465e90(int value)
 {
     CarSetupView* v = (CarSetupView*)this;
@@ -343,50 +369,28 @@ void Car::FUN_00465e90(int value)
         zFriction[4] = (char)(ones + '0');
         xFriction[4] = (char)(ones + '0');
         TyreSurface* s_ = &v->surface[i];
-        float* cp = &s_->zStiffness.v[2];
+        float* cp = &s_->zStiffness.v[1];
         s_->rollingResistance = config.GetFloat(rollingResistance) * scale->rollingResistance;
         s_->inducedDrag = config.GetFloat(inducedDrag) * scale->inducedDrag;
         s_->pneumaticTrail = config.GetFloat(pneumaticTrail) * scale->pneumaticTrail;
         s_->pneumaticOffset = config.GetFloat(pneumaticOffset) * scale->pneumaticOffset;
-        {
-            const TyreF3& r = *(const TyreF3*)&config.GetVector3(zStiffness);
-            *(int*)&cp[-2] = r.i[0];
-            *(int*)&cp[-1] = r.i[1];
-            *(int*)&cp[0] = r.i[2];
-        }
-        { float c_ = cp[-2]; cp[-2] = scale->zStiffness.v[0] * c_; }
-        { float c_ = cp[-1]; cp[-1] = scale->zStiffness.v[1] * c_; }
-        { float c_ = cp[0]; cp[0] = scale->zStiffness.v[2] * c_; }
-        {
-            const TyreF3& r = *(const TyreF3*)&config.GetVector3(xStiffness);
-            *(int*)&cp[1] = r.i[0];
-            *(int*)&cp[2] = r.i[1];
-            *(int*)&cp[3] = r.i[2];
-        }
-        { float c_ = cp[1]; cp[1] = scale->xStiffness.v[0] * c_; }
-        { float c_ = scale->xStiffness.v[1]; cp[2] = c_ * cp[2]; }
-        { float c_ = scale->xStiffness.v[2]; cp[3] = c_ * cp[3]; }
+        Put3(&cp[-1], *(const TyreF3*)&config.GetVector3(zStiffness), scale->zStiffness.v);
+        Put3x(&cp[2], *(const TyreF3*)&config.GetVector3(xStiffness), scale->xStiffness.v);
         {
             const TyreF2& r = *(const TyreF2*)&config.GetVector2(cStiffness);
-            *(int*)&cp[4] = r.i[0];
-            *(int*)&cp[5] = r.i[1];
+            *(int*)&cp[5] = r.i[0];
+            *(int*)&cp[6] = r.i[1];
         }
-        { float c_ = cp[4]; cp[4] = scale->cStiffness.v[0] * c_; }
-        { float c_ = scale->cStiffness.v[1]; cp[5] = c_ * cp[5]; }
+        { float c_ = cp[5]; cp[5] = scale->cStiffness.v[0] * c_; }
+        { float c_ = scale->cStiffness.v[1]; cp[6] = c_ * cp[6]; }
         {
             const TyreF2& r = *(const TyreF2*)&config.GetVector2(zFriction);
-            *(int*)&cp[6] = r.i[0];
-            *(int*)&cp[7] = r.i[1];
+            *(int*)&cp[7] = r.i[0];
+            *(int*)&cp[8] = r.i[1];
         }
-        { float c_ = cp[6]; cp[6] = scale->zFriction.v[0] * c_; }
-        { float c_ = cp[7]; cp[7] = scale->zFriction.v[1] * c_; }
-        {
-            const TyreF2& r = *(const TyreF2*)&config.GetVector2(xFriction);
-            *(int*)&cp[8] = r.i[0];
-            *(int*)&cp[9] = r.i[1];
-        }
-        { float c_ = cp[8]; cp[8] = scale->xFriction.v[0] * c_; }
-        { float c_ = scale->xFriction.v[1]; cp[9] = c_ * cp[9]; }
+        { float c_ = cp[7]; cp[7] = scale->zFriction.v[0] * c_; }
+        { float c_ = cp[8]; cp[8] = scale->zFriction.v[1] * c_; }
+        Put2y(&cp[9], *(const TyreF2*)&config.GetVector2(xFriction), scale->xFriction.v);
     }
     Bal(1); Bal(1); Bal(1); Bal(1); Bal(1); Bal(1);
 }

@@ -1044,10 +1044,7 @@ struct W7_Car {
 
 // ---- functions in address order ----
 // NONMATCHING: RALLYTROPHY 0x45ad40
-// Best tested form: 1402/1404 bytes, 696 differing bytes. Making Camber's rear reference height improves
-// the FPU/stack schedule; Toe reference/base/output values, a one-time reference store, and factoring
-// the Toe base after its branch are worse. Other differences remain in the toe
-// blocks, wheel-matrix stack slots, and the target's hoisted 1.0f register. Evidence: ev_44efd80de74fa57abbe051afd7c89aabb5cbbfca52bc9ff6c566f2d37ba828ec.
+// Round 18 (2026-11-17): rear block reuses front sp1/tb variables (one slot each, frame now 0x20 = orig; y2 accumulates in tb) 38 -> 26 insns. Left: orig a1 at -0xc/l1 at -0x10 (ours a1 takes dead dt slot +8, l1 at -0xc); decl order, scopes, ref-local, steer-test placement did not move it.
 // Tried 2026-10-30 night: hand-inlined Toe/Camber using the dt param slot as the ref temp (matches orig [ebp+8]) with base/spring1 copied to locals, and reloading wheel damage per use (114->73 insns differ); still differs: orig keeps x and spring0/base on the FPU stack across the steer math (slot/frame 0x20 vs 0x1c), a/x/y declaration order and wheel-ptr hoisting had no effect.
 // Tried 2026-11-01 re-pass: loads of spring0/toeBase into locals (all-operands-first fld) plus reusing tb as the y accumulator (y stored in the toe-base slot) 73->53 insns differ; still differs: orig interleaves the tb/sp1 int spills with the flds, frame 0x20 vs 0x1c, and wheel-matrix temp slots.
 // Round 17 (2026-11-15): rear block mirrors front (cb, sp2 int spills, then s3/cb0 fld; sp1 loaded before tb) 53 -> 41 insns, size 1404 = orig; left: frame 0x20 vs 0x1c (orig keeps sp1 slot reserved, l1 at -0x10, a1 at -0xc; declaration/scope/ref-local variants did not move it).
@@ -1154,15 +1151,15 @@ void Car::UpdateSteering(float dt)
         v->wheel[3].row1[1] = r->y;
         v->wheel[3].row1[2] = r->z;
     } else {
-        float sp2 = v->spring[2].value;
-        float cb = v->camberBase;
+        sp1 = v->spring[2].value;
+        tb = v->camberBase;
         float s3 = v->spring[3].value; float cb0 = v->camberBase;
-        float x2, y2;
+        float x2;
         dt = v->rearRef[v->tuning];
         if (s3 < dt) x2 = (dt - s3) * v->rearIn[v->tuning] * v->camberIn + cb0;
         else x2 = (s3 - dt) * v->rearOut[v->tuning] * v->camberOut + cb0;
-        if (sp2 < dt) y2 = (dt - sp2) * v->rearIn[v->tuning] * v->camberIn + cb;
-        else y2 = (sp2 - dt) * v->rearOut[v->tuning] * v->camberOut + cb;
+        if (sp1 < dt) tb = (dt - sp1) * v->rearIn[v->tuning] * v->camberIn + tb;
+        else tb = (sp1 - dt) * v->rearOut[v->tuning] * v->camberOut + tb;
         W3_Wheel* w3 = &v->wheel[3];
         w3->row2[0] = 0;
         w3->row2[1] = 0;
@@ -1177,12 +1174,12 @@ void Car::UpdateSteering(float dt)
             W3_CROSS();
         }
         W3_Wheel* w2 = &v->wheel[2];
-        w2->row1[1] = (float)cos(-y2);
+        w2->row1[1] = (float)cos(-tb);
         w2->row2[1] = 0;
         w2->row2[2] = 1.0f;
         w2->row1[2] = 0;
         w2->row2[0] = 0;
-        w2->row1[0] = (float)sin(-y2);
+        w2->row1[0] = (float)sin(-tb);
         {
             float* cb = w2->row2;
             float* ca = w2->row1;
@@ -1191,6 +1188,7 @@ void Car::UpdateSteering(float dt)
         }
     }
 }
+
 
 // original: FUN_0045b2c0
 __declspec(naked)

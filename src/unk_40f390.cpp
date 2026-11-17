@@ -258,8 +258,9 @@ static __forceinline void GridInsert(GridPtrVec* v, int* P, const int& X)
         v->last = e + 1;
     } else {
         v->Ucopy(v->last - 1, v->last, v->last);
-        int* d = v->last;
-        for (int* f = v->last - 1; P != f; )
+        int* f = v->last;
+        int* d = f;
+        for (--f; P != f; )
             *--d = *--f;
         for (int* p = P; p != P + 1; ++p)
             *p = X;
@@ -273,6 +274,7 @@ static __forceinline void GridInsert(GridPtrVec* v, int* P, const int& X)
 // Tried 2026-10-30 night: 292->187 via `float r2 = rr*rr; if (len < r2)` and local GridPtrVec* r/a for the two Ins calls; loop forms/goto/declaration order/pragma flags (a,g,w,t,y,s) no effect; still differs: original loops are unrotated (head test once, i/ebx=0 in regs) and GridInsert block layout/slots.
 // Tried 2026-11-01 re-pass: ~25 variants (while/for-header/goto loop heads, volatile zero local for the ebx=0 compare, i/made/attached/ScenePoint/r,a declaration order, self pointer, ++i in progress expr, volatile flags, len-after-r2); none below 187 insns differ; still differs: loop-head layout (original unrotated, i in ecx, ebx=0 live) and GridInsert block layout.
 // 2026-11-13 pass: 187 -> 87 insns differ (1722 -> 1709 bytes): loops as `while (1)` + break (unrotated), `++k` in progress expr, GridInsert std::max(1,s) order, e/P!=f/last=e+1 forms, per-loop v=&c->records..; left: ecx/eax regs for nodeFirst[k]->node, branch-3 `mov ecx,eax; add eax,-4` vs lea.
+// 2026-11-17: 92 -> 84 insns (1709 -> 1710 bytes): k shares i (one loop var), allRefs.Ins direct, GridInsert f=last;--f. Left: i/made slot swap (made outranks i), orig `mov ebx,eax` nodeFirst copy, `add eax,-4` vs lea/sub (VC6 normalizes += -1 forms), j*0x48 operand order.
 // original: FUN_0040fcc0
 void StageGrid::Build()
 {
@@ -311,19 +313,18 @@ void StageGrid::Build()
         if (!attached) {
             made = new GridRef(o);
             GridPtrVec* r = &cell->refs;
-            GridPtrVec* a = &allRefs;
             r->Ins((GridRef**)r->last, 1, &made);
-            a->Ins((GridRef**)a->last, 1, &made);
+            allRefs.Ins((GridRef**)allRefs.last, 1, &made);
         }
         label->SetProgress((float)(int)(i + 1) / (float)(unsigned int)(objFirst == 0 ? 0 : objLast - objFirst) * DAT_0050846c + DAT_00508468);
         i++;
     }
-    unsigned int k = 0;
+    i = 0;
     while (1) {
-        if (nodeFirst == 0 || k >= (unsigned int)(nodeLast - nodeFirst))
+        if (nodeFirst == 0 || i >= (unsigned int)(nodeLast - nodeFirst))
             break;
-        nodeFirst[k]->node->Slot3();
-        label->SetProgress((float)(int)++k / (float)(unsigned int)(nodeFirst == 0 ? 0 : nodeLast - nodeFirst) * DAT_00508464 + DAT_00508460);
+        nodeFirst[i]->node->Slot3();
+        label->SetProgress((float)(int)++i / (float)(unsigned int)(nodeFirst == 0 ? 0 : nodeLast - nodeFirst) * DAT_00508464 + DAT_00508460);
     }
     for (int j = 0; j < count48; j++) {
         BYTE* rec = records48 + j * 0x48;
