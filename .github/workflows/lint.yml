@@ -6,6 +6,6 @@ jobs:
   python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       # Matching needs VC6 and the retail executable, so CI only checks the tooling.
       - run: python3 -I -m compileall -q tools
