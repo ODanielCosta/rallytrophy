@@ -109,18 +109,12 @@ struct F_CarView {
 
 // Copies the point velocity of w (returned through the hidden pointer t) into a Car vector member.
 #define F_STORE(dst) \
-    { F_Vec* r = c->body->FUN_004204f0(&t, &w); (dst).x = r->x; (dst).y = r->y; (dst).z = r->z; }
+    { F_Vec* r = c->body->FUN_004204f0(&t, &w); H_Cp(dst, r); }
 
-// NONMATCHING: RALLYTROPHY 0x452b20
-// Pass 2026-11-13: insdiff lines 489->229, size 5077->4994 (orig 5036): H_Normalize tail as v[0]*(1/len), (1/len)*v[1], (1/len)*v[2] (indicators match; H_Normalize1 keeps inv local for v[0]); part2020/2024 build the difference as block-local H_V3 dir2 = B - A (result written in place, no copy into a function-scope dir); part2020 A first then A.x -= t before A.z. Still differs: A/B frame offsets (orig A=-0x50, B=-0x40 with 4-byte gap; a pad subclass did not help), sum-chain scheduling (mov/faddp order), hood m[9] = -m[6] reload (fstp;fld;fchs), the first Normalize1 extra fld st(0).
-// Tried 2026-10-30 night: ~80 variants (struct copy, += forms, x as one expression, volatile on copy/add/expr per axis); best is x as a
-// Re-pass 2026-11-01: sums rewritten in the asm's fadd order (chained temps in H_Normalize/H_Normalize1/lenSq, loc.* dot as z,y,x chain written into loc directly), H_AddPos as fld o; fadd p via a temp, one function-scope H_V3 dir puts the float temps in the original's -0x34 slot (insdiff 362->237 lines); still differs: dir/A/B Vec copy order at the part2020/2024 blocks, normalise tail (fld st(0); fmul mem vs fld mem; fmul st,st(1)), lea/pointer-setup order in H_Cross sites, EH-state init order at 0xd8/0xc8.
-// volatile expression + volatile y/z adds (23->17); the original delays the y/z fstp past the argument setup, which no form reproduces.
-// Tried 2026-10-31 re-pass: ~50 more variants (plain/two-temp/int-copy/volatile y,z; forceinline Add helpers; x as volatile expr or two-temp); none beat 17 insns, permute -r 40 found nothing; the original interleaves the F_STORE copy loads with fld/fadd and delays fstp p.x/y/z, which no source form reproduces.
-// Tried 2026-11-11: the plain form (copy x, y, z; then += x, y, z; no volatile) has the original's instruction set
-// at the exact size but starts the x87 chain three integer moves early (21 insns vs 17 with the volatile form kept
-// here); the result copy as a struct assignment, int copies or int temporaries does not move it.
-// 2026-11-16 round 22: ~20 more variants, none beat 17 insns: G_Copy float form is moot (the copy is already int movs in the original, and ours); sums non-volatile/lamp-first/deferred p.x via block temp, struct-assign and local-temp result copies all 21-41 insns (one temp form: 135 bytes but 25 insns).
+static __forceinline void H_Cp(F_Vec& d, const F_Vec* r) { d.x = r->x; d.y = r->y; d.z = r->z; }
+// Lever: operand/parameter order (l before a) decides which add operand VC6 fld's first; helper pins the p stores.
+static __forceinline void H_P(Vec3& p, const Vec3& l, const Vec3& a) { p.x = a.x + l.x; *(int*)&p.y = *(int*)&a.y; *(int*)&p.z = *(int*)&a.z; p.y += l.y; p.z += l.z; }
+/* FUNCTION: RALLYTROPHY 0x452b20 */
 void Car::FUN_00452b20()
 {
     F_CarView* c = (F_CarView*)this;
@@ -133,10 +127,10 @@ void Car::FUN_00452b20()
     F_Set(p, 0.0f, 0.0f, c->body->unka8);
     c->body->ToWorld(&w, &p);
     F_STORE(c->point0);
-    *(volatile float*)&p.x = c->driverB.x + c->lamp0.x; p.y = c->driverB.y; *(volatile float*)&p.y += c->lamp0.y; p.z = c->driverB.z; *(volatile float*)&p.z += c->lamp0.z; 
+    H_P(p, c->lamp0, c->driverB);
     c->body->ToWorld(&w, &p);
     F_STORE(c->point2);
-    *(volatile float*)&p.x = c->driverA.x + c->lamp1.x; p.y = c->driverA.y; *(volatile float*)&p.y += c->lamp1.y; p.z = c->driverA.z; *(volatile float*)&p.z += c->lamp1.z; 
+    H_P(p, c->lamp1, c->driverA);
     c->body->ToWorld(&w, &p);
     F_STORE(c->point3);
 }
@@ -683,6 +677,8 @@ inline void H_Normalize1(float* v)
 
 // NONMATCHING: RALLYTROPHY 0x453940
 // Logic complete (5010 of 5036 bytes; 3310 differing bytes). The trunk and hood angles now match the target's register
+// Pass 2026-11-13: insdiff lines 489->229, size 5077->4994 (orig 5036): H_Normalize tail as v[0]*(1/len), (1/len)*v[1], (1/len)*v[2] (indicators match; H_Normalize1 keeps inv local for v[0]); part2020/2024 build the difference as block-local H_V3 dir2 = B - A (result written in place, no copy into a function-scope dir); part2020 A first then A.x -= t before A.z. Still differs: A/B frame offsets (orig A=-0x50, B=-0x40 with 4-byte gap; a pad subclass did not help), sum-chain scheduling (mov/faddp order), hood m[9] = -m[6] reload (fstp;fld;fchs), the first Normalize1 extra fld st(0).
+// Re-pass 2026-11-01: sums rewritten in the asm's fadd order (chained temps in H_Normalize/H_Normalize1/lenSq, loc.* dot as z,y,x chain written into loc directly), H_AddPos as fld o; fadd p via a temp, one function-scope H_V3 dir puts the float temps in the original's -0x34 slot (insdiff 362->237 lines); still differs: dir/A/B Vec copy order at the part2020/2024 blocks, normalise tail (fld st(0); fmul mem vs fld mem; fmul st,st(1)), lea/pointer-setup order in H_Cross sites, EH-state init order at 0xd8/0xc8.
 // x87 divides; staged a2/b1 and wrapped-phase locals align the wiper arithmetic schedule. Remaining issues include
 // the 12-byte frame/rotation-local displacement, three inline normalisations, and offset-add operand order.
 // Tried 2026-10-30 night: 336->282 insns via A/B declared B-first and the second dir via a dir2 temp copy (adds the original's extra 12-byte frame slot, but also an extra copy: 5064 vs 5036 bytes); dummy locals, dir-first, loc/d swap, acc/w reorders did nothing; still differs: hole above loc, inlined normalise schedule, x/y order of lenSq.

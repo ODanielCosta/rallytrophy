@@ -307,6 +307,7 @@ extern int DAT_00501454;
 extern int DAT_00501458;
 
 // NONMATCHING: RALLYTROPHY 0x491130
+// 2026-11-17: new Car in a local (Car* c; car = c; c->player = this) 17 -> 14 insns; ~25 more (setup/mode decl order, += setup, ternary mode, self copy, helper) keep setup/mode swapped (ebp/esi).
 // 2026-11-12: all 16 placements of the a/b/mode/flag initialisers (declaration vs both branches) tried; the declaration form (17 insns) stays best.
 // Same size and flow; VC6 gives the four live values (a, b, setup, mode) other registers
 // (original: ebx=0x501428 value, edi=0x50142c value, ebp=setup pointer, esi=mode).
@@ -320,6 +321,7 @@ void Player::FUN_00491130()
     if (DAT_00501458 && !DAT_00501454) {
         ai = new AIDriver(this);
     }
+
     int a = DAT_00501428, b = DAT_0050142c, mode = 0, flag = 1, index;
     BYTE* setup;
     if (local) {
@@ -332,15 +334,10 @@ void Player::FUN_00491130()
         if (a > DAT_004ff5f0[index]) a = DAT_004ff5f0[index];
         setup = (BYTE*)DAT_0056b0c8 + 0x139404;
     }
-    if (unk40 == 2) {
-        b = 0;
-        a = 0;
-        mode = 4;
-        flag = 0;
-        setup = 0;
-    }
-    car = new Car(setup, unk2c, index, b, flag, a, mode);
-    car->player = this;
+    if (unk40 == 2) { b = 0; a = 0; mode = 4; flag = 0; setup = 0; }
+    Car* c = new Car(setup, unk2c, index, b, flag, a, mode);
+    car = c;
+    c->player = this;
 }
 
 // FUNCTION: RALLYTROPHY 0x491350
