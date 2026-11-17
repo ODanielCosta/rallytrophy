@@ -32,6 +32,8 @@ file (queue and log), and leaves `python3 -I tools/match.py` fully passing.
 
 ## Log
 
+- 2026-11-17 (afternoon): residual-pattern survey over all 140 insdiffs: `mov r,[m]; test r,r` vs `cmp [m],0` occurs only in 0x4b0180, `lea eax; mov ebp,eax` only in 0x461a40, so no synthetic study of either unlocks more than one function. The helper parameter-order lever does not carry over to stack/global operands (0x4ad1d0, 0x470940: all forms identical; notes in the sources and NOTES.md).
+
 - 2026-11-17 (wave of nine Sonnet agents on 33 near misses, plus second rounds): MATCH 0x452b20 `Car::FUN_00452b20` (F_STORE copy and the p sums as `__forceinline` helpers; helper parameter order picks the fld operand; two volatiles removed). 0x48b620 42 -> 29 insns at exact size (scale stores written out instead of SetScale), 0x491130 17 -> 14 (new Car through a local). Not merged: ReadBatch and 0x48a920 gains that needed new volatiles. Everything else (RecordTable twins, StageScreen, ColModel, Screen1378, model readers, AIDriver, 0x4ab910 family, CityLight) unchanged; the residuals are register choices that earlier passes already logged.
 
 - 2026-11-16 (Kimi, RasteriseObject): 0x4721b0 improves 30 -> 23 differing instructions at exact 1372-byte size using the target's x86 vertex-clear loop; remaining differences are two instruction-order clusters. Evidence ev_4240455cbe14a14f3854d481b1b393fabc7c3fa1e8580120352af03636fc2e2c.
