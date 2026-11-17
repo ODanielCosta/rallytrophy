@@ -698,6 +698,9 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
 - **Calling conventions of hand-declared callees:** a helper declared `__fastcall` that is really a member (thiscall, ecx = this + stack args) still compiles but shifts pushes/registers (`push edx`, `xor edx,edx` vs `push ebp`). Check the callee's own definition (grep its address in src/) before chasing scheduling.
 - **Per-component vector sums** (`v.x = a[0]; v.x += e.x; v.y = a[1]; ...`) reproduce x87 sequences that struct copies plus `+=` do not (SweepQuery::Cast 251 -> 181).
 
+## Register swaps that one extra use fixes (2026-11-17)
+- RecPool::Push 0x4013c0 (car/clock ebx/ebp) and ServiceMenu::DrawRepair 0x44a420 (-1 constant vs dp) both flip to the original's registers when one more REAL use is added (a redundant loop compare; a second `col.value = -1` store in the loop). Inert uses (`x;`, `x += 0`, self-assignment) are optimised away first and change nothing. Both variants cost 2-7 bytes, so they were not kept, but they show the original source has one more use of that variable somewhere that compiles to no extra code (e.g. a value reused from a register in a compare or call argument). Look for such a use before trying more statement orders.
+
 ## Dossier caveat (2026-11-17)
 - `tools/dossier.py`/`triage.py` EH-state columns count only immediate `mov [ebp-4],N` stores. A state stored from a register (`mov [ebp-0x4],edi` with edi = 0) or byte flags near the frame end make phantom "missing/extra state" leads: ColModel 0x41a890, TriCollector::ContactList 0x419be0 and GameG8 0x433bc0 all store the original's state sequence already. Check the raw stores with objdump before briefing an EH lead.
 

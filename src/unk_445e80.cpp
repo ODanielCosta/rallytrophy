@@ -1295,6 +1295,7 @@ void ServiceMenu::DrawTune()
 // 2026-11-12: 30 more variants (loop tp pointer, if/else and SetColorObj colour, direct text->color, x/y decl swap, k/dp declaration placement): unchanged 165 insns; i/tp and -1/dp register pairs stay swapped.
 // 2026-11-13 round 2: 65->63 insns (x(339) computed before y(262)); ~45 more variants on the -1/dp ebx/ebp swap (white int/Color locals, separate white for the loop, col set inside loop, dp/k/col order, loop forms, repair[7-k], float dv=*dp) all 65 or worse.
 // 2026-11-15 round 15: 63->62 insns (u and v both initialised before the level tests); k-- order, y+=, dp++ order, SetColorObj/scale/x/y reorders, non-volatile k all no gain.
+// 2026-11-17: an extra col.value=-1 store inside the damage loop (before its DrawQuad) fixes the ebx/ebp swap (insdiff 150->131) but adds 7 bytes (or ebx + spill); no zero-code way found to raise the -1 weight. Loop-tail/dp++/k order, Color(-1) temp, text->color direct, dv local: no gain.
 // original: FUN_0044a420 (page 2 of Draw)
 void ServiceMenu::DrawRepair()
 {
