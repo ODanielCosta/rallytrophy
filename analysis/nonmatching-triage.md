@@ -103,7 +103,7 @@ Instruction-multiset view: 36 functions are pure register/scheduling permutation
 | 0x470610 | src/unk_46fdf0.cpp | ParallelShadow::Create | order | 715 | 715 | 131 | 0 | `push   ebx` | `mov    DWORD PTR [esi+0x174],ebx` |  |
 | 0x470940 | src/unk_46fdf0.cpp | ParallelShadow::Prepare | other | 3336 | 3336 | 388 | 24 | `push   edi` | `mov    BYTE PTR [ebx+0xc],cl` |  |
 | 0x471ab0 | src/unk_46fdf0.cpp | ParallelShadow::ProjectMeshes | size | 1770 | 1788 | 1093 | 51 | `push   ebp` | `push   ebx` |  |
-| 0x4721b0 | src/unk_46fdf0.cpp | ParallelShadow::RasteriseObject | order+registers | 1372 | 1372 | 38 | 0 | `lea    ecx,[edi+0x124]` | `fadd   DWORD PTR [ebp-0x10]` |  |
+| 0x4721b0 | src/unk_46fdf0.cpp | ParallelShadow::RasteriseObject | order+registers | 1372 | 1372 | 41 | 0 | `lea    ecx,[edi+0x124]` | `fadd   DWORD PTR [ebp-0x10]` |  |
 | 0x473470 | src/unk_472c90.cpp | RainEffect::Update | size | 3321 | 3324 | 2757 | 30 | `sub    esp,0x1c8` | `sub    esp,0x1cc` | eh 0,1,6,7,6,8,6,9,6,10,6,11,6,14,1,1,17,18,19,20,21,17,14,23,24,23,25,23,26,23,27,14 vs 0,1,6,7,6,8,6,9,6,10,6,11,6,14,0,0,1,1,17,18,19,20,21,17,14,23,24,23,25,23,26,23,27,14 |
 | 0x4746b0 | src/unk_4741a0.cpp | SkidMarks::AddSegment | other | 972 | 972 | 169 | 7 | `mov    esi,DWORD PTR [edi+0x150]` | `test   edx,edx` |  |
 | 0x4751b0 | src/unk_474c50.cpp | SnowFall::Update | size | 1745 | 1741 | 603 | 6 | `je     0x47586c` | `je     0x475870` |  |

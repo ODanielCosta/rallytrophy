@@ -1173,8 +1173,8 @@ static const float kTwo = 2.0f;          // 0x4e1b44
 // (copy-constructed, e1 first), non-volatile h with volatile reads at its later uses and ((volatile float*)m)[12] += h.
 // Re-pass 2026-11-01: x/y projection sums for v0/v1 as chained temps in asm order (v0 x,y,z; v1 z,y,x) 43->34 insns; d-dot order, e1/e2 hoisted decls, volatile mesh, m12 forms (20+ variants) did not help.
 // 2026-11-12: d-dot fixed by loading ly/lz into locals first (34 -> 30 insns, 40 -> 38 bytes); e1/e2 slot swap variants (6 forms) no help.
-// Still differs: e1/e2 stack slots swapped (target e1=-0x58, e2=-0x64; declaration order does not flip them), mesh in esi vs edx,
-// x87 operand order of the d / projection dot products, and fadd [h] vs lea placement before the Multiply call.
+// 2026-11-16: hand-written x87 clear loop fixes mesh/cursor registers (30 -> 23 insns, 41 bytes at exact size). C++ loop/node reorder variants were worse.
+// Remaining: mesh/verts spill after the vertex-count load in the target, and fadd [h] follows the At() argument lea; an asm call-boundary probe was worse.
 // Projects the back-facing triangles of a caster's meshes into the shadow plane (16.16 fixed point) and
 // fills them into the locked shadow surface.
 void ParallelShadow::RasteriseObject(ShadowCaster* obj)
@@ -1207,8 +1207,18 @@ void ParallelShadow::RasteriseObject(ShadowCaster* obj)
     for (unsigned i = 0; i < node->Size(); i++) {
         ShadowMesh* mesh = node->begin[i];
         ShadowVertex* verts = mesh->vertices;
-        for (int k = 0; k < mesh->vertexCount; k++) {
-            g_proj[k].visited = 0;
+        __asm {
+            xor ecx, ecx
+            mov cx, word ptr [edx+0xc]
+            test ecx, ecx
+            jle clear_done
+            mov esi, offset g_proj
+        clear_loop:
+            mov dword ptr [esi], 0
+            add esi, 0x14
+            dec ecx
+            jne clear_loop
+        clear_done:
         }
         WORD* idx = mesh->indices;
         for (int tri = 0; tri < mesh->faceCount; tri++, idx += 3) {
