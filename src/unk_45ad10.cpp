@@ -1621,6 +1621,7 @@ void Car::PhysicsStep(float dt)
 // Tried 2026-10-30 night: 9 more variants (plain a-b, swapped mul order, split front/rear, const-ref and volatile Sub helpers, hoisted spring locals); 84-87 insns differ at best (hoisting gives 84 but +20 bytes); original keeps both compress loads on the FPU as `fld A; fld B; fxch; fsub st,st(1)` + `fstp st(0)` (a by-value inline float call) which no source form reproduced.
 // Tried 2026-10-31 re-pass: 20 more variants (named-temp spring compress pair, init of dead/arm/world Vec3 from body fields, store order of lastLoad/load, volatile lastLoad store, arb fill order, decl order of body/c, rp increment placement, per-component force); still 84-87 insns differ; dead=*(Vec3*)rotation init makes size 756 = original but 84 insns; remaining diff is the original fld A; fld B; fxch; fsub st,st(1) compress pair and its four distinct induction pointer temps, not reproduced.
 // Pass 2026-11-16 (r25): 87 -> 77 insns differ (739 -> 754 bytes, orig 756): W6_Sub takes float temps (t=b; u=a) and its first args are read through W6_Rd, which reproduces the `fld A; fld B; fxch; fsub st,st(1); fstp st(0)` pairs; arb[3] copied as int bits (original fstp/mov eax). Open: loop induction slot numbers (arb/w/count at -0x18/-0x1c/-0x20 in the original, asm operand temps after them), dead/arm Vec3 slot swap, torque add operand order.
+// Pass 2026-11-17 (ws7): 77 -> 76 insns differ (754 bytes): `trans` declared after the force multiply (original assigns it between the two xforms). Tried without gain: ap/lp pointer induction, arm/dead/world decl order, contact int local, AddTo operand forms for torque, Vec3 arg temp for arm, statement swaps of force add/arm. Next: original keeps contact in ebx and pushes the cross-call args mid-force-add.
 // Per wheel: spring force + anti-roll term, applied to the body force and (arm x force) torque.
 void Car::ApplySuspensionForces()
 {
@@ -1649,12 +1650,12 @@ void Car::ApplySuspensionForces()
                 f = 0.0f;
             }
             const float* matrix = body->rotation;
-            const float* trans = body->position;
             const float* point = w->up;
             Vec3 dead;
             float* result = (float*)&dead;
             W6_XFORM();
             Vec3 force = *(Vec3*)&body->rotation[4] * f;
+            const float* trans = body->position;
             point = r - 10;
             Vec3 world;
             result = (float*)&world;
@@ -1674,6 +1675,7 @@ void Car::ApplySuspensionForces()
         }
     }
 }
+
 
 // NONMATCHING: RALLYTROPHY 0x45c700
 // original: FUN_0045c700. Current candidate: 1128/1144 bytes, 868 differing bytes outside relocations. Loading the
