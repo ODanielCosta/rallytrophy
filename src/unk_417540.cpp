@@ -107,6 +107,7 @@ struct V24 {
 // vector operations as in the original. Left: register allocation (the original keeps the record pointer in edi
 // and the trace in edi later) and the frame layout.
 // 2026-11-16 pass: POS/DIR/dv/lo/hi/sph copies as int-bit stores, dv -= POS, `a += Scale()`/`b += Scale()` (reads the returned pointer), rand compare flipped: 369 -> 297 insns differ, 2292 -> 2346 bytes (orig 2332).
+// 2026-11-17 pass: plain float ph local instead of the dt alias (297 -> 295 insns). No effect: sph/box store order, helper for box updates, trace pointer forms. Original floors the unrounded st0 and keeps ph as a real float slot ([ebp+0x10], fst); ours spills a double temp (frame +8); floor-first (ae) gives 2333 bytes but 314 insns.
 void Stage::FUN_00417540(Player* player, int time, int dt)
 {
     int car = *(int*)((BYTE*)player + 0x28);
@@ -213,12 +214,9 @@ tail:
         f5 = (float)dt * DAT_004e1400;
         r = REC(cur);
         F(0x1370, int) = F(0x1370, int) + dt;
-        // the original rounds the phase to float in the dead dt slot ([ebp+0x10]) before subtracting floor
-        float& ph = *(float*)&dt;
-        f4 = (f5 * F(0x23c, float) * rate) / F(0x234, float) + F(0x13a0, float);
-        ph = f4;
-        F(0x13a0, float) = f4;
-        F(0x13a0, float) = (float)(ph - floor(f4));
+        float ph2 = (f5 * F(0x23c, float) * rate) / F(0x234, float) + F(0x13a0, float);
+        F(0x13a0, float) = ph2;
+        F(0x13a0, float) = (float)(ph2 - floor(ph2));
         f5 = f5 * rate + F(0x139c, float);
         f4 = r[6];
         F(0x139c, float) = f5;
