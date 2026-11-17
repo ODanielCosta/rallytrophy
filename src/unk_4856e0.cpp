@@ -4245,6 +4245,7 @@ int RaceMode::FUN_0048b080(int award)
 }
 
 // NONMATCHING: RALLYTROPHY 0x48b620
+// 2026-11-17: 0.625 and the closing text scales as member stores (not SetScale): 42 -> 29 insns differ, size exact 1772.
 // 1768 (incl. 28-byte jump table) vs 1772. Same control flow, EH states (mouse 0, colour 1, position 2, uv 3),
 // switch table and cursor call (HudPoint by value) as the original. Differences: the original keeps 0 in edi and
 // never CSEs -1, reads the Color back from its stack slot in the button loop (this build folds it to an
@@ -4353,11 +4354,13 @@ int RaceMode::FUN_0048b620(int reset)
             text->Printf(DAT_0056b0ac, DAT_0056aea8 * 8.0f, DAT_0056aeac * 710.0f, "%i.", rank);
         }
         char buffer[16];
-        text->SetScale(DAT_0056aea8, DAT_0056aeac);
+        text->scaleX = DAT_0056aea8;
+        text->scaleY = DAT_0056aeac;
         text->Print(DAT_0056b0ac, DAT_0056aea8 * 114.0f, DAT_0056aeac * 708.0f, player->name, 0, 1.0f, 1.0f);
         FormatTime(player->FUN_00491f70(), buffer);
         text->Print(DAT_0056b0ac, DAT_0056aea8 * 558.0f, DAT_0056aeac * 708.0f, buffer, 0, 1.0f, 1.0f);
-        text->SetScale(DAT_0056aea8 * 0.625f, DAT_0056aeac * 0.625f);
+        text->scaleX = DAT_0056aea8 * 0.625f;
+        text->scaleY = DAT_0056aeac * 0.625f;
         text->Print(DAT_0056b0ac, DAT_0056aea8 * 114.0f, DAT_0056aeac * 738.0f, FUN_00405380(player->unk2c + 0x138), 0, 1.0f, 1.0f);
         if (player->unk1a14) {
             FormatSessionTime(player->unk1a14, buffer);
