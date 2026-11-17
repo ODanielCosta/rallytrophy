@@ -309,7 +309,15 @@ static __forceinline void Put2y(float* d, const TyreF2& r, const float* k)
     { float c_ = k[1]; d[1] = c_ * d[1]; }
 }
 // original: FUN_00465e90
+static __forceinline void Put2x(float* d, const TyreF2& r, const float* k)
+{
+    *(int*)&d[0] = r.i[0];
+    { float c_ = k[0]; d[0] = c_ * d[0]; }
+    *(int*)&d[1] = r.i[1];
+    { float c_ = d[1]; d[1] = k[1] * c_; }
+}
 // NONMATCHING: RALLYTROPHY 0x465e90
+// 2026-11-17 (Claude): zFriction through Put2x (copy0, k-first scale0, copy1, d-first scale1): 4 -> 2 insns. Left: x[0] fstp after the next GetVector2 temp lea in ours (orig stores first); all 90 legal Put3x statement orders and a Put2c helper for c: no change.
 // 1649 vs 1644 bytes. Strings (PathString: out-of-line _Tidy, inline assign), the nine key-template copies, the
 // digit patching and the per-surface fld/fmul/fstp sequence match; open: the induction pointer is biased to record+0x10
 // (original +0x18), the digit chars are kept in cl/dl (original al), and the runtime_error copy inlines _Tidy (original
@@ -383,13 +391,7 @@ void Car::FUN_00465e90(int value)
         }
         { float c_ = cp[5]; cp[5] = scale->cStiffness.v[0] * c_; }
         { float c_ = scale->cStiffness.v[1]; cp[6] = c_ * cp[6]; }
-        {
-            const TyreF2& r = *(const TyreF2*)&config.GetVector2(zFriction);
-            *(int*)&cp[7] = r.i[0];
-            *(int*)&cp[8] = r.i[1];
-        }
-        { float c_ = cp[7]; cp[7] = scale->zFriction.v[0] * c_; }
-        { float c_ = cp[8]; cp[8] = scale->zFriction.v[1] * c_; }
+        Put2x(&cp[7], *(const TyreF2*)&config.GetVector2(zFriction), scale->zFriction.v);
         Put2y(&cp[9], *(const TyreF2*)&config.GetVector2(xFriction), scale->xFriction.v);
     }
     Bal(1); Bal(1); Bal(1); Bal(1); Bal(1); Bal(1);
