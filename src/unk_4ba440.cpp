@@ -471,6 +471,7 @@ void SegmentInfo::Update()
 // original: 0x4ba620 etc. follow
 
 // NONMATCHING: RALLYTROPHY 0x4ba620
+// 2026-11-17: `f = sqrt(..); radius = f;` gives the original's fstp st(N) tail (7 -> 6 insns); left: w.x/w.y stored (w address-taken in the original); pointer/ref/reused-t forms no better.
 // 2026-11-16 pass 3: ~40 more tail variants (x-first sums, w.z=f, float locals, inline helpers, double r, FrLen helper) gave no gain; the original keeps w.x/w.y stores (fstp/fst) that ours drops. double r reaches 6 insns but 39 bytes, still 517 vs 523.
 // Semantics complete (inline-asm Xform/Rot, EBP frame). 66->47 insns differ: i-indexed loop over planes/tplanes + if/else idx stores.
 // Tried 2026-10-31 re-pass: ~35 variants (param-slot counter, q-pointer vs indexed, ternary vs if/else, 6 dot orders (original y,z,x kept), while/!= loops, t hoisted, a/c tail forms, volatile self); still differs: original has one induction pointer q with jmp-to-test loop and lea of P/T after the first Xform, esi/edi prologue swapped, tail a/c in stack temps.
@@ -499,7 +500,8 @@ void ViewFrustum::Init(FrustumDevice* device)
     ScenePoint w(planes[10], planes[18], 0.0f);
     float f = farD;
     w.x = w.x * f; w.y = w.y * f;
-    radius = (float)sqrt(w.y * w.y + f * f + w.x * w.x);
+    f = (float)sqrt(w.y * w.y + f * f + w.x * w.x);
+    radius = f;
 }
 
 // A vector with an empty destructor and the out-of-line operator- (0x414330): the live copy gives the original its EH frame.

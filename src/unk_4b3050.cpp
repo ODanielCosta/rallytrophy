@@ -17,7 +17,7 @@ struct Pod3 { float x, y, z; Pod3& operator+=(const Vec3& o) { x += o.x; y += o.
 // NONMATCHING: RALLYTROPHY 0x4b3800
 // SYMBOL: ?TriClosest4b@@YAMPAM0000@Z
 // Tried 2026-11-01: C++-linkage twin gives the original's EH frame; 12 declaration orders no effect (slots follow first use).
-// 2026-11-13 pass: 194 -> 103 insns differ (1381 -> 1443 vs 1473 bytes): Sub via S414Vec3 into a ScenePoint diff (EH object), END as float px/py/pz with out-of-line PS operator* (alternatename to ScenePoint's), goto-free Eberly if/else structure with leaf bodies duplicated; paren-regrouped e = (e + e + dist) + c at some leaves stops VC6 merging identical tails (bitmask search). Remaining: tail-merge pattern at the L_E/-e>=c leaves, s/t/e slot order (orig s,t,e = point,origin,e1 slots; ours e,t,s).
+// 2026-11-13 pass: 194 -> 103 insns differ (1381 -> 1443 vs 1473 bytes): Sub via S414Vec3 into a ScenePoint diff (EH object), END as float px/py/pz with out-of-line PS operator* (alternatename to ScenePoint's), goto-free Eberly if/else structure with leaf bodies duplicated; paren-regrouped e = (e + e + dist) + c at some leaves stops VC6 merging identical tails (bitmask search). 2026-11-17: both -e>=c leaves as `e = (e + e + dist) + c; t = 1.0f;` -> 100 insns, 1469 bytes. Failed: other leaf orders/regroups, 7 forms of the line-78 leaf, d/e/dist permutations, all d,e,s,t decl orders, SubV/derived-ctor helper (EH state store moves after Sub but doubles). Orig sets EH state after Sub; s/e slots swapped (s needs more refs than e). Remaining: tail-merge pattern at the L_E/-e>=c leaves, s/t/e slot order (orig s,t,e = point,origin,e1 slots; ours e,t,s).
 float __cdecl TriClosest4b(float* point, float* origin, float* e1, float* e2, float* out)
 {
     ScenePoint diff;
@@ -45,7 +45,7 @@ float __cdecl TriClosest4b(float* point, float* origin, float* e1, float* e2, fl
                     s = 0.0f;
                     {
                         if (e >= 0.0f) { t = 0.0f; e = dist; }
-                        else if (-e >= c) { t = 1.0f; e = (e + e + dist) + c; }
+                        else if (-e >= c) { e = (e + e + dist) + c; t = 1.0f; }
                         else { t = -(e / c); e = t * e + dist; }
                     }
                 }
@@ -53,7 +53,7 @@ float __cdecl TriClosest4b(float* point, float* origin, float* e1, float* e2, fl
                 s = 0.0f;
                 {
                         if (e >= 0.0f) { t = 0.0f; e = dist; }
-                        else if (-e >= c) { t = 1.0f; e = (e + e + dist) + c; }
+                        else if (-e >= c) { e = (e + e + dist) + c; t = 1.0f; }
                         else { t = -(e / c); e = t * e + dist; }
                     }
             }

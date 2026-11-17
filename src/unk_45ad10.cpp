@@ -1044,10 +1044,7 @@ struct W7_Car {
 
 // ---- functions in address order ----
 // NONMATCHING: RALLYTROPHY 0x45ad40
-// Best tested form: 1402/1404 bytes, 696 differing bytes. Making Camber's rear reference height improves
-// the FPU/stack schedule; Toe reference/base/output values, a one-time reference store, and factoring
-// the Toe base after its branch are worse. Other differences remain in the toe
-// blocks, wheel-matrix stack slots, and the target's hoisted 1.0f register. Evidence: ev_44efd80de74fa57abbe051afd7c89aabb5cbbfca52bc9ff6c566f2d37ba828ec.
+// Round 18 (2026-11-17): rear block reuses front sp1/tb variables (one slot each, frame now 0x20 = orig; y2 accumulates in tb) 38 -> 26 insns. Left: orig a1 at -0xc/l1 at -0x10 (ours a1 takes dead dt slot +8, l1 at -0xc); decl order, scopes, ref-local, steer-test placement did not move it.
 // Tried 2026-10-30 night: hand-inlined Toe/Camber using the dt param slot as the ref temp (matches orig [ebp+8]) with base/spring1 copied to locals, and reloading wheel damage per use (114->73 insns differ); still differs: orig keeps x and spring0/base on the FPU stack across the steer math (slot/frame 0x20 vs 0x1c), a/x/y declaration order and wheel-ptr hoisting had no effect.
 // Tried 2026-11-01 re-pass: loads of spring0/toeBase into locals (all-operands-first fld) plus reusing tb as the y accumulator (y stored in the toe-base slot) 73->53 insns differ; still differs: orig interleaves the tb/sp1 int spills with the flds, frame 0x20 vs 0x1c, and wheel-matrix temp slots.
 // Round 17 (2026-11-15): rear block mirrors front (cb, sp2 int spills, then s3/cb0 fld; sp1 loaded before tb) 53 -> 41 insns, size 1404 = orig; left: frame 0x20 vs 0x1c (orig keeps sp1 slot reserved, l1 at -0x10, a1 at -0xc; declaration/scope/ref-local variants did not move it).
@@ -1154,15 +1151,15 @@ void Car::UpdateSteering(float dt)
         v->wheel[3].row1[1] = r->y;
         v->wheel[3].row1[2] = r->z;
     } else {
-        float sp2 = v->spring[2].value;
-        float cb = v->camberBase;
+        sp1 = v->spring[2].value;
+        tb = v->camberBase;
         float s3 = v->spring[3].value; float cb0 = v->camberBase;
-        float x2, y2;
+        float x2;
         dt = v->rearRef[v->tuning];
         if (s3 < dt) x2 = (dt - s3) * v->rearIn[v->tuning] * v->camberIn + cb0;
         else x2 = (s3 - dt) * v->rearOut[v->tuning] * v->camberOut + cb0;
-        if (sp2 < dt) y2 = (dt - sp2) * v->rearIn[v->tuning] * v->camberIn + cb;
-        else y2 = (sp2 - dt) * v->rearOut[v->tuning] * v->camberOut + cb;
+        if (sp1 < dt) tb = (dt - sp1) * v->rearIn[v->tuning] * v->camberIn + tb;
+        else tb = (sp1 - dt) * v->rearOut[v->tuning] * v->camberOut + tb;
         W3_Wheel* w3 = &v->wheel[3];
         w3->row2[0] = 0;
         w3->row2[1] = 0;
@@ -1177,12 +1174,12 @@ void Car::UpdateSteering(float dt)
             W3_CROSS();
         }
         W3_Wheel* w2 = &v->wheel[2];
-        w2->row1[1] = (float)cos(-y2);
+        w2->row1[1] = (float)cos(-tb);
         w2->row2[1] = 0;
         w2->row2[2] = 1.0f;
         w2->row1[2] = 0;
         w2->row2[0] = 0;
-        w2->row1[0] = (float)sin(-y2);
+        w2->row1[0] = (float)sin(-tb);
         {
             float* cb = w2->row2;
             float* ca = w2->row1;
@@ -1191,6 +1188,7 @@ void Car::UpdateSteering(float dt)
         }
     }
 }
+
 
 // original: FUN_0045b2c0
 __declspec(naked)
@@ -1483,6 +1481,7 @@ void Car::FUN_0045b900(int dt)
 // sequence without changing the total mismatch count; hoisting wp2 to match the persistent Vec3 lifetime helps.
 // Remaining differences include EH state numbers (target: 3 persistent Vec3 locals), transform argument slots,
 // the radius-sum FPU stack, and post-collision centre-of-mass update order. Evidence: ev_c92c59602c67fd58248c61d5b8be6532014a74b970e4fb2582dd1e42d5e74d32.
+// Pass 2026-11-17 (ws10, 240->232 insns, 1989->2002 of 2002 = exact size, insdiff 530->~490 lines): savedPos[1..2] read through posp (original `lea esi,[ebx+0x14]; [esi+4]`), centre[1] also cached in a float local (cy, cz), V->dt stored before V->rate. Tried without gain: drag built in place from a Vec3 copy (frame 0x84, size 1983), arm/drag as float[3] PODs (EH states 4,3,5,6 vs orig 4,3,5,7), const-ref named cross-product temps, dropping volatile rotp (1975 bytes, worse). Orig facts: frame 0x8c (ours 0x90), wp2 persistent, arm at -0x38, cross-product return temp at -0x2c shared by both calls, n/loop count in frame slots, rate stored via fld/fstp.
 // Pass 2026-11-16b (1594->1450 differing bytes, 242->240 insns, 1986->1989 of 2002): centre[2] update reads cz into a float local first (int copy-in, fld/fadd/fstp-to-member as the original's centre[1..2] shape). Tried: 2-float YZ struct temp (1451 bytes but 2013 size), delayed centre.x store via local/double/duplicate store (R1/R2: no effect), dup store on cz, double cz, cy+cz locals: all worse.
 // One physics step of dt seconds: gravity, aerodynamic drag and downforce, suspension, brakes, drivetrain, tyre
 // forces, rigid body integration and the collision with the stage (restoring the pose when the body hit).
@@ -1493,8 +1492,8 @@ void Car::PhysicsStep(float dt)
 {
     W5_Body* b = V->body;
     Vec3 gravity(0.0f, -(b->mass * 9.81f), 0.0f);
-    DAT_00509418 = W5_PassFloat(V->rate);
     DAT_0050941c = V->dt;
+    DAT_00509418 = W5_PassFloat(V->rate);
     V->saved[0] = b->in14c[0];
     V->saved[1] = b->in14c[1];
     V->saved[2] = b->in14c[2];
@@ -1503,8 +1502,8 @@ void Car::PhysicsStep(float dt)
     float* volatile rotp = b->rot;
     V->savedMat = *(W5_Mat*)rotp;
     V->savedPos[0] = b->position[0];
-    V->savedPos[1] = b->position[1];
-    V->savedPos[2] = b->position[2];
+    V->savedPos[1] = posp->y;
+    V->savedPos[2] = posp->z;
     b->dt = dt;
     Vec3& force = *(Vec3*)b->force;
     Vec3& torque = *(Vec3*)b->torque;
@@ -1597,9 +1596,10 @@ void Car::PhysicsStep(float dt)
             delta.y *= 0.05f;
             delta.z *= 0.05f;
             *posp += delta;
+            float cy = b->centre[1];
             float cz = b->centre[2];
             b->centre[0] += delta.x;
-            b->centre[1] += delta.y;
+            b->centre[1] = cy + delta.y;
             b->centre[2] = cz + delta.z;
         }
     } else {
@@ -1623,6 +1623,7 @@ void Car::PhysicsStep(float dt)
 // Tried 2026-10-30 night: 9 more variants (plain a-b, swapped mul order, split front/rear, const-ref and volatile Sub helpers, hoisted spring locals); 84-87 insns differ at best (hoisting gives 84 but +20 bytes); original keeps both compress loads on the FPU as `fld A; fld B; fxch; fsub st,st(1)` + `fstp st(0)` (a by-value inline float call) which no source form reproduced.
 // Tried 2026-10-31 re-pass: 20 more variants (named-temp spring compress pair, init of dead/arm/world Vec3 from body fields, store order of lastLoad/load, volatile lastLoad store, arb fill order, decl order of body/c, rp increment placement, per-component force); still 84-87 insns differ; dead=*(Vec3*)rotation init makes size 756 = original but 84 insns; remaining diff is the original fld A; fld B; fxch; fsub st,st(1) compress pair and its four distinct induction pointer temps, not reproduced.
 // Pass 2026-11-16 (r25): 87 -> 77 insns differ (739 -> 754 bytes, orig 756): W6_Sub takes float temps (t=b; u=a) and its first args are read through W6_Rd, which reproduces the `fld A; fld B; fxch; fsub st,st(1); fstp st(0)` pairs; arb[3] copied as int bits (original fstp/mov eax). Open: loop induction slot numbers (arb/w/count at -0x18/-0x1c/-0x20 in the original, asm operand temps after them), dead/arm Vec3 slot swap, torque add operand order.
+// Pass 2026-11-17 (ws7): 77 -> 76 insns differ (754 bytes): `trans` declared after the force multiply (original assigns it between the two xforms). Tried without gain: ap/lp pointer induction, arm/dead/world decl order, contact int local, AddTo operand forms for torque, Vec3 arg temp for arm, statement swaps of force add/arm. Next: original keeps contact in ebx and pushes the cross-call args mid-force-add.
 // Per wheel: spring force + anti-roll term, applied to the body force and (arm x force) torque.
 void Car::ApplySuspensionForces()
 {
@@ -1651,12 +1652,12 @@ void Car::ApplySuspensionForces()
                 f = 0.0f;
             }
             const float* matrix = body->rotation;
-            const float* trans = body->position;
             const float* point = w->up;
             Vec3 dead;
             float* result = (float*)&dead;
             W6_XFORM();
             Vec3 force = *(Vec3*)&body->rotation[4] * f;
+            const float* trans = body->position;
             point = r - 10;
             Vec3 world;
             result = (float*)&world;
@@ -1676,6 +1677,7 @@ void Car::ApplySuspensionForces()
         }
     }
 }
+
 
 // NONMATCHING: RALLYTROPHY 0x45c700
 // original: FUN_0045c700. Current candidate: 1128/1144 bytes, 868 differing bytes outside relocations. Loading the

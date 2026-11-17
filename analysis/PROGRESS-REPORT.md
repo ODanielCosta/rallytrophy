@@ -15,12 +15,12 @@ _Updated 2026-11-17 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1944 / 2084 (93.28%) | 452,818 / 742,276 (61.00%) |
-| Written, not yet exact | 140 | 289,458 |
+| Byte-exact | 1946 / 2084 (93.38%) | 455,829 / 742,276 (61.41%) |
+| Written, not yet exact | 138 | 286,447 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   ██████████████████░░░░░░░░░░░░ 61.00% of code bytes
+exact   ██████████████████░░░░░░░░░░░░ 61.41% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -33,7 +33,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Startup helpers | `0x401000`–`0x404d50` | 61 / 65 / 65 | 74.2% | 100.0% | `████████████` |
 | Language / text table | `0x404d50`–`0x405580` | 13 / 13 / 13 | 100.0% | 100.0% | `████████████` |
 | Config files | `0x405580`–`0x409690` | 34 / 34 / 34 | 100.0% | 100.0% | `████████████` |
-| Stage scene and collision | `0x409690`–`0x420490` | 175 / 201 / 201 | 28.2% | 100.0% | `████████████` |
+| Stage scene and collision | `0x409690`–`0x420490` | 176 / 201 / 201 | 29.7% | 100.0% | `████████████` |
 | StageTable/control/credits screens | `0x420490`–`0x4266c0` | 34 / 39 / 39 | 49.7% | 100.0% | `████████████` |
 | Mode select screen | `0x4266c0`–`0x427600` | 9 / 9 / 9 | 100.0% | 100.0% | `████████████` |
 | Game settings screen | `0x427600`–`0x4295c0` | 11 / 11 / 11 | 100.0% | 100.0% | `████████████` |
@@ -84,7 +84,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Car shadows (ParallelShadow) | `0x46fdf0`–`0x472c90` | 65 / 69 / 69 | 36.8% | 100.0% | `████████████` |
 | Rain and view-matrix inverse | `0x472c90`–`0x4741a0` | 9 / 10 / 10 | 37.7% | 100.0% | `████████████` |
 | Skid marks | `0x4741a0`–`0x474c50` | 11 / 12 / 12 | 63.2% | 100.0% | `████████████` |
-| Snowfall | `0x474c50`–`0x4758b0` | 6 / 7 / 7 | 44.4% | 100.0% | `████████████` |
+| Snowfall | `0x474c50`–`0x4758b0` | 7 / 7 / 7 | 100.0% | 100.0% | `████████████` |
 | Sky | `0x4758b0`–`0x476490` | 13 / 14 / 14 | 51.1% | 100.0% | `████████████` |
 | Texture scroller and window rain | `0x476490`–`0x477370` | 17 / 19 / 19 | 49.0% | 100.0% | `████████████` |
 | Wheel spray | `0x477370`–`0x478020` | 13 / 13 / 13 | 100.0% | 100.0% | `████████████` |

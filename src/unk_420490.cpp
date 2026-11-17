@@ -824,19 +824,20 @@ public:
 // and the function's full frame/EH schedule still differ.
 // Tried 2026-10-30 night: fixed itoa/Year/EngineCC/Load/0xd4+0x68 sizes, StagePathText assign/append, per-texture temp strings (412 insns differ); still differs: this/count regs (ebx/edi vs edi/esi), ctor-time EH state placement for dir/path, and the texture-name temp lifetimes.
 // Tried 2026-11-01 re-pass: Bal(1) x1..8 at start, x1..30 at end, x1/x3 mid (17 variants): start/mid no change; end 10+ only drops 412->363 by suppressing inlines (built 2872 vs orig 3273 bytes, wrong direction); gap is whole-function regalloc (ebx=this/ebp=entry vs edi/esi), not budget.
+// 2026-11-17: e declared up front and set as `e = entries;` just before the main loop (makes e stack-resident like the original; first loop untouched), num[32] (was 36), wire f[] chains split into ascending stores: 165 -> ~80 insns, 3250 -> 3265 bytes (orig 3273). Open: `push 0xd4` for the next new hoisted above the wire stores (InitWireF forceinline helper no help), e/temp slots 0x1c/0x18 vs 0x18/0x14, i=0 / new-pointer reg (ebp vs esi).
 void StageScreen::LoadCars()
 {
     int i = 0;
     int n = count;
-    StageEntry* e = entries = new StageEntry[n];
+    StageEntry* e; entries = new StageEntry[n];
     for (int k = 0; k < n; k++) {
         ((DWORD*)&entries[k])[0x28] = 0;
         ((DWORD*)&entries[k])[0x29] = 0;
     }
-        for (i = 0; i < n; i++, e++) {
+        e = entries; for (i = 0; i < n; i++, e++) {
             IniFile ini;
             ini.Open((const char*)&PTR_DAT_004f6078, 0xb);
-            char num[36]; // 2026-11-11: sized to the original frame (was 32; +4 could equally be in buf; 198 -> 165 insns)
+            char num[32]; // 32 again once e is stack-resident (the 2026-11-11 +4 padding compensated for e in a register)
             char buf[256];
             FUN_004c1902(i + 1, num, 10);
             StagePathText dir("data/cars/car_");
@@ -889,15 +890,15 @@ void StageScreen::LoadCars()
             CarTex* t1 = new CarTex(path.c_str(), 0x841, 0);
             wire->tex[1] = (DWORD)t1;
             t1->Bind((int)DAT_0056b0ac); }
-            wire->f[0x10 - 2] = wire->f[0x11 - 2] = wire->f[0x12 - 2] = wire->f[0x13 - 2] = 0x3f800000;
-            wire->f[0x18 - 2] = wire->f[0x19 - 2] = wire->f[0x1a - 2] = wire->f[0x1b - 2] = 0x3f800000;
-            wire->f[0x1c - 2] = wire->f[0x1d - 2] = wire->f[0x1e - 2] = wire->f[0x1f - 2] = 0;
+            wire->f[0x10 - 2] = 0x3f800000; wire->f[0x11 - 2] = 0x3f800000; wire->f[0x12 - 2] = 0x3f800000; wire->f[0x13 - 2] = 0x3f800000;
+            wire->f[0x18 - 2] = 0x3f800000; wire->f[0x19 - 2] = 0x3f800000; wire->f[0x1a - 2] = 0x3f800000; wire->f[0x1b - 2] = 0x3f800000;
+            wire->f[0x1c - 2] = 0; wire->f[0x1d - 2] = 0; wire->f[0x1e - 2] = 0; wire->f[0x1f - 2] = 0;
             wire->f[0xe - 2] = 0x10;
             wire->f[0x27 - 2] = 2;
             wire->f[6 - 2] = 5;
             wire->f[7 - 2] = 6;
             wire->f[0x26 - 2] = 0xf;
-            wire->f[0x14 - 2] = wire->f[0x15 - 2] = wire->f[0x16 - 2] = wire->f[0x17 - 2] = 0;
+            wire->f[0x14 - 2] = 0; wire->f[0x15 - 2] = 0; wire->f[0x16 - 2] = 0; wire->f[0x17 - 2] = 0;
             UiItem* book = new UiItem;
             ((DWORD*)e)[0x29] = (DWORD)book; // +0xa4 (h1)
             { path.AssignString(PathCat2(dir, "/carbook.tga"), 0, std::string::npos);
@@ -919,6 +920,9 @@ void StageScreen::LoadCars()
     n1t->Bind((int)DAT_0056b0ac);
     SetItem(n1);
 }
+
+
+
 
 // ---- StageScreen::RefreshUnits (0x423b90) and StageScreen::Layout (0x421fa0) ----
 

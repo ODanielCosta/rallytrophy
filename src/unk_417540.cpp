@@ -107,6 +107,8 @@ struct V24 {
 // vector operations as in the original. Left: register allocation (the original keeps the record pointer in edi
 // and the trace in edi later) and the frame layout.
 // 2026-11-16 pass: POS/DIR/dv/lo/hi/sph copies as int-bit stores, dv -= POS, `a += Scale()`/`b += Scale()` (reads the returned pointer), rand compare flipped: 369 -> 297 insns differ, 2292 -> 2346 bytes (orig 2332).
+// 2026-11-17 pass: plain float ph local instead of the dt alias (297 -> 295 insns). No effect: sph/box store order, helper for box updates, trace pointer forms. Original floors the unrounded st0 and keeps ph as a real float slot ([ebp+0x10], fst); ours spills a double temp (frame +8); floor-first (ae) gives 2333 bytes but 314 insns.
+// 2026-11-17 pass 2: `int local30;` declared bare, `local30 = 0;` only in the else arm (ref-count slot order): 295 -> 279 insns, 2346 -> 2337 bytes. No effect: ph as inline Frac helper / address-taken / dt alias / `f=ph=expr` forms (all keep the double temp), px/pz/pz2 hoisted, car/local30 decl order, extra car refs.
 void Stage::FUN_00417540(Player* player, int time, int dt)
 {
     int car = *(int*)((BYTE*)player + 0x28);
@@ -118,7 +120,7 @@ void Stage::FUN_00417540(Player* player, int time, int dt)
 
     if (F(0x136c, int) == -1) {
         unsigned int i = 0;
-        int local30 = 0;
+        int local30;
         if (F(0x13ec, int) == 2) {
             if (F(0x13f0, int) <= 0) goto tail;
             if (!(F(0x13f4, int) < F(0x13f0, int))) F(0x13f4, int) = 0;
@@ -131,6 +133,7 @@ void Stage::FUN_00417540(Player* player, int time, int dt)
             local30 = (time - tk) + dt;
             F(0x13f4, int) = k + 1;
         } else {
+            local30 = 0;
             float px = *(float*)(*(int*)(car + 0x24) + 0x14);
             float pz = *(float*)(*(int*)(car + 0x24) + 0x1c);
             float r2 = F(0x240, float) * F(0x240, float);
@@ -213,12 +216,9 @@ tail:
         f5 = (float)dt * DAT_004e1400;
         r = REC(cur);
         F(0x1370, int) = F(0x1370, int) + dt;
-        // the original rounds the phase to float in the dead dt slot ([ebp+0x10]) before subtracting floor
-        float& ph = *(float*)&dt;
-        f4 = (f5 * F(0x23c, float) * rate) / F(0x234, float) + F(0x13a0, float);
-        ph = f4;
-        F(0x13a0, float) = f4;
-        F(0x13a0, float) = (float)(ph - floor(f4));
+        float ph2 = (f5 * F(0x23c, float) * rate) / F(0x234, float) + F(0x13a0, float);
+        F(0x13a0, float) = ph2;
+        F(0x13a0, float) = (float)(ph2 - floor(ph2));
         f5 = f5 * rate + F(0x139c, float);
         f4 = r[6];
         F(0x139c, float) = f5;

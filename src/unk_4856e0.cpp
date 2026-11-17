@@ -4145,6 +4145,7 @@ typedef void Generated_48b050();
 // ---- big draw functions ----
 
 // NONMATCHING: RALLYTROPHY 0x48b080
+// 2026-11-17 (~25 compiles, 143 insns unchanged): sx/sy/z order and placement, room/local in or before the loop, accumulate room. The original keeps a zero in ebp (`xor ebp,ebp`, `push ebp` for every flags argument, EH and z slot stores from it); every non-volatile zero form folds to `push 0`, so the volatile z stays.
 // Tried 2026-10-31: 188->152 insns with `RaceMode* volatile self = this` (this reloaded from its slot) and a volatile-stored zero `z` used for every flags argument (the original keeps 0 in ebp); volatile/int copies of xRank/xCar/xPoints, count/min forms, decl-order swaps and plain z (constant-folded) gave nothing more; still differs in frame size (0x48 vs 0x58) and the float local slots.
 // Tried 2026-11-01 re-pass: ~35 variants (no volatile self, plain z, result-first/result as flag arg, volatile award/count, point-loop forms, scored/count forms, iw/ih int locals, sy split, z placement); only iw/ih int locals before sx/sy helped (152->150 insns). Still differs: original keeps count/min in ebx/ebp (ours ebx/edi), spills this after push edi, and has 0x58 frame with xRank/xCar/xPoints copied through int regs at loop entry.
 // Pass 2026-11-13: 145->143 insns (807->750 differing bytes): xName declared before y, volatile z store moved after the iw/ih reads (just before Draw). Tried and rejected: done/result/loop counter as the shared zero (ebp), `volatile int done` (139 insns but new volatile), reordered done tests, sx/sy/iw/ih/color order swaps, ternary min.
@@ -4261,6 +4262,7 @@ int RaceMode::FUN_0048b080(int award)
 // constructed Color assigned 0x80000000 puts its store after the array-ctor pushes as in the original (410 -> 390).
 // 2026-11-12: tried SetScale for the 1.5625 pair, SetColorObj, colour store after the if, rank in a local: 390 -> 389 at best, no gain.
 // 2026-11-16 (round 23): rank read into a local before the Printf: 49 -> 42 insns differ, 329 bytes, size 1764 (8 short). tools/reorder.py moves were unsound here (SetScale above a Print, colour store above DrawRect) and rejected; Printf/scale-store order, player/color order, FormatTime temp: no gain.
+// 2026-11-17 loop 8: SetScale(DAT_0056aea8, DAT_0056aeac) for both reset scales (after Printf and at the end) gives 21 insns but size 1776 (+4: `mov ecx,ds:0` instead of A1 `mov eax,ds:0` for the dev load in the two 0.625 Prints; original loads dev early into eax). Not kept. Dev-in-local, PrintAt helper, operand swaps, Color/uv decl order, 0.625 as SetScale/locals: no gain.
 int RaceMode::FUN_0048b620(int reset)
 {
     TextRenderer* text = DAT_0056b0c8->text;

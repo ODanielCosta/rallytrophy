@@ -51,6 +51,7 @@ struct MsgError : std::exception {                   // std::logic_error layout:
     } str;
 };
 // NONMATCHING: RALLYTROPHY 0x401cf0
+// 2026-11-17 (~27 compiles, 200 insns unchanged): file->parts[k] in the loop (ref, begin()[k], const copy), k/i loop forms, member-alias stores of frames (int*, self, NParts helper): frames still forwarded in ebx; the cascade starts at the prologue.
 // 1186 vs 1213 bytes; the call sequence matches (20 calls) and the message string is a twin shaped like the
 // original (Tidy call, inline assign/append around _Grow). Left: register allocation (the original keeps `this`
 // in a slot and re-reads `frames` for every allocation) and the frame layout (0x48 vs 0x40).

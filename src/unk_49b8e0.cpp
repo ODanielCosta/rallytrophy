@@ -1754,14 +1754,13 @@ struct AiVelocity {
     float x, y, z;
 };
 
+// by-value Length: with ax/ay as float locals, a.x stays on the FPU like the original
+static __forceinline float Len(AiVelocity v) { return (float)sqrt(v.z * v.z + v.y * v.y + v.x * v.x); }
+
 // NONMATCHING: RALLYTROPHY 0x49f1f0
-// 485 vs 522 bytes, 354 differing bytes; logic complete. The original copies the two velocities into locals in a mixed fld/integer
-// 2026-11-16 L3: q1/q2 in y*y+z*z+x*x order (60 -> 58 insns, 495 bytes); direct sqrt(expr), named x*x temps, ac/bc copies, per-field/ref velocity copies (A-K) no better.
-// 2026-11-16 r23: Sub via S414Vec3 into a POD offset, x*x+z*z order (62 -> 60 insns, 351 bytes); float-local/field-wise/ref velocity copies (e1-e5,f1-f3,g1-g4) all 61-89 insns, no gain.
-// Tried 2026-10-31 re-pass (16 variants): named x*x temps (a, b, both) with z*z+y*y+xx and y*y+z*z+xx orders, offset.y=0 after/volatile/double dz, field-wise or reordered copies, reference-to-velocity (all 61-82 insns vs 62 baseline). Original orders: speed z*z+y*y+x*x, q y*y+z*z+x*x, a.x*a.x kept in st(0), b.x*b.x spilled to [esp+0x14], b.y/b.z kept in FPU after speed2; no source form found.
-// Tried 2026-10-30 night: const refs, component float copies, q-first sqrt(q), reordered Length/q, __forceinline by-value Len/Sq helpers (all 66-86 insns vs 62 baseline); original keeps x1 in FPU with x1*x1 reuse and spills copies at [esp+0x10..0x38], not reproduced.
-// pattern (x1 stays in the FPU, x1*x1 and x2*x2 are reused for the squared speeds) that plain struct copies and a
-// by-value helper (not inlined, EH frame) did not reproduce.
+// 2026-11-17: 58 -> 53 insns (496 bytes vs 522; insdiff 114 -> 104 lines): a from float locals ax/ay + by-value Len(a) (a.x stays on the FPU
+// as in the original); b side now matches. Residual: original loads a.y via fld and stores it twice ([34], temp [14]) and a.z via int to
+// [38] then [10]; ours moves y with ints. Older tries: x*x temps, double y/z locals, sqrt(expr), ref copies, Len for b too (514 bytes).
 int AIDriver::FUN_0049f1f0(Player* other)
 {
     int result = 0;
@@ -1774,12 +1773,13 @@ int AIDriver::FUN_0049f1f0(Player* other)
     if (closeness < DAT_004e1348) {
         closeness = 1.0f;
     }
-    AiVelocity a = *(AiVelocity*)player->car->body->velocity;
+    float* va = player->car->body->velocity;
+    float ax = va[0]; float ay = va[1]; AiVelocity a; a.y = ay; a.z = va[2]; a.x = ax;
     AiVelocity b = *(AiVelocity*)theirs->body->velocity;
-    float speed1 = a.Length();
+    float speed1 = Len(a);
     float speed2 = b.Length();
     float ratio = speed1 / speed2;
-    float q1 = a.y * a.y + a.z * a.z + a.x * a.x;
+    float q1 = ay * ay + a.z * a.z + ax * ax;
     float q2 = b.y * b.y + b.z * b.z + b.x * b.x;
     if (q1 * 2.5f > q2 || other->local && distance < 12.0f && q1 * 1.5f > q2) {
         result = 1;

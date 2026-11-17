@@ -2185,6 +2185,7 @@ static inline void AssignStd(NameString& n, const std::string& s)
 }
 
 // NONMATCHING: RALLYTROPHY 0x463940
+// 2026-11-17 (~30 compiles, unchanged): meters sites store 0x18/0x1c/0x20 in source order in the original (ours sinks them before the jne); whole-block and partial __forceinline helpers do not pin them here; light sprite 0xf CSE and 0x9c position unchanged by 9 orders.
 // 2026-11-15 pass: light sprite unk9c store moved after the color stores (before unk20): 66 -> 63 insns, 1115 -> 1101 bytes, 2923 bytes. Tried: meters store reorders (m1-m6, 64-70), volatile on blendSrc/Dst, unk9c at end / after lightSprite (no better).
 // 2026-11-13 pass: spriteCount non-volatile, tail store before ++count, SpriteName temp via pointer, AssignStd(b, dir + "x") (std::string temp, inline dtor): 1532->1115 bytes, 119->66 insns, 2936->2924. Left: meters stores 18/1c/20 scheduled late (2 sites), light sprite 2-in-edx/test dl, Brake/Reverse eax/edi load order; 300 store permutations per site found nothing better; QuadF helper and stale-volatile removal were worse.
 // 2026-10-31: 30 trailing discarded Bal(1) calls (N 27..37; fewer do nothing, 38+ over-spend) keep the early-return _Tidy calls out of line, chained cache stores reversed: 190->150 insns. Tried: JoinPath temp as the Assign argument (worse, 2977 bytes). Still differs: ADD_SPRITE count inc scheduling (mov/inc/mov vs inc mem), the original passes the operator+ result eax straight to Assign instead of lea of a named tmp, sprite store order.

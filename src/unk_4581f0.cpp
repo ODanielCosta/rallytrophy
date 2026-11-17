@@ -142,6 +142,7 @@ struct M2_IntVec : std::vector<int> {
 // Tried 2026-11-01 pass 3 (~65 variants): per-component Extend for ay/az as `unsigned sa=*(unsigned*)&e.c; float a=e.c; if (sg&sa){float t=a; t=t+mn.c; mn.c=t;}` DOES give the original's mov ecx,[e]; fld e; test; fadd mn shape (size 931->925) but h stays at the frame bottom; h declared before every local, h as float[3]+Vec3& (922 bytes, lo/hi slots then match but ay/az swap, h EH state lost), all 6 orders of ay/az/h, float[3] ay/az, qq volatile slot, volatile h.x store, volatile-view loads: slot order is not declaration-driven, so h above ay is unresolved.
 // Pass 2026-11-13: Scale() helper for ay/az, matrix declared before box, trans after the scaling, Length as z*z+y*y+x*x: 167 -> 134 insns differ, 931 -> 925 bytes. Left: ay/az scale shape (original fld st(0); fmul mem), h slot above ay, EH-state/Collect tail order.
 // Pass 2026-11-15: erase as M2_IntVec::EraseAll (copy + _Destroy both calls, call list now matches), ax/ay/az scaled with the written-out `hi.c - lo.c` (CSE), Extend per component with sign word + loaded edge: 134 -> 91 insns differ, 925 -> 915 bytes. Left: h/radius tail (original stores h to memory), mx(mn) copy order, Collect-arg order.
+// Pass 2026-11-17 (~30 variants, no gain): early/late point/result/trans decls, h forms, `double r = sqrt(..)` kept on the FPU with radius stored after center (917 bytes, sqrt-on-stack shape matches, 92 insns); h slot above ay still unresolved.
 // original: FUN_004581f0
 void Car::FUN_004581f0()
 {

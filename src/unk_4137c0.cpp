@@ -81,8 +81,12 @@ extern char* __cdecl FUN_004c1902(int value, char* buf, int radix); // _itoa
 struct FlareRect { float v[4]; ~FlareRect() {} };
 
 static __forceinline void SetV3(float& x, float& y, float& z, float a, float b, float c) { x = a; y = b; z = c; }
+static __forceinline void SetI(int& d, int v) { d = v; }
 static __forceinline void SetF(float& d, float v) { d = v; }
 // NONMATCHING: RALLYTROPHY 0x4137c0
+// 2026-11-17: sprite int stores via SetI (pins them in source order against the fstp copies; only works for
+// pointer-reloaded bases, `this`-based SetI is a no-op and adding many SetI sites changes unrelated codegen): 9 hunks left.
+// Round 2: `lp = ptr; if (lp == 0) lp = ""` + loc floats in locals: size 2910, 132 insns. `this`-based SetI via self ptr, tail const order: no effect.
 // 2942 vs 2914 bytes; frame is 0x24 larger (original shares stack slots between the ini-scope locals and the
 // CarBodyEnv number buffer) and the ring-key array initialisation order differs; flow, calls and strings match
 // Tried 2026-10-30 night: msg path c_str in a local, SetV3 forceinline (fld c,b,a order), re-lea loader; 342->314; still 0x24 bigger frame (num[32] not sharing slots with ini-scope arrays: block/hoist/int[8]/volatile pad all failed), key-array init order and EH-state placement differ.
@@ -129,9 +133,9 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
             layer.Append(map, strlen(map));
             ConfigVector2 size = config.GetVector2(sizeKey);
             ConfigVector3 loc = config.GetVector3(locKey);
-            const char* lp = ""; if (layer.ptr) lp = layer.ptr;
-            AT(Sky*, 0x6ac)->AddLayer(lp, (TextureLoader*)&AT(char, 0xd4), size.values[0],
-                                      size.values[1], loc.values[0], loc.values[1], loc.values[2]);
+            const char* lp = layer.ptr; if (lp == 0) lp = "";
+            float l0 = loc.values[0], l1 = loc.values[1], l2 = loc.values[2];
+            AT(Sky*, 0x6ac)->AddLayer(lp, (TextureLoader*)&AT(char, 0xd4), size.values[0], size.values[1], l0, l1, l2);
         }
     }
     if (AT(int, 0x22c) != 0) switch (AT(int, 0x22c)) {
@@ -183,34 +187,34 @@ void SceneSetup::FUN_004137c0(const FlareString& dir)
     AT(Sprite*, 0x9dc) = new Sprite;
     ATP(AT(Sprite*, 0x9dc), Texture*, 0) = loader->Load(env.c_str(), 0x40);
     SetF(ATP(AT(Sprite*, 0x9dc), float, 0x60), rc.v[0]);
-    ATP(AT(Sprite*, 0x9dc), int, 0x98) = 0xd;
-    ATP(AT(Sprite*, 0x9dc), int, 0x9c) = 2;
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x98), 0xd);
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x9c), 2);
     SetF(ATP(AT(Sprite*, 0x9dc), float, 0x64), rc.v[1]);
-    ATP(AT(Sprite*, 0x9dc), int, 0x18) = 5;
-    ATP(AT(Sprite*, 0x9dc), int, 0x1c) = 2;
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x18), 5);
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x1c), 2);
     SetF(ATP(AT(Sprite*, 0x9dc), float, 0x68), rc.v[2]);
-    ATP(AT(Sprite*, 0x9dc), int, 0x6c) = 0;
-    ATP(AT(Sprite*, 0x9dc), int, 0x70) = 0;
-    ATP(AT(Sprite*, 0x9dc), int, 0x74) = 0;
-    ATP(AT(Sprite*, 0x9dc), int, 0x78) = 0;
-    ATP(AT(Sprite*, 0x9dc), int, 0x7c) = 0;
-    ATP(AT(Sprite*, 0x9dc), int, 0x24) = 4;
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x6c), 0);
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x70), 0);
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x74), 0);
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x78), 0);
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x7c), 0);
+    SetI(ATP(AT(Sprite*, 0x9dc), int, 0x24), 4);
     Sprite* b = new Sprite;
     ATP(b, Texture*, 0) = ATP(AT(Sprite*, 0x9dc), Texture*, 0);
     SetF(ATP(b, float, 0x60), rc.v[0]);
-    ATP(b, int, 0x98) = 0xd;
-    ATP(b, int, 0x9c) = 2;
+    SetI(ATP(b, int, 0x98), 0xd);
+    SetI(ATP(b, int, 0x9c), 2);
     SetF(ATP(b, float, 0x64), rc.v[1]);
-    ATP(b, int, 0x18) = 5;
-    ATP(b, int, 0x1c) = 6;
-    ATP(b, int, 0x6c) = 0;
+    SetI(ATP(b, int, 0x18), 5);
+    SetI(ATP(b, int, 0x1c), 6);
+    SetI(ATP(b, int, 0x6c), 0);
     SetF(ATP(b, float, 0x68), rc.v[2]);
     AT(Sprite*, 0x9e0) = b;
-    ATP(b, int, 0x70) = 0;
-    ATP(b, int, 0x74) = 0;
-    ATP(b, int, 0x78) = 0;
-    ATP(b, int, 0x7c) = 0;
-    ATP(b, int, 0x24) = 4;
+    SetI(ATP(b, int, 0x70), 0);
+    SetI(ATP(b, int, 0x74), 0);
+    SetI(ATP(b, int, 0x78), 0);
+    SetI(ATP(b, int, 0x7c), 0);
+    SetI(ATP(b, int, 0x24), 4);
     AT(int, 0x714) = 0;
     AT(int, 0x718) = 0;
     AT(int, 0x71c) = 0;

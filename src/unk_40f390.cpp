@@ -22,12 +22,10 @@ static __forceinline int RoundF(float v)
 #define IV(p, o) (*(int*)((BYTE*)(p) + (o)))
 
 // NONMATCHING: RALLYTROPHY 0x40f390
-// reason: RoundF applied (EBP frame now from inline asm); built 2391 vs 2340 bytes, 2153 differ, regalloc differs.
-// Tried 2026-10-30 night: decl order/register/while-loop/pointer-walk/+1-folded nx variants, `StageGrid* g = this` member access + volatile diag in loop 1 (627->603 insns); still differs: original keeps this in esi and gx/gy/i in registers across loop tops (ours spills), x87 round interleave.
-// Tried 2026-11-01 repass: x87 association checked (only fsub/fsubr and slot differences, sums/lim/round chains agree); 11 variants (this-> direct, pointer-walk and count-down x loops, rows/cols locals, volatile g, double diag, while gy) all 599-642 insns differ vs 603 base; original uses count-down inner loops with cursor spills, ours differs in regalloc throughout, not within permuter range.
-// Tried 2026-11-16 (r26): type==2 branch swapped to `!= 2` first (594 vs 599 insns but +16 bytes), diag via cw/ch locals or direct members (603-624 insns), reorder.py sweep (no gain); calls.py shows all 6 calls match, so the +62 bytes are regalloc/spills (orig keeps this in esi), not extra inlining.
-// Pass 2026-11-16 (L2): vector loop bound as `i < (first==0 ? 0 : (last-first)>>2)` (inline size(); loops no longer rotated), type!=2 arm first, nx/ny = RoundF()+1 shared by both edges, margin non-volatile int copy: 2402 -> 2378 bytes, 599 -> 521 insns differ.
-// The point transform is the X87XformT asm helper (657 -> 627 differing instructions; the positional byte count got worse, 2153 -> 2190).
+// reason: built 2370 vs 2340 bytes, frame 0x80 vs 0x78, 411 insns differ (844 insdiff lines); regalloc: orig keeps gx/gy in eax/edx and cell in ebx, ours gx in edi.
+// Tried 2026-10/11: decl order, this-> direct, pointer-walk/count-down loops, volatile g, cols/rows locals, rd at function scope, cell at function scope, diag sqrt operand orders (no effect).
+// Residual: gx/cell slots swapped (orig gx -0x1c, cell -0x2c), diag prologue fld order, loop-2 obj spilled to its own slot (frame +8).
+// 2026-11-17: `Vec3Slot p` declared at the top of the type-list loop body (before obj), not inside the != 2 arm: 521 -> 411 insns, invW/invH slots match.
 void StageGrid::FillCells()
 {
     StageGrid* g = this;
@@ -38,7 +36,6 @@ void StageGrid::FillCells()
     float invH = DAT_004e1348 / g->cellH;
     float cw = g->cellW;
     float diag = (float)sqrt(cw * cw + g->cellH * g->cellH);
-    float rd;
     for (; gy < g->rows; gy++) {
         for (gx = 0; gx < g->cols; gx++) {
             BYTE* cell = g->cells + (g->cols * gy + gx) * 0xb0;
@@ -69,6 +66,7 @@ void StageGrid::FillCells()
                 }
             }
             for (i = 0; i < (unsigned int)(IV(cell, 0x74) == 0 ? 0 : (IV(cell, 0x78) - IV(cell, 0x74)) >> 2); ) {
+                Vec3Slot p;
                 int obj = IV(IV(IV(cell, 0x74) + i * 4, 0), 4);
                 if (IV(obj, 4) != 2) {
                     float r = g->radius + FV(obj, 0xc4);
@@ -83,7 +81,6 @@ void StageGrid::FillCells()
                     if (g->rows < y1) y1 = g->rows;
                     float lim = *(volatile float*)&diag * DAT_004e138c + r;
                     lim = lim * lim;
-                    Vec3Slot p;
                     X87XformT(&p.x, &FV(obj, 0xb8), &FV(obj, 0x20), &FV(obj, 0x14));
                     int y, x;
                     for (y = y0; y < y1; y++) {
@@ -129,7 +126,7 @@ void StageGrid::FillCells()
                     }
             }
             for (i = 0; i < (unsigned int)(IV(cell, 0x94) == 0 ? 0 : (IV(cell, 0x98) - IV(cell, 0x94)) >> 2); i++) {
-                rd = diag;
+                float rd = diag;
                 int obj = IV(IV(cell, 0x94), i * 4);
                 rd += DAT_004e13d4;
                 int nx = RoundF(rd * invW) + 1;
@@ -153,7 +150,7 @@ void StageGrid::FillCells()
                     }
             }
             for (i = 0; i < (unsigned int)(IV(cell, 0xa4) == 0 ? 0 : (IV(cell, 0xa8) - IV(cell, 0xa4)) >> 2); i++) {
-                rd = diag;
+                float rd = diag;
                 int obj = IV(IV(cell, 0xa4), i * 4);
                 rd += DAT_004e13d0;
                 int nx = RoundF(rd * invW) + 1;
@@ -258,8 +255,9 @@ static __forceinline void GridInsert(GridPtrVec* v, int* P, const int& X)
         v->last = e + 1;
     } else {
         v->Ucopy(v->last - 1, v->last, v->last);
-        int* d = v->last;
-        for (int* f = v->last - 1; P != f; )
+        int* f = v->last;
+        int* d = f;
+        for (--f; P != f; )
             *--d = *--f;
         for (int* p = P; p != P + 1; ++p)
             *p = X;
@@ -273,6 +271,7 @@ static __forceinline void GridInsert(GridPtrVec* v, int* P, const int& X)
 // Tried 2026-10-30 night: 292->187 via `float r2 = rr*rr; if (len < r2)` and local GridPtrVec* r/a for the two Ins calls; loop forms/goto/declaration order/pragma flags (a,g,w,t,y,s) no effect; still differs: original loops are unrotated (head test once, i/ebx=0 in regs) and GridInsert block layout/slots.
 // Tried 2026-11-01 re-pass: ~25 variants (while/for-header/goto loop heads, volatile zero local for the ebx=0 compare, i/made/attached/ScenePoint/r,a declaration order, self pointer, ++i in progress expr, volatile flags, len-after-r2); none below 187 insns differ; still differs: loop-head layout (original unrotated, i in ecx, ebx=0 live) and GridInsert block layout.
 // 2026-11-13 pass: 187 -> 87 insns differ (1722 -> 1709 bytes): loops as `while (1)` + break (unrotated), `++k` in progress expr, GridInsert std::max(1,s) order, e/P!=f/last=e+1 forms, per-loop v=&c->records..; left: ecx/eax regs for nodeFirst[k]->node, branch-3 `mov ecx,eax; add eax,-4` vs lea.
+// 2026-11-17: 92 -> 84 insns (1709 -> 1710 bytes): k shares i (one loop var), allRefs.Ins direct, GridInsert f=last;--f. Left: i/made slot swap (made outranks i), orig `mov ebx,eax` nodeFirst copy, `add eax,-4` vs lea/sub (VC6 normalizes += -1 forms), j*0x48 operand order.
 // original: FUN_0040fcc0
 void StageGrid::Build()
 {
@@ -311,19 +310,18 @@ void StageGrid::Build()
         if (!attached) {
             made = new GridRef(o);
             GridPtrVec* r = &cell->refs;
-            GridPtrVec* a = &allRefs;
             r->Ins((GridRef**)r->last, 1, &made);
-            a->Ins((GridRef**)a->last, 1, &made);
+            allRefs.Ins((GridRef**)allRefs.last, 1, &made);
         }
         label->SetProgress((float)(int)(i + 1) / (float)(unsigned int)(objFirst == 0 ? 0 : objLast - objFirst) * DAT_0050846c + DAT_00508468);
         i++;
     }
-    unsigned int k = 0;
+    i = 0;
     while (1) {
-        if (nodeFirst == 0 || k >= (unsigned int)(nodeLast - nodeFirst))
+        if (nodeFirst == 0 || i >= (unsigned int)(nodeLast - nodeFirst))
             break;
-        nodeFirst[k]->node->Slot3();
-        label->SetProgress((float)(int)++k / (float)(unsigned int)(nodeFirst == 0 ? 0 : nodeLast - nodeFirst) * DAT_00508464 + DAT_00508460);
+        nodeFirst[i]->node->Slot3();
+        label->SetProgress((float)(int)++i / (float)(unsigned int)(nodeFirst == 0 ? 0 : nodeLast - nodeFirst) * DAT_00508464 + DAT_00508460);
     }
     for (int j = 0; j < count48; j++) {
         BYTE* rec = records48 + j * 0x48;

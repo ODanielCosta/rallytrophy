@@ -233,6 +233,7 @@ struct OldScoreRecord {
 };
 
 // NONMATCHING: RALLYTROPHY 0x490470
+// 2026-11-17 (~30 compiles, 77 insns unchanged): Convert helper before/after count/index, count/index first, typed dst pointers, unsigned char index, row/base forms, record field orders. Orig keeps 230*(base+h) in ebp and 23*(base+h) in [esp+0x10] (ours reversed) and computes base*23 once per g.
 // 914 vs 929 bytes (86 insns differ, was 94). Structure, loops and frame are the same; the register assignment differs (this in ebp instead of ebx),
 // so the loop counters and several operands are swapped.
 // Tried 2026-10-30 night: OldScoreRecord needed pad25 (date at 0x28, 94->~92), `!g ? g : X` for the g loop base (94->86); folding the unk1f/+3 terms (c+1, old.unk24, base+h+3, count-counts), loop var declaration order and row hoisting leave 86; original keeps two induction values (230*(b+h) in ebp, 23*(b+h)+1 in a stack slot) and this in ebx.

@@ -1098,8 +1098,12 @@ void ServiceMenu::DrawInfo()
 }
 
 // NONMATCHING: RALLYTROPHY 0x449860
-// Logic and instruction stream ~88% aligned (3024 vs 3004 bytes incl. jump table). Open: the original keeps the -1 colour
-// in ebp (or ebp,-1 / mov [slot],ebp / push ebp) and has its EH Color slot above pos[]/uv[] (frame 0x90, mine 0x78).
+// 2026-11-17: frame now exact (0x90, 3004 bytes); insdiff 206 -> 145 lines. Levers: the two x-width forms were swapped
+// (`right` branch: single expression DAT*985 - GetWidth; timeLeft: x=DAT*985; x = x - GetWidth), buf[32], scaleX/scaleY as
+// direct member stores instead of SetScale (inline arg temps hoisted the second fld). Left: orig spills row to [esp+0x1c]
+// right after the scaleY fld (ours after the scaleY fstp), then eax/ecx/edx roles in the itoa/Print arg setup and the
+// -1/edi/esi/eax pairs in the tuneSprite else branch; the older notes (frame 0x98, buf[40]) are obsolete.
+// Tried: row at function scope, row==i, cost via unk28, SetScale/cost/color statement orders: no change.
 // Tried 2026-10-31: buf[16]->buf[40] matches the original frame size 0x90 (279->229); 720 decl-order permutations of uv/pos/color/buf/i/unused, x/y swap, separate j counter, color.value=-1, volatile z did not beat it; still differs: uv/pos/color/i slot order (original: i low, uv/pos above, Color above them) and -1 held in ebp.
 // Tried 2026-11-01 re-pass: ~20 variants (tune loop as do-while over int* tp with volatile k=5 like DrawRepair, k/row/i merged into one local, y/x and k/row/dummy decl orders, buf[32]/[40]); the code already equals the original apart from stack offsets (loops, -1 in ebp, calls identical) and decl order never moves scalar slots; original frame has x/y at 0x18/0x14 with a hole at 0x10 and row/k shared at 0x1c below uv/pos, ours puts x/y at 0x10/0x14 and the counter above pos (229 insns differ, all slot offsets); no behaviour bug found (per-entry tune[i] vs tuneOrig[i] already correct).
 // 2026-11-12: the two selector markers as `x = (...) * DAT; y = DAT * 551; stores` (x kept on the FPU stack like the original) and `int row = unk28;` hoisted above the second marker: 229 -> 63 insns differ (3000 vs 3004 bytes). Left: frame 0x98 vs 0x90 (original spills (float)tune[row] into a slot at 0x6c, ours adds slots) and the uv store order in the changed-tune quad.
@@ -1114,7 +1118,7 @@ void ServiceMenu::DrawTune()
     HudPoint uv[4];
     HudPoint pos[4];
     Color color(0xFFFFFFFF);
-    char buf[40];
+    char buf[32];
     int i;
     uv[0].x = uv[3].x = 0.0f;
     uv[1].x = uv[2].x = 1.0f;
@@ -1226,8 +1230,7 @@ void ServiceMenu::DrawTune()
             const char* left = FUN_00405380(G_left[unk28]);
             const char* right = FUN_00405380(G_right[unk28]);
             bigText->Print(DAT_0056b0ac, DAT_0056aea8 * 617.0f, y, left, 0, 1.0f, 1.0f);
-            x = DAT_0056aea8 * 985.0f;
-            x = x - bigText->GetWidth(right, 0);
+            x = DAT_0056aea8 * 985.0f - bigText->GetWidth(right, 0);
             bigText->Print(DAT_0056b0ac, x, y, right, 0, 1.0f, 1.0f);
         }
         lil->scaleX = DAT_0056aea8 * 0.75f;
@@ -1240,14 +1243,16 @@ void ServiceMenu::DrawTune()
         lil->Print(DAT_0056b0ac, x, y, FUN_00405380(0x77), 0, 1.0f, 1.0f);
         lil->color = DAT_00508c04;
         int cost = tuneTime[row];
-        lil->SetScale(DAT_0056aea8 * 1.5f, DAT_0056aeac * 1.5f);
+        lil->scaleX = DAT_0056aea8 * 1.5f;
+        lil->scaleY = DAT_0056aeac * 1.5f;
         itoa(cost, buf, 10);
         y = DAT_0056aeac * 200.0f;
         x = DAT_0056aea8 * 785.0f;
         x = x - lil->GetWidth(buf, 0);
         lil->Print(DAT_0056b0ac, x, y, buf, 0, 1.0f, 1.0f);
         itoa(timeLeft, buf, 10);
-        x = DAT_0056aea8 * 985.0f - lil->GetWidth(buf, 0);
+        x = DAT_0056aea8 * 985.0f;
+        x = x - lil->GetWidth(buf, 0);
         if (timeLeft < cost && tune[row] == tuneOrig[row]) {
             lil->SetColor(ColorArg(0xFFD14A4F));
         } else {
@@ -1295,6 +1300,7 @@ void ServiceMenu::DrawTune()
 // 2026-11-12: 30 more variants (loop tp pointer, if/else and SetColorObj colour, direct text->color, x/y decl swap, k/dp declaration placement): unchanged 165 insns; i/tp and -1/dp register pairs stay swapped.
 // 2026-11-13 round 2: 65->63 insns (x(339) computed before y(262)); ~45 more variants on the -1/dp ebx/ebp swap (white int/Color locals, separate white for the loop, col set inside loop, dp/k/col order, loop forms, repair[7-k], float dv=*dp) all 65 or worse.
 // 2026-11-15 round 15: 63->62 insns (u and v both initialised before the level tests); k-- order, y+=, dp++ order, SetColorObj/scale/x/y reorders, non-volatile k all no gain.
+// 2026-11-17: an extra col.value=-1 store inside the damage loop (before its DrawQuad) fixes the ebx/ebp swap (insdiff 150->131) but adds 7 bytes (or ebx + spill); no zero-code way found to raise the -1 weight. Loop-tail/dp++/k order, Color(-1) temp, text->color direct, dv local: no gain.
 // original: FUN_0044a420 (page 2 of Draw)
 void ServiceMenu::DrawRepair()
 {

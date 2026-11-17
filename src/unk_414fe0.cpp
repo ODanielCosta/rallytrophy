@@ -364,11 +364,13 @@ struct PlaceRec {
 __forceinline const char* CS(PlaceStr* s) { return s->ptr ? s->ptr : ""; }
 
 // NONMATCHING: RALLYTROPHY 0x4150b0
+// 2026-11-17 (Claude): dst before ext.x (all 120 orders of the five setup statements tried) and pd declared before the scale: 1 insn left - the pd slot store is hoisted into the dir -= start block (orig: after fmul [eax+4]). pd via a ScaleRet helper, SetP helper, decl/assign splits, inv local: no better.
 // Tried 2026-10-31: CS() forceinline helper (reloads the name pointer), no pos local, ext.z before ext.y, n+1 temp: 72 -> 31 insns.
 // Tried 2026-10-31 re-pass: ~30 variants (ext init order, brace init, pos/dir copy forms, Length as named double/temps, n+1 forms, inline-order); only pos copy via PlaceVec* p/q helped, 31 -> 29. Remaining: inlined-asm arg slot order, dir copy via mov ecx,eax, ext.y/z kept on FPU across Length.
 // 2026-11-15 r17: dir copy via PlaceVec* d/s with x,y,z stores (not struct assign) 29 -> 24 insns; Length/ext-init/up-init/n+1 variants no gain.
-// Still differs: ext/asm-slot store order, pos/dir copies (original loads z early, no lea base) and the original
-// keeps ext.y/z on the FPU across Length(); variants of copies, Length, volatile stores did not move it.
+// 2026-11-17: size now exact (697), 24 -> 5 hunks: ext.y/z as doubles + (y*y+z*z) grouping reproduces the FPU-resident Length; PlaceCross/PlaceTransform
+// args via pointer locals. Round 2: pointer locals declared in order m,t,e,d for each PlaceTransform, pd/pu after up init: 5 -> 2 hunks.
+// Left: first call stores [ebp-0x24]=ecx before [ebp-0x8]=edi (orig after); scale fstp/arg-slot scheduling. Scale forms/ext.x moves no gain.
 void StageSounds::FUN_004150b0(PlaceObj* o)
 {
     if (strlen(CS(&o->name)) < 8)
@@ -377,26 +379,37 @@ void StageSounds::FUN_004150b0(PlaceObj* o)
     int n = t[6] * 10 + t[7] - 0x210;
     PlaceRec* rec = (PlaceRec*)&placed[n * 0x12];
         PlaceVec ext;
-    ext.x = o->f[40];
     ext.z = 0.0f;
     ext.y = 0.0f;
-    PlaceTransform(&ext.x, &o->f[8], &rec->start.x, &o->f[5]);
+    float* dst = &rec->start.x;
+    ext.x = o->f[40];
+    float* pt1 = &o->f[5];
+    float* pm1 = &o->f[8];
+    float* pe1 = &ext.x;
+    PlaceTransform(pe1, pm1, dst, pt1);
     rec->start.y = o->f[6];
     ext.x = o->f[43];
-    PlaceTransform(&ext.x, &o->f[8], &rec->end.x, &o->f[5]);
+    float* pm = &o->f[8];
+    float* pt = &o->f[5];
+    float* pe = &ext.x;
+    float* pd2 = &rec->end.x;
+    PlaceTransform(pe, pm, pd2, pt);
     rec->end.y = o->f[6];
     { PlaceVec* p=(PlaceVec*)&o->f[5]; PlaceVec* q=&rec->pos; q->x=p->x; q->y=p->y; q->z=p->z; }
     { PlaceVec* d=&rec->dir; PlaceVec* s=&rec->end; d->x=s->x; d->y=s->y; d->z=s->z; }
     rec->dir -= rec->start;
     float len = rec->dir.Length();
     rec->length = len;
+    float* pd = &rec->dir.x;
     rec->dir *= 1.0f / len;
     PlaceVec up;
+    float* pu = &up.x;
     up.x = 0.0f;
     up.y = 1.0f;
     up.z = 0.0f;
-    PlaceCross(&rec->dir.x, &up.x, &rec->side.x);
-    float rad = ext.Length() * 1.1f;
+    PlaceCross(pd, pu, &rec->side.x);
+    double bb = ext.y, c = ext.z;
+    float rad = (float)sqrt(ext.x * ext.x + (bb * bb + c * c)) * 1.1f;
     rec->radius = rad;
     rec->radius2 = rad * rad;
     int m = n + 1;

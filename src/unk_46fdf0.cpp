@@ -524,7 +524,8 @@ ParallelShadow::~ParallelShadow()
 
 // original: FUN_00470610
 // NONMATCHING: RALLYTROPHY 0x470610
-// Same size (715); the best candidate has 131 differing bytes. Volatile unk60 and unk70 stores move the call-setup
+// 2026-11-17: dropped volatile on unk60 (insdiff 16 -> 14 lines, 136 bytes, 7 insns); only unk70 stays volatile. Tried: Z4/SpInit/per-arg-return __forceinline store helpers, group reorders (all worse, 8-20 insns).
+// Same size (715); older best candidate had 131 differing bytes. Volatile unk60 and unk70 stores move the call-setup
 // schedule closer to the target's interleaving. Adding volatile unk40 stores regresses to 155 differences; volatile
 // unk40 alone gives 165, and volatile unk18/unk24 gives 182.
 // Allocates the shadow texture: a render target when the device can draw into textures, else a texture
@@ -544,10 +545,10 @@ void ParallelShadow::Create(ShadowEngine* engine, int size)
         spriteA.unk40[1] = 0;
         spriteA.unk40[2] = 0;
         spriteA.unk40[3] = 1.0f;
-        ((volatile Sprite*)&spriteA)->unk60[0] = 0;
-        ((volatile Sprite*)&spriteA)->unk60[1] = 0;
-        ((volatile Sprite*)&spriteA)->unk60[2] = 0;
-        ((volatile Sprite*)&spriteA)->unk60[3] = 0;
+        spriteA.unk60[0] = 0;
+        spriteA.unk60[1] = 0;
+        spriteA.unk60[2] = 0;
+        spriteA.unk60[3] = 0;
         spriteA.unk18 = 1;
         spriteA.unk24 = 1;
         ((volatile Sprite*)&spriteA)->unk70[0] = 0;
