@@ -508,6 +508,7 @@ inline void Cross(float* o,const float* a,const float* b)
     }
 }
 // NONMATCHING: RALLYTROPHY 0x4b59b0
+// 2026-11-17 (~20 compiles, 57 insns unchanged): orig places the Coplanar call + shared epilogue right after arm 1 (v2!=0 jumps back to it) and keeps i0/i1/j1 in fresh locals (-0x3c/-0x38/-0x30, frame 0x3c) where ours reuses the dead param slots (frame 0x34). Swap/Ord-helper/sum/coplanar-placement forms: no gain.
 // Interval temporaries, x87 scheduling and exception-frame allocation differ.
 // Tried 2026-10-30 night: 319->146 insns via preloaded axis values, shared product temps pu1/pu2 (u1*u0,u2*u0) reused by INTERVAL, x reused as running max with (float)bits(y)>x, final arm as D2==0?Coplanar:arm; still differs: arms 2 and 5 laid out-of-line (VC6 merges the duplicated V1/V2 arms), Vec3 direction at -0x40 not -0x48 (frame 0x34 vs 0x3c), tail x87 store slots.
 // Tried 2026-11-01 re-pass: 146->105 insns by restructuring INTERVAL tail as else-if D1==0 with nested D2==0 Coplanar test then the V1 arm last (breaks VC6 arm merging), V2 arm in that branch storing X1 before X0; ~25 more variants (Moller-style D1!=0/D2!=0/else Coplanar = 188, v0 normal[0]-first sum and volatile/temp chains, no effect on fld order) failed; still differs: Coplanar block placed inline not after arm6, Vec3 direction at -0x40 not -0x48 (frame 0x34 vs 0x3c), tail x87 store slots; sums already match the asm order.
