@@ -389,6 +389,7 @@ extern float DAT_004e1338;
 #define CARF(c, off) (*(float*)((BYTE*)(c) + (off)))
 
 // NONMATCHING: RALLYTROPHY 0x4013c0. Sampling/playback behavior matches the observed PE paths; current candidate is 558/579 bytes with 451 differing bytes, primarily frame and register allocation. Plain PE/object comparison.
+// 2026-11-17 (~34 variants, 41 insns): car/clock ebx/ebp swap is use-count driven: a redundant `&& clock >= *(int*)nx` loop test swaps them (32 insns) but costs 2 bytes (cmp form); inert clock uses, Lerp helper, store orders, loop forms: no effect.
 // Tried 2026-10-30 night: volatile self copy of this (spill slot), else-arm cur=0, volatile c->time compare, >=0x28 (169->59 insns); still differs: car/clock registers swapped (ebx/ebp), 'mov dl' byte load vs dword, so the Lerp8 arg reloads differ.
 // Tried 2026-11-01 re-pass: ~30 variants (m0 read before self store, volatile mode/clock/car/player reads, local copies of car/clock, named Lerp8 temps per call, volatile 0x1350 byte store, early/late player load, extra clock uses); none moved the ebx/ebp swap (use-count driven) or the Lerp8 byte-arg register order; best 57 vs 59 insns differ, not an improvement in kind.
 // Pass 2026-11-16 (r21): 59 -> 41 insns differ (158 bytes) by storing 0x134c (r) after the last Lerp8 store; ~140 variants (named Lerp8 temps x32, store permutations, typed Car members, extra clock uses) did not move car/clock to ebp/ebx (only a redundant `&& clock >= *nx` loop test flips it, +2 bytes) nor delay the Lerp8 fstp as the original does.
