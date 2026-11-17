@@ -326,12 +326,8 @@ struct SnowMatrix {
     float m[16];
 };
 // original: FUN_004751b0
-// NONMATCHING: RALLYTROPHY 0x4751b0
-// Tried 2026-10-31: kInvFixed written as the literal 1/65536 in the unit.x/y/z products fixes their fld/fmul order; register assignment (this/flake/vertex) and quad-corner temp slots still differ.
-// Tried 2026-11-01: CpV forceinline field copy of v->position (147->47 insns), cursors ca/cb declared after world.m stores, chained dot (dq) in asm order, p++ before i++, volatile float reads for fov/near/far (-> 21 insns differ); still differs: offX/offY memory-operand subs and phase/y load order in the flake loop, push 1.0f/fld fov order in vf51.
-// 1747 vs 1741 bytes, same instruction mix and EH states. Open: register assignment (original this=edi,
-// flake=ebx, vertex=esi) and the stack slot order of the quad corners / hidden-return Vec3 temporaries.
-// Pass 2026-11-15 (round 15): 21 -> 14 insns differ (1745 vs 1741). File-scope ctor-less SnowMatrix + inline identity stores, camera position copied as ints before it, cb/ca declared after `Vec3 right` (as RainEffect::Update). Open: offX/offY as memory operands + phase/y load order in the flake loop, push esi order, vf51 arg order.
+/* FUNCTION: RALLYTROPHY 0x4751b0 */
+// Levers: rel declared before fx (x first, y/z after), camera position ints assigned after decls, vf51 args via plain locals.
 void SnowFall::Update(RenderDevice* device, Camera* camera, int a, int b, float dt)
 {
     if (DAT_00501428 == 0) {
@@ -339,12 +335,13 @@ void SnowFall::Update(RenderDevice* device, Camera* camera, int a, int b, float 
     }
     Vec3* cresult;
     int* cpi = (int*)&camera->position;
-    int c0 = cpi[0], c1 = cpi[1], c2 = cpi[2];
+    int c0, c1, c2;
     SnowMatrix world;
     world.m[1] = world.m[2] = world.m[3] = 0.0f;
     world.m[4] = world.m[6] = world.m[7] = 0.0f;
     world.m[8] = world.m[9] = world.m[11] = 0.0f;
     world.m[0] = world.m[5] = world.m[10] = world.m[15] = 1.0f;
+    c0 = cpi[0]; c1 = cpi[1]; c2 = cpi[2];
     ((int*)world.m)[12] = c0;
     ((int*)world.m)[13] = c1;
     ((int*)world.m)[14] = c2;
@@ -383,8 +380,8 @@ void SnowFall::Update(RenderDevice* device, Camera* camera, int a, int b, float 
         }
         p->phase += FloatToInt((float)p->speed * dt);
         int idx = (p->phase >> 16) & 0x3ff;
-        float fx = (float)((sway[0][idx] - offX + p->x) & 0xffff) * unit.x;
         Vec3 rel;
+        float fx = (float)((sway[0][idx] - offX + p->x) & 0xffff) * unit.x;
         rel.y = (float)((p->y - offY) & 0xffff) * unit.y;
         rel.z = (float)((sway[1][idx] + p->z - offZ) & 0xffff) * unit.z;
         rel.x = fx - box.x * 0.5f;
@@ -421,7 +418,8 @@ void SnowFall::Update(RenderDevice* device, Camera* camera, int a, int b, float 
     m->vertexCount = drawn * 4;
     device->vf46(world.m, 1);
     device->vf48((const float*)&camera->right, 1);
-    device->vf51(*(volatile float*)&camera->fov, 1.0f, *(volatile float*)&camera->nearBits, *(volatile float*)&camera->farBits, 1);
+    float fov = camera->fov; float nb = *(float*)&camera->nearBits; float fb = *(float*)&camera->farBits;
+    device->vf51(fov, 1.0f, nb, fb, 1);
     device->SetRenderState(5, 0);
     device->vf42(4);
     device->vf35(material);

@@ -15,12 +15,12 @@ _Updated 2026-11-17 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1945 / 2084 (93.33%) | 454,088 / 742,276 (61.18%) |
-| Written, not yet exact | 139 | 288,188 |
+| Byte-exact | 1946 / 2084 (93.38%) | 455,829 / 742,276 (61.41%) |
+| Written, not yet exact | 138 | 286,447 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   ██████████████████░░░░░░░░░░░░ 61.18% of code bytes
+exact   ██████████████████░░░░░░░░░░░░ 61.41% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -84,7 +84,7 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Car shadows (ParallelShadow) | `0x46fdf0`–`0x472c90` | 65 / 69 / 69 | 36.8% | 100.0% | `████████████` |
 | Rain and view-matrix inverse | `0x472c90`–`0x4741a0` | 9 / 10 / 10 | 37.7% | 100.0% | `████████████` |
 | Skid marks | `0x4741a0`–`0x474c50` | 11 / 12 / 12 | 63.2% | 100.0% | `████████████` |
-| Snowfall | `0x474c50`–`0x4758b0` | 6 / 7 / 7 | 44.4% | 100.0% | `████████████` |
+| Snowfall | `0x474c50`–`0x4758b0` | 7 / 7 / 7 | 100.0% | 100.0% | `████████████` |
 | Sky | `0x4758b0`–`0x476490` | 13 / 14 / 14 | 51.1% | 100.0% | `████████████` |
 | Texture scroller and window rain | `0x476490`–`0x477370` | 17 / 19 / 19 | 49.0% | 100.0% | `████████████` |
 | Wheel spray | `0x477370`–`0x478020` | 13 / 13 / 13 | 100.0% | 100.0% | `████████████` |
