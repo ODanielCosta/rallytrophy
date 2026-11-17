@@ -692,6 +692,9 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   on insns, so not adopted; ColModel 0x41a890 entry 8 is the first Sub's P3 temporary (map-exact form re-allocates
   the whole function, not adopted).
 
+## Dossier caveat (2026-11-17)
+- `tools/dossier.py`/`triage.py` EH-state columns count only immediate `mov [ebp-4],N` stores. A state stored from a register (`mov [ebp-0x4],edi` with edi = 0) or byte flags near the frame end make phantom "missing/extra state" leads: ColModel 0x41a890, TriCollector::ContactList 0x419be0 and GameG8 0x433bc0 all store the original's state sequence already. Check the raw stores with objdump before briefing an EH lead.
+
 ## Store placement outside loops (2026-11-16 study, ~85 compiles; matched SceneEntry::SceneEntry)
 
 With /Oa, measured in synthetic reductions:

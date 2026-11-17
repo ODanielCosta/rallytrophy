@@ -1968,6 +1968,7 @@ struct G8_Opponent {
 extern G8_Opponent DAT_004f7c30[];
 
 // NONMATCHING: RALLYTROPHY 0x433bc0
+// 2026-11-17: EH lead was a misread (the trailing 'state 1' stores are lastA/lastB bytes). Roles: orig this=edi, zero=ebx, 1=ebp; ours this=ebp, zero=edi, 1=ebx. Forceinline free-function body cannot inline (EH object); zero-store probes do not flip roles.
 // Championship / career continuation: front-end state machine (network screen, 0x11a4 screen, name entry, career data,
 // track select), then the player setup and the per-rally service-area + race loop. Same flow and instruction stream
 // (register-blind diff ratio 0.963, 1836 vs 1826+table bytes); VC6 gives `this` ebp/zero edi/rally ebx where the
