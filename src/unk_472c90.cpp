@@ -268,6 +268,7 @@ struct RainMatrix {
 // Tried 2026-10-30 night: local `r=&query.tris` pointer (449->443), step/right/world declaration orders, late step, size/begin locals in the tri pick; whole-function reg allocation still differs (orig spills this, size in ebx; wind slot 0x14 higher).
 // Re-pass 2026-11-01: float sums checked against the original (same fadd association, only fld/fmul operand order differs in the splash facing test); `RainEffect* volatile self = this;` read for threshold and splashSizeOld/New brought 443->348 insns differ (3323 vs 3324 bytes); tried self for other fields, px/py/pz or int-copied camera position before WorldMatrix, decl order of step/world, no r pointer; still differs: this in ebx with automatic spill vs ours volatile self push, WorldMatrix init order after camera loads, slot offsets.
 // Pass 2026-11-13: 344 -> 342 insns differ, 2773 -> 2629 differing bytes (3321 vs 3324). File-scope ctor-less RainMatrix + inline identity stores (EH state 0 before the stores), camera position copied as ints before the matrix, self declared after wind. Open: this=ebx w/o volatile self (439 insns), vertex=edi/camera=esi roles, lo/hi copy+Clear scheduling.
+// Reorder pass 2026-11-17: 339 -> 317 insns differ (3321 vs 3324): reorder.py swaps of lo/hi query stores, world.m zero stores, qc/cb order, rel.z -= half. Lead (lo/hi after Clear, shadowed ca/cb/cresult in splash) tested: worse.
 // Pass 2026-11-15 (r16): 342 -> 339 insns differ (3321 vs 3324 bytes): volatile self declared before RainMatrix world, lens scale written out per use (`wind.x *= 0.05f / scale` x3, no k local). Tried: r pointer forms (Tris()/query.tris direct -> 473 insns), non-volatile this (439), t2 copy for splash sizes (417-439), lo/hi adjust after Clear (379), Sub via S414Vec3 for e (425; calls.py Sub diffs on pos-A are alias names only), fused wind exprs, self at function top (343).
 void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, float dt)
 {
@@ -280,9 +281,9 @@ void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, floa
     RainEffect* volatile self = this;
     RainMatrix world;
     world.m[1] = world.m[2] = world.m[3] = 0.0f;
-    world.m[4] = world.m[6] = world.m[7] = 0.0f;
     world.m[8] = world.m[9] = world.m[11] = 0.0f;
     world.m[0] = world.m[5] = world.m[10] = world.m[15] = 1.0f;
+    world.m[4] = world.m[6] = world.m[7] = 0.0f;
     ((int*)world.m)[12] = c0;
     ((int*)world.m)[13] = c1;
     ((int*)world.m)[14] = c2;
@@ -297,8 +298,8 @@ void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, floa
         wind.z *= 0.05f / scale;
     } else {
         wind.x = 0;
-        wind.y = 0;
         wind.z = 0;
+        wind.y = 0;
     }
     wind += velocity * 0.05f;
     Vec3 qa, qc, qb, qd;
@@ -312,14 +313,14 @@ void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, floa
     qc.x = qc.y = qc.z = 0;
     qd.x = qd.y = qd.z = 0;
     Vec3* fwd = &camera->forward;
-    Vec3* ca = &camera->up;
     Vec3* cb = fwd;
+    Vec3* ca = &camera->up;
     Vec3* cresult = &right;
     CROSS();
     float w = streakWidth;
     qa -= (right * w) * 0.5f;
-    qb += (right * w) * 0.5f;
     qc += (right * w) * 0.5f;
+    qb += (right * w) * 0.5f;
     qd -= (right * w) * 0.5f;
     float unit = boxSize * 1.5259022e-5f;
     int fall = FloatToInt(dt * velocity.y / unit);
@@ -342,8 +343,8 @@ void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, floa
         rel.y = (float)((p[1] - offY) & 0xffff) * unit;
         rel.z = (float)((p[2] - offZ) & 0xffff) * unit;
         rel.x -= half;
-        rel.y -= half;
         rel.z -= half;
+        rel.y -= half;
         if (rel.z * fwd->z + rel.y * fwd->y + rel.x * fwd->x > self->threshold) {
             Set(v->position, rel + qa);
             v++;
@@ -378,20 +379,20 @@ void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, floa
     Set(lo, camera->position);
     Set(hi, camera->position);
     lo.x -= 20.0f;
-    lo.y -= 20.0f;
     lo.z -= 20.0f;
     hi.x += 20.0f;
+    lo.y -= 20.0f;
     hi.y += 20.0f;
     hi.z += 20.0f;
     Tris()->Clear();
     query.queryKind = 0xf;
-    query.querySphere = &sphere;
-    query.queryMin.x = lo.x;
-    query.queryMin.y = lo.y;
     query.queryMin.z = lo.z;
+    query.queryMin.x = lo.x;
     query.queryMax.x = hi.x;
     query.queryMax.y = hi.y;
+    query.querySphere = &sphere;
     query.queryMax.z = hi.z;
+    query.queryMin.y = lo.y;
     float eyeDot = camera->eyePosition.z * fwd->z + camera->eyePosition.y * fwd->y + camera->eyePosition.x * fwd->x;
     std::vector<CollTri*>* r = &query.tris;
     bool searched = false;
@@ -420,8 +421,8 @@ void RainEffect::Update(RenderDevice* device, Camera* camera, int a, int b, floa
             e.y *= inv;
             e.z *= inv;
             Vec3 axis;
-            ca = &tri->normal;
             cb = &e;
+            ca = &tri->normal;
             cresult = &axis;
             CROSS();
             float u = (float)(rand() & 0x3ff) * (1.0f / 1024.0f);

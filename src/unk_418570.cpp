@@ -440,6 +440,7 @@ struct SphX { Vec3 c; float d; SphX(const Vec3& p, float r) : c(p) { d = r; } ~S
 // Tried 2026-11-01 re-pass: float sums re-checked against asm (d2, plane num/den dots, normal length fixed to the original association; dead e3 = b-c); 322->326 insns differ is the cost of correct sums. d2 as double/volatile, bestT/chain/edge split decls, e1/e2 order, for-loop, folded operator chain: no gain; d2 stays on the x87 stack in the original (fcom then fsqrt) while ours spills it.
 // Pass 2026-11-13 (r6418b90): 307 -> 253 insns differ (2140 -> 2157 bytes): hit test as if(fun) hit else edges (block layout), loop-2 iterates `volatile first` (orig keeps first/t in one [esp+0x10] slot, reloaded), loop bound hits.size() w/o p!=0, `Vec3 sm; sm = ...` default-ctor form. Rejected: non-volatile t (size 2059 but 373 insns), ScenePoint types (same bytes, only symbol names differ), mn/mx/bestT decl moves, extra self ptr, rv/else return shape.
 // Pass 2026-11-16 (r29): 253 -> 251 insns differ (size unchanged 2157): `first = 0` declared before `Vec3 e`, chain test flipped to `if (chain == 0) first = t, chain = t; else last->next = t;`. Rejected: nesting/rv/else forms for the early return (epilogue still cloned), per-iteration `t = first` local (size 2085 but 312-352 insns: regalloc org/dir/t shuffles), chain/last decl moves, num-before-den.
+// Pass 2026-11-17 (Q): 251 -> 199 insns differ (2138 -> 2124 bytes): `Vec3 sm; sm.x = org[0]; sm.x += e.x; sm.y = org[1]; sm.z = org[2]; sm.y += e.y; sm.z += e.z;` (x added on the x87 stack, y/z via int copy) matches the orig sum sequence. Rejected: ctor form Vec3 sm(org+e) (z,y,x order), operand swaps (canonicalised), sph.c per-component/reordered (orig keeps sm.x on x87 stack, stores sph.c.x last: unresolved).
 float SweepQuery::Cast(float r, float* org, float* dir, float* outPt, float* outN)
 {
     float d2 = dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2];
@@ -450,7 +451,7 @@ float SweepQuery::Cast(float r, float* org, float* dir, float* outPt, float* out
     Vec3 e = *(Vec3*)org; e += *(Vec3*)dir;
     Vec3 dv = *(Vec3*)dir;
     SphY sph;
-    Vec3 sm; sm = *(Vec3*)org; sm += e;
+    Vec3 sm; sm.x = org[0]; sm.x += e.x; sm.y = org[1]; sm.z = org[2]; sm.y += e.y; sm.z += e.z;
     sm.x *= 0.5f; sm.y *= 0.5f; sm.z *= 0.5f;
     sph.c = sm; sph.d = (float)sqrt(d2) * 0.5f + r;
     float ex = e.x, ey = e.y, ez = e.z;
