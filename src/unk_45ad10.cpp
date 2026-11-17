@@ -1481,6 +1481,7 @@ void Car::FUN_0045b900(int dt)
 // sequence without changing the total mismatch count; hoisting wp2 to match the persistent Vec3 lifetime helps.
 // Remaining differences include EH state numbers (target: 3 persistent Vec3 locals), transform argument slots,
 // the radius-sum FPU stack, and post-collision centre-of-mass update order. Evidence: ev_c92c59602c67fd58248c61d5b8be6532014a74b970e4fb2582dd1e42d5e74d32.
+// Pass 2026-11-17 (ws10, 240->232 insns, 1989->2002 of 2002 = exact size, insdiff 530->~490 lines): savedPos[1..2] read through posp (original `lea esi,[ebx+0x14]; [esi+4]`), centre[1] also cached in a float local (cy, cz), V->dt stored before V->rate. Tried without gain: drag built in place from a Vec3 copy (frame 0x84, size 1983), arm/drag as float[3] PODs (EH states 4,3,5,6 vs orig 4,3,5,7), const-ref named cross-product temps, dropping volatile rotp (1975 bytes, worse). Orig facts: frame 0x8c (ours 0x90), wp2 persistent, arm at -0x38, cross-product return temp at -0x2c shared by both calls, n/loop count in frame slots, rate stored via fld/fstp.
 // Pass 2026-11-16b (1594->1450 differing bytes, 242->240 insns, 1986->1989 of 2002): centre[2] update reads cz into a float local first (int copy-in, fld/fadd/fstp-to-member as the original's centre[1..2] shape). Tried: 2-float YZ struct temp (1451 bytes but 2013 size), delayed centre.x store via local/double/duplicate store (R1/R2: no effect), dup store on cz, double cz, cy+cz locals: all worse.
 // One physics step of dt seconds: gravity, aerodynamic drag and downforce, suspension, brakes, drivetrain, tyre
 // forces, rigid body integration and the collision with the stage (restoring the pose when the body hit).
@@ -1491,8 +1492,8 @@ void Car::PhysicsStep(float dt)
 {
     W5_Body* b = V->body;
     Vec3 gravity(0.0f, -(b->mass * 9.81f), 0.0f);
-    DAT_00509418 = W5_PassFloat(V->rate);
     DAT_0050941c = V->dt;
+    DAT_00509418 = W5_PassFloat(V->rate);
     V->saved[0] = b->in14c[0];
     V->saved[1] = b->in14c[1];
     V->saved[2] = b->in14c[2];
@@ -1501,8 +1502,8 @@ void Car::PhysicsStep(float dt)
     float* volatile rotp = b->rot;
     V->savedMat = *(W5_Mat*)rotp;
     V->savedPos[0] = b->position[0];
-    V->savedPos[1] = b->position[1];
-    V->savedPos[2] = b->position[2];
+    V->savedPos[1] = posp->y;
+    V->savedPos[2] = posp->z;
     b->dt = dt;
     Vec3& force = *(Vec3*)b->force;
     Vec3& torque = *(Vec3*)b->torque;
@@ -1595,9 +1596,10 @@ void Car::PhysicsStep(float dt)
             delta.y *= 0.05f;
             delta.z *= 0.05f;
             *posp += delta;
+            float cy = b->centre[1];
             float cz = b->centre[2];
             b->centre[0] += delta.x;
-            b->centre[1] += delta.y;
+            b->centre[1] = cy + delta.y;
             b->centre[2] = cz + delta.z;
         }
     } else {
