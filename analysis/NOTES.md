@@ -728,3 +728,73 @@ With /Oa, measured in synthetic reductions:
 - **Disproved:** the lea base is not chosen by register number, by listing order, or by source operand order.
 - **Helper sweep on constructors (2026-11-16 rounds 12-14).** Wrapping groups of member stores in `static __forceinline` free helpers matched four functions: SceneXform::SceneXform, BmfReader::BmfReader (`Zero3`), CarBody::CarBody (`Z3` on eight vectors, which also removed a volatile) and AIDriver::Init (`StoreTuning345`). Each match needed EVERY drifting group wrapped; wrapping only some groups was worse. The helper does nothing when the residual is a register choice or a register copy (ServiceMenu::Init, ReplayHeader::Load, StageScreen::LoadLayout) or a loop-entry compare (WindowRain::Init).
 - **Helper parameter order sets the x87 operand order (2026-11-17, matched Car::FUN_00452b20).** `p = a + l` written inside a `__forceinline` helper loads the operand whose PARAMETER comes first: `H_P(p, l, a)` gives `fld l; fadd a`, `H_P(p, a, l)` the reverse, whatever order the expression inside the helper uses. Combined with the helper pinning the p stores past the copy loads, this replaced two volatile hacks. LIMIT (same day): it does not generalise. With stack-local or global operands (0x4ad1d0 box-axis dots, 0x470940 plane sums: 16-32 helper variants each, both parameter orders, every body shape) VC6 emits identical code; the operands in 0x452b20 were members reached through a pointer parameter.
+
+## Global-cause audit (2026-11-17): there is no hidden switch
+
+Question: is one global cause (flag, toolchain, compiler state) behind the 138 NONMATCHING functions? Every candidate
+was measured over the whole tree. Result: none. The build setup is right and the compiler is deterministic; each
+residual is a source-shape difference. Do not repeat these sweeps.
+
+- **Second witness: the 1.00 build.** `tools/v100.py` maps every 1.01 function onto the disc's 1.00 exe (same source
+  four months earlier; both keep `.reloc`, so masking is exact): 1059 byte-identical, 206 differ only in constants or
+  offsets, 491 changed, 328 not located. Of the 491 changed ones only two differ purely in operand or store order:
+  0x4b76c0 (a source edit, reproduced below) and 0x4baf40 (two member zero stores moved, a reordered initialiser).
+  So the original compiler gave the same code for the same source across two builds with different headers: no
+  "lottery". Where a small source edit happened (0x420db0: two extra call arguments), only that site moved.
+- **Flags.** Removing `/Oa` (match.py could only add flags before): 0 matches gained, 487 lost, in every file. Added to
+  the base set, over all 192 files: `/Z7` 0 gained / 0 lost (debug info is codegen-neutral; objcmp needs `.bf/.ef`
+  symbols ignored to see that), `/EHa` 0/415, `/GR` 0/1, `/MT` 0/2, `/MD` 0/292, `/J` 0/9, `/GA` 0/0, `/vmg` 0/0,
+  `/Gz` 0/145, `/Og` 0/0, `/DNDEBUG /DWIN32 /D_WINDOWS` 0/0, `/D_DEBUG` 0/0. `/Za` does not compile the tree.
+- **Declaration count ("entropy").** 1-12 dummy typedefs / prototypes / inline helpers / structs / classes after the
+  includes of all 78 files with NONMATCHING functions (4,680 compiles): 0 matches gained. Only four functions react at
+  all: 0x4a2440 (known), 0x411600 (487-496 bytes), 0x419f30 (1932 -> 1926) and the matched 0x44d6a0 (breaks under 5
+  variants). The flip pattern has period 7 in struct count, so it looks like compiler-heap layout, but it is too rare
+  to be a lever.
+- **Names.** Renaming every `DAT_`/`FUN_` identifier of a file to random names of random length (7 files, 16 variants
+  each): no byte changes anywhere, including in the two count-sensitive functions.
+- **Previous function.** Twelve differently shaped functions (empty, loop, x87, EH, big frame, switch, `__asm`, try)
+  inserted right before eight near misses: no byte changes. Codegen does not depend on what was compiled before,
+  apart from the known epilogue-cloning and "already compiled means non-throwing" effects.
+- **Unused locals** (8 kinds x 1-6, ten near misses): one function changed, for the worse.
+- **`T* v = (T*)this;` aliases** (24 NONMATCHING functions use one): replacing the alias with the direct expression
+  gives identical code in all 21 non-volatile cases.
+- **`__assume(x)`** is accepted by VC6 SP5 and can change code, but only where the assumption enables an optimisation;
+  it adds no register weight (RecPool::Push, 136 placements). It is not the "one more use with no code" of 2026-11-17.
+
+## Base/index order of `[a+b]` is source-controlled (2026-11-17; lab found through the 1.00 witness)
+
+0x4b76c0 is identical in 1.00 and 1.01 except `[esi+edi-1]` vs `[edi+esi-1]`. No spelling of `dst[len - 1]` flips it
+(26 forms), no declaration count either. What does: 1.00 indexes with a fresh local (`int n = len; if (n == -1)
+n = wcslen(src) + 1; ... dst[n - 1] = 0;` matches 1.00 exactly), 1.01 with the parameter. Rules measured on
+synthetic functions:
+
+- Two registers: the base is the value **defined later** (assignment order, not declaration order). Between two
+  parameters the first parameter is the base. A local copy of a parameter beats any parameter.
+- Two fields loaded through one pointer: the field at the higher offset is loaded first and is the base.
+- A member load made at the use counts as the latest definition, so it is the base against any earlier local.
+
+**Expanded `std::string::append` sites.** The original has 137 of them (pattern: `call _Xlen` ... `lea n,[a+b]`).
+In 123 the appended length m is the index and the copy destination is `[len+ptr]`; our compiler gives that for every
+plain `s = a; s += b;` and for every twin. In 14 the order is swapped (`[m+len]`, then `[ptr+len]`), and all 14 are in
+NONMATCHING functions: Stage::Stage 4, Car::LoadDriver 5 (its entire residual), StageScreen::RefreshUnits 3,
+StageScreen::LoadCars 1, BmfReader::ReadMaterial 1. One unidentified source idiom, five functions.
+
+What reproduces the swapped order in small functions (`[m+len]` and `[ptr+len]` together):
+- assign and append expanded inside ONE inline member function of the object that owns the string, either a holder
+  (`struct H { std::string s; void Set(a, b) { s = a; s += b; } }`) or a class derived from `std::string`, with the
+  local declared as that type. Two separate members (`Asg`, `App`), `operator=` + `operator+=` wrappers, a free inline
+  function taking `std::string&`, chained `(s = a) += b` and plain statements all give the normal order.
+- It needs the real class: with a renamed copy of `<xstring>` the order is kept, but it is lost when the constructor
+  stores the three zeros directly instead of calling `_Tidy()`, or when `_Tr::copy` is replaced by `memcpy`. Whether
+  `_Grow`/`_Eos` have bodies does not matter. Any twin reached through a cast (`(Twin*)&path`, `(Twin*)this`) gives
+  the normal order; a twin declared as the local's own type gets `[m+len]` but not `[ptr+len]`.
+- It is lost as soon as another object with a destructor is alive at the site (a `File f(...)` before the append, in
+  either declaration order, also a `new`'d one deleted later). A temporary that dies in its statement or an object in
+  a closed block does not disturb it; plain live values do not either.
+
+Open: LoadDriver's swapped sites run with two ModelFile objects alive (unwind states 1 and 4), which no form above
+survives, so the original's construct is still unknown. In LoadDriver itself, combined members on the cast twin, on a
+holder twin and on a class derived from the real string with the real fields (`#define private public`) all leave the
+same 10 bytes; plain `path = dir; path += "x";` statements expand all eight appends (3805 bytes), one inline helper
+called eight times expands too few (3540). Next step with a real chance: read how c2 orders the operands of an
+address add (c2.dll, the routine that builds `[base+index]`), instead of more source variants.
