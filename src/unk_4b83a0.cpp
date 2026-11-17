@@ -11,12 +11,13 @@ void IntVec::Resize(unsigned int n, const int& x)
         erase(begin() + n, end());
 }
 
-// NONMATCHING: RALLYTROPHY 0x4b8640
+// FUNCTION: RALLYTROPHY 0x4b8640
 // reason: original loads the uninitialised allocator byte into dl twice; ours uses cl then dl
 // Tried 2026-10-30 night: zeroing-statement orders, ml()/sets()/SetVec() init forms, explicit allocator args, plain std::vector sets; all 2-5 insns differ, ours hoists the sets allocator load into dl and uses cl for the meshes one.
 // Tried 2026-10-31 re-pass: 16 more variants (all 5! store orders sampled, chained zero, explicit ml(), shared int z, volatile on verts/count40/pad50, dead volatile char local, placement-new sets) 2-6 insns differ; permute -r 40 best 2 insns, no MATCH; still the uninitialised allocator-byte load (dl before xor vs ours hoisted dl + cl).
 // Pass 2026-11-14: EntryMeshList ctor now flag2c(0), meshes() {} (header): 2 -> 1 insns differ (13 bytes); the flag store now precedes the meshes zero stores, original stores it after them; allocator-byte regs (dl,dl) still differ.
-SceneEntry::SceneEntry(): sets()
+// Pass 2026-11-16: allocator-temp angles (MeshVec(const allocator_type& = ...) ctor, flag2c after meshes(), flag2c in body, sets() variants, flag2c declared-init order) no gain; 1-insn/13-byte form kept. Explicit std::allocator args do not compile (no allocator ctor on MeshVec/SetVec).
+SceneEntry::SceneEntry(): flag2c(0), meshes(), sets()
 {
     count44 = 0;
     count40 = 0;
@@ -52,24 +53,24 @@ SceneEntry& SceneEntry::operator=(const SceneEntry& o)
     int i;
     delete[] verts;
     delete data4c;
-    for (i = 0; (unsigned)i < ml.meshes.size(); i++)
-        delete ml.meshes[i];
+    for (i = 0; (unsigned)i < meshes.size(); i++)
+        delete meshes[i];
     for (i = 0; (unsigned)i < sets.size(); i++) {
         delete[] sets[i]->mats;
         delete sets[i];
     }
     Resize0(&sets, 0, (EntryMatSet*)0);
-    Resize0M(&ml.meshes, 0, (EntryMesh*)0);
-    for (i = 0; (unsigned)i < o.ml.meshes.size(); i++)
+    Resize0M(&meshes, 0, (EntryMesh*)0);
+    for (i = 0; (unsigned)i < o.meshes.size(); i++)
         {
-        EntryMesh* m = new EntryMesh(*o.ml.meshes[i]);
-        MeshVec* r = &ml.meshes;
+        EntryMesh* m = new EntryMesh(*o.meshes[i]);
+        MeshVec* r = &meshes;
         r->Ins(r->end(), 1, m);
     }
     head[0] = o.head[0]; head[1] = o.head[1]; head[2] = o.head[2]; head[3] = o.head[3];
     head[4] = o.head[4]; head[5] = o.head[5]; head[6] = o.head[6]; head[7] = o.head[7];
     head[8] = o.head[8]; head[9] = o.head[9]; head[10] = o.head[10];
-    ml.flag2c = o.ml.flag2c;
+    flag2c = o.flag2c;
     count40 = o.count40;
     count44 = o.count44;
     if (count40 || count44) {
@@ -93,8 +94,8 @@ SceneEntry& SceneEntry::operator=(const SceneEntry& o)
 SceneEntry::~SceneEntry()
 {
     unsigned i;
-    for (i = 0; (unsigned)i < ml.meshes.size(); i++)
-        delete ml.meshes[i];
+    for (i = 0; (unsigned)i < meshes.size(); i++)
+        delete meshes[i];
     for (i = 0; (unsigned)i < sets.size(); i++) {
         delete[] sets[i]->mats;
         delete sets[i];

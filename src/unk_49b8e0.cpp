@@ -97,20 +97,20 @@ void AIDriver::FUN_0049ba70()
     unk128 = unk130 = unk124 = unk12c = 1.0f;
 }
 
+// Helper keeps these three stores at their source position (flat stores sink above the zero stores).
+static __forceinline void StoreTuning345(float* t) { t[3] = DAT_00500cf8; t[4] = DAT_00500d10; t[5] = DAT_00500d14; }
 #pragma auto_inline(off)
-// NONMATCHING: RALLYTROPHY 0x49bb80
+// FUNCTION: RALLYTROPHY 0x49bb80
 // Tried 2026-10-30 night: int id local for _itoa arg (fixed 35->2, size now 962); 720 tuning store orders, 3/5 moved after later stores (x anchors, 4-perms), volatile barriers, permute -r 20; only [ebp+0x190]/[0x198] stores still land before the zero stores instead of after unk168.
 // Tried 2026-10-31 re-pass: 40 variants (tuning[3]/[5] stores after unk168 plain/volatile/int-temp/block-temp, 12 tuning source orders, volatile on unk168/unk560/unk180) and permute -r 40; all stay at 2 insns (the [0x190]/[0x198] stores sink no later than the zero stores; reordering tuning loads shifts the register choice instead).
 // 2026-11-16 r20: int locals a/b for tuning[3]/[5] declared in all 720 orders with the 4 other tuning loads, stores after unk168: still 2 insns (load registers swap, [3]/[4] trade eax/ecx); no gain.
+// 2026-11-16 MATCH: tuning[3..5] stores wrapped in forceinline StoreTuning345 placed after unk168 (inline helper pins the store group).
 // Init: default tuning, clears the state and reads data/extras/ai_<car model>.ini.
 void AIDriver::Init()
 {
     tuning[0] = DAT_00500d1c;
     tuning[1] = DAT_00500d04;
     tuning[2] = DAT_00500d18;
-    tuning[3] = DAT_00500cf8;
-    tuning[4] = DAT_00500d10;
-    tuning[5] = DAT_00500d14;
     unk558 = 0;
     unk104 = 0;
     unk158 = 0;
@@ -138,6 +138,7 @@ void AIDriver::Init()
     unk180 = 0;
     unk560 = 0;
     unk168 = 0;
+    StoreTuning345(tuning);
     Config config;
     config.Define(DAT_00500d38, 8);
     char number[32];

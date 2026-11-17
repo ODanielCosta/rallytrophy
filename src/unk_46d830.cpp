@@ -61,6 +61,7 @@ inline void CopyBits(Vec3* dst, const Vec3& src)
 // 2026-11-11: counts and array pointers read back through this->mesh (no volatile), vertex pointer loaded before the
 // guard, `while (j--)` vertex loop (the SnowFall/RainEffect form): 482 -> 435 bytes differ, 1065 vs 1048.
 // 2026-11-13: triangleCount stored before vertexCount (original order): 59 -> 55 insns differ, 435 -> 423 bytes. Tried ~35 more: u2/v2 hoisted first (3 pairs, split 4th), EffectVertex* u2/v2 cursors, cursor order permutations (all worse); still differs: frame 8 bytes larger than the original (stack slots), vptr/new-size/state=9 hoisted to the top, spilled u2/v2 cursor stores.
+// 2026-11-16: one full initial-member inline helper and four contiguous store-group helpers are byte-neutral (423 bytes / 55 insns, 1065 vs 1048); no source change adopted.
 CarRain::CarRain(int count)
 {
     savedTrunk.m[5] = savedTrunk.m[10] = savedTrunk.m[15] = savedTrunk.m[0] = 1.0f;

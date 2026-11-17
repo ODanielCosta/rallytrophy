@@ -59,6 +59,7 @@ struct TmpLV : public ViewMat {
 // Tried 2026-10-31: CopyV int copy for corner stores plus this->corner[k] for corners 1-3 (c only for corner 0) took 101->~19 insns; kind/flags barriers and load permutations done; still differs in EH state store placement (early vs just before Concat), flags/position14 register choice, and x87 operand order of the first corner add.
 // Tried 2026-10-31 re-pass: local ViewMat-derived TmpLV with inline copy ctor (EH state 2 now lands before Concat as in the original) and tmp.m[14] stored after it took 19->14 insns; sweeps of flags/position14 load order, glow/flare/matrix store order, volatile tmp stores, and AddRC/AddCR x87 operand helpers did not move the remaining diffs (add esi,0x20 slot, edx/eax roles for position14/flags, first-component fld order of corners 0 and 1).
 // Tried 2026-11-15 (r14): 144 load/store/flags-load permutations of the position14 copy, flags written as f/f|1 forms, glow/flare/unk8 store reorders: none below 14 insns (px lands in eax, original edx; the 1 byte size gap is and al,0xfd vs and dl,0xfd).
+// Tried 2026-11-16: position/flags/initial-position inline helpers and interleaved forms; direct-argument CopyPosFlags reaches 12 insns but is still 1043 vs 1044 bytes and 558 differing bytes, so it was not merged.
 CityLight::CityLight(LightSource* source, TextureLoader* loader, Sprite* glowSprite, Sprite* flareSprite)
 {
     unk8 = 0;

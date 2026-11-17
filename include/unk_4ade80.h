@@ -56,15 +56,33 @@ public:
     ~CachePendingList(); // 0x49ad30: destroys active and recycled nodes
     void PopHead()
     {
+        Node* node = m_head; m_head = node->next; Node* prev = node->prev;
+        if (node == m_tail) { m_tail = prev; } else { node->next->prev = prev; }
+        node->next = m_free;
+        node->prev = 0;
+        m_free = node;
+        m_freeCount++;
+        m_count--;
+    }
+    // Same as PopHead; reading prev inside each arm keeps the m_head store before the m_tail cmp (Reload phase 1).
+    void PopHeadB()
+    {
         Node* node = m_head;
-        Node* prev;
         m_head = node->next;
-        prev = node->prev;
-        if (node == m_tail) {
-            m_tail = prev;
-        } else {
-            node->next->prev = prev;
-        }
+        if (node == m_tail) { Node* p = node->prev; m_tail = p; } else { Node* p = node->prev; node->next->prev = p; }
+        node->next = m_free;
+        node->prev = 0;
+        m_free = node;
+        m_freeCount++;
+        m_count--;
+    }
+    // Phase 2 twin: next is read once into a local and stored to m_head before the tail test; prev is read per arm.
+    void PopHeadC()
+    {
+        Node* node = m_head;
+        Node* nx = node->next;
+        m_head = nx;
+        if (node == m_tail) { Node* p = node->prev; m_tail = p; } else { Node* p = node->prev; node->next->prev = p; }
         node->next = m_free;
         node->prev = 0;
         m_free = node;

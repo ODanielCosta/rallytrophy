@@ -1401,6 +1401,7 @@ static __forceinline void StageInsert(LLVec* v, int* P, unsigned int M, const in
 // 2026-11-12: 8th site grow arm hand-expanded in the function body, end stored before last (62 -> 3 insns differ, 1700 bytes; only an eax/ecx swap around the end store remains).
 // 2026-11-16 inline-budget pass: twin-class (declared-only insert) for every subset of sites 1-7 with a real 8th push_back: best 33 insns (m096), never < the hand-expanded 8th site (3 insns); the original expands Ucopy/Destroy out of line with no size() before new, a shape no R gives. end-store variants (&s[n], (int)n, cast store) keep 3.
 // Tried 2026-10-31: one or two discarded Bal(1) at every statement position (no change at 5..19, worse 78/155 after the last site; only the 8th push_back inlines in both, so the count is already right); 8th site as block temp / push_back(ra = new) / own rb or rc local all worse (62 -> 70..84).
+// 2026-11-16 inline-helper pass (18 variants): SetEnd/SetLast/SetFirst static inline helpers (void, returning, by-value-pointer, in every order) for the end/last/first stores: the end store still sinks past mov ecx,this (3 insns, unchanged); helpers that compute s+n inside or on last/first worsen to 4..45 insns.
 void StageScreen::LoadLayout()
 {
     Config config;

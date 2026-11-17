@@ -33,9 +33,9 @@ SceneEntry* ModelLoader::ReadMesh(File* file, unsigned int size)
     f[9] = f[10] = s;
     f[0] = b.x; f[3] = cx; f[1] = b.y; f[2] = b.z; f[4] = c.y; f[5] = c.z;
     if (flags & 1)
-        e->ml.flag2c |= 1;
+        e->flag2c |= 1;
     if (flags & 2)
-        e->ml.flag2c |= 2;
+        e->flag2c |= 2;
     while ((unsigned)(FUN_004a5fc0(file) - start) < size) {
         ModelNamedValue* n = FUN_004af560(file);
         if (n->name.compare("VERTEXLIST") == 0)

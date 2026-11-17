@@ -406,6 +406,7 @@ class CarBody { public: void FUN_0046be50(int mode); };
 
 static inline int Bal(int a) { return a + 1; }  // discarded calls: inline-budget ballast
 // NONMATCHING: RALLYTROPHY 0x403ca0
+// 2026-11-16: `double t = rec.r.a2c; car->unk1a20 = (float)t;` gives the original's fld/fstp copy, but the int copies then rotate registers (edx for eax), 22 insns. The mov esi,eax placement (car bound before the Read pushes) is the real blocker; ~65 car-form variants leave it.
 // Calling convention (thiscall on the header, bool result), object sizes, constructor arguments, the PathText
 // string calls and block order follow the target. Direct singleton field stores before taking the `race` alias
 // improve the object comparison (158 differing bytes vs. 589 in the prior form), but the frame remains four
@@ -418,6 +419,8 @@ static inline int Bal(int a) { return a + 1; }  // discarded calls: inline-budge
 // with an inline _Tidy), ten discarded Bal() calls before the success cleanup. Left: `mov esi,eax` placement after the Read pushes in the
 // car loop and the fld/fstp float copy.
 // 2026-11-16 round 27b: ~55 more variants, none better (10 insns). A float temp (`float q = rec.r.a2c; car->unk1a20 = q;`) gives the fld/fstp but shifts register choice (22 insns); car as t/car copy, if/else, hoisted car, const car, casts, Read(&rec.r), rec/car order, reorder.py: `mov esi,eax` stays before the Read pushes.
+// 2026-11-16 F10: inline helpers (Pick(car) after Read, SetCar, CopyF/CopyI/CopyD for the a2c and a20 copies): 8 variants, car helpers 10 insns unchanged (compiler still hoists mov esi,eax), CopyF(float&,const float&) stays mov/mov, CopyD(double) gives fld/fstp but 22 insns.
+// 2026-11-16 F13: group helpers (PickCar ternary, ReadRec/ReadCar/ReadGroup Read+ReadSetup, CopyRec field copies, PickInto out-param, New0/NewD arms), all 2^3 combinations + ~12 more: 10 insns unchanged, mov esi,eax still hoisted.
 bool ReplayHeader::Load(int index)
 {
     ReplayPath name("savegame/replay");

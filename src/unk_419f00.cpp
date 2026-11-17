@@ -132,11 +132,15 @@ struct ColVec {
 };
 
 // NONMATCHING: RALLYTROPHY 0x41b270
+// 2026-11-16 (Kimi, 2 rounds, 24 candidates): end-pointer, centre-pointer and index induction, counter recomputed from pointers, aggregate loop state, inline-helper body, scope destructors, first-loop local reuse, counter types and guard forms. Best was 6 insns at 695 bytes; nothing beat 1 insn.
 // Tried 2026-10-31 re-pass (11->1 insn): vertex loop as plain `for (k = n; k != 0; k--)` (fixes je/setup), Dot arg v[0] re-derived from tr+0x28,
 // Length as local c=z,b=y,a=x via `ColVec* q`, e1 from `float* p1 = &v[1]->x` (reproduces the dead add eax,4); only `dec ebx` still sits
 // before the two [ebp+8]/[ebp+0xc] pointer spills instead of after. Tried while/do/--i/i>0/unsigned/volatile c,tr,i/pointer-arith c++/tr++ order, permute -r 40 (no MATCH, best 1).
 // 2026-11-14 pass (~30 more variants, still 1 insn): i-- inside for-comma/body-top/while/early --i, c++ before tr++, tr++/c++ folded into the call, comma increments, reusing n/k/i, m/t as loop vars, do-while (size 687), if-break loop (worse). idiom.py found no source form for dec-after-spills.
 // 2026-11-16 pass (~25 more, all 1 insn or worse): m/t reused as loop pointers (86+ insns), counter as while/if-break/do-while-guard/i-- in body, ptr-arith forms, unsigned i, nTris cached, c/t order: dec stays before the spills.
+// 2026-11-16 pass 2 (~20 more, all 1 insn or worse): ++tr/tr+=1/i-=1/i=i-1, decl order, n3 copy + if/do-while(--i) (moves mov ebx,esi and still dec first), while+i-- at end, reorder.py on loop body (no gain), idiom.py -e 'mov [..],reg; dec; jne' = 0 hits.
+// 2026-11-16 pass 3 (11 more, no gain): store-placement rule probes (c-first/ptr-arith/tmp-next increments, no-op use of tr/c after increments, address-taken tr/c): original spills sit BEFORE dec like the preheader ones sit between test and je only when not sunk; no source form found.
+// 2026-11-16 pass 4 (~18 variants): inline-helper advances (ref-param Adv/Dec: 702 bytes, 45 insns; value-returning NxT/NxC/Dc before/after dec, in for-update, temps): all still 1 insn, dec before spills.
 void ColModel::Transform(float* m, float* t)
 {
     float M[16] = { m[0], m[1], m[2], 0.0f, m[4], m[5], m[6], 0.0f, m[8], m[9], m[10], 0.0f, t[0], t[1], t[2], 1.0f };

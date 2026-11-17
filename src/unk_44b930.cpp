@@ -332,12 +332,16 @@ void ReplayMenu::BuildRects()
 }
 
 // NONMATCHING: RALLYTROPHY 0x44c580
+// 2026-11-16 round 11: inline helpers for rally (taking rec), the Game table read after the multiply, and later rec uses in the subtract statement were all folded or forced a reload; still 4 insns.
 // Identical size and instruction mix; only the register for the rally index in the "v -= table[rally]" step differs
 // (original edx with the Game load after the multiply, mine esi with the Game load hoisted; 13 bytes).
 // Named offsets, factored multiplication, an inline rally accessor, and a volatile Game* all emit worse or unchanged code.
 // Tried 2026-10-30 night: rally in a local, offset local, reordered sum, int* base, records[k].rally, permute.py -r 20; all stay at 4 insns (esi reused for rally, Game load hoisted above the multiply; original keeps rec in esi and uses edx).
 // Tried 2026-10-31 re-pass: local Game* before the sum, subtract-assign vs v=v-x, pre-multiplied offset, volatile rally/flag/value reads at earlier sites, permute.py -r 40; all 4 insns (volatile on rally or Game* breaks the function to 51 insns); esi still reused for rally.
 // 2026-11-15 tie-break study: 29 more variants (rally/Game locals, g early, offset forms, ternary, split value read); all 13 bytes. Cause is scheduling: the Game load is hoisted above the multiply so edx is busy and rally takes the free esi; no source lever found.
+// 2026-11-16: 18 more (operand order of the sum, int-cast base, 1512-byte struct-array index, off/g/x2 locals, 63*24 split) and reorder.py over the whole body (best = baseline): all 4 insns / 13 bytes.
+// 2026-11-16 pass 2 (workspace F5): 20 more (self->m_game, 63*24 split, offset-first, p[378] base, int-cast, rally assigned inside the 0xb4 call, rec alias, top-declared rec, g local, ternary/split value, int flag, temp t, re-read flagE); all 13 bytes / 4 insns or far worse.
+// 2026-11-16 pass 3 (F8, register-weight angle): ~48 more (rally local early/late/split in two, unsigned/long/const/ptr types, flag as rec->flagE, 10 operand/offset orders, records[k] re-reads, moving the v block earlier); all 4 insns / 13 bytes or far worse. rec is not in esi after the sub in the original either (reloaded later); the split is only rally dest = edx (orig) vs esi (dying rec reg, ours) because our Game load is scheduled before the multiply.
 // original: FUN_0044c580
 void ReplayMenu::DrawField(int k)
 {

@@ -960,6 +960,8 @@ public:
     {
         if (n < size()) {
             EraseOut(begin() + n, end());
+        } else if (size() < n) {
+            insert(end(), n - size(), x); // dead for n == 0, but keeps the default-argument temporary
         }
     }
     void Erase1(iterator pos)          // erase(pos) with _Destroy out of line

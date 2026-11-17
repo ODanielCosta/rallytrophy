@@ -65,7 +65,10 @@ void ModelCacheState::Add(void* mesh)
 // Tried 2026-10-30 night: out-of-line Size()/Erase() resize twins (ResizeB for the two-call sites), PopHead with hoisted prev, per-site node/count vars, loop shapes, one permute run (no MATCH); still differs: phase-2 count/entries regs (esi/edi vs edi/ebp), prologue push order, lea vs mov+add in count sums, unlink cmp scheduling.
 // Tried 2026-10-31 re-pass: 20 variants (local decl order, count/flags after first loop, operand order of count sums, short-width temp, volatile self, field-assign order); all stay at 40 insns differ or worse (count/flags moved after loop 1 gives 141); regalloc (count/flags in ebp/edi, phase-2 count in edi, entries ptr in ebp) unmoved.
 // Tried 2026-11-16 round 22: count/flags after `pending`, no nextCount temp (`count += w`), `tri = w*3` temp and count2 declared before loop 2: 40 -> 12 insns differ; left: m_head store sched in PopHead (phase 1), edx/ecx/eax picks in phase 2 and the ResizeB/Build* arg setup; PopHead rewrites (hoisted next/prev, reordered stores) and PopHead-before-Insert all worse.
+// Tried 2026-11-16 round 26: Insert/PopHead swap (130 insns), hoisted h node, count/flags store order, unsigned cast, hand-expanded PopHead in phase 1 (4 forms, +/-3 bytes, 32-120 insns), reorder.py exhausted: stays 12 insns/18 bytes.
 // Tried 2026-11-16 round 25 (~100 compiles, stays 12 insns/18 bytes): PopHead bodies (hoisted prev/next, m_head->prev, *(Node**) reads, tail temp, per-site helpers), phase-2 count forms (int, short temp, `*=3`, named/unnamed nextCount, store order in else), reorder.py/permute.py: none moved the m_head-store/cmp order (phase 1) or the edx/ecx and eax-avoiding picks in phase 2 else/tail.
+// 2026-11-16 round 27: phase-specific PopHead bodies (PopHeadB: per-arm block-scoped prev, used in phase 1) fixes the phase-1 m_head store order; 18 -> 12 differing bytes, phase 2 (hoisted PopHead) unchanged: edx/ecx picks, lea/push eax vs edx, ResizeB arg regs.
+// 2026-11-16 round 28: phase-2 twin PopHeadC (next local, per-arm prev): 11 -> 9 insns differ, 12 -> 10 bytes; left: free reg (ecx vs edx) and the lea/ResizeB register rotation that follows.
 void ModelCacheState::Reload(RenderDevice* renderer)
 {
     device = renderer;
@@ -83,7 +86,7 @@ void ModelCacheState::Reload(RenderDevice* renderer)
             count += *(unsigned short*)((char*)mesh + 0xc);
             flags = nextFlags;
             batch.Insert(batch.end(), mesh);
-            pending.PopHead();
+            pending.PopHeadB();
         } else {
             BuildVertices(count, (unsigned char)flags, &batch);
             batch.Resize(0);
@@ -102,7 +105,7 @@ void ModelCacheState::Reload(RenderDevice* renderer)
         if (nextCount < 65000) {
             count2 = nextCount;
             batch.Insert(batch.end(), mesh);
-            pending.PopHead();
+            pending.PopHeadC();
         } else {
             BuildIndices(count2, &batch);
             batch.ResizeB(0);

@@ -691,3 +691,27 @@ Findings and synthetic files: session scratchpad `sched_{A,B,C}/study/`.
   9 entries (drag function-scope, wp2 in the speed2 block, f before arm2) - the map-exact variant scores worse
   on insns, so not adopted; ColModel 0x41a890 entry 8 is the first Sub's P3 temporary (map-exact form re-allocates
   the whole function, not adopted).
+
+## Store placement outside loops (2026-11-16 study, ~85 compiles; matched SceneEntry::SceneEntry)
+
+With /Oa, measured in synthetic reductions:
+- A store written before a block-ending compare is scheduled after the compare, just before the jump, whenever its value and address are already in registers. Aliasing has no effect: same base, other base, global, parameter and through-pointer cases all sink. Disambiguation is not the lever.
+- The exception: a store whose base is a single-use reload from the stack (`mov edx,[t]` used only for that store) stays at its source position. If that base is used again, the store sinks.
+- A store sinks only until its value register is reused. A value in ecx is pinned ahead of `mov ecx,this`; a value in eax can follow it. Stores cross `add esp,N` and `mov ecx,this`, but never a call. A late store before a call is therefore usually a register choice, not a scheduling choice (StageScreen::LoadLayout).
+- A member initialised inside a nested sub-object's inline constructor is emitted in source order, so it lands first. The same member in the outer constructor's flat initialiser list sinks below the following dword zero stores and lets both allocator bytes share `dl`. A wrapper struct is not codegen-neutral; flattening it matched SceneEntry::SceneEntry.
+- Inlined list PopHead (ModelCacheState::Reload): the `m_head` store sinks when `prev` is hoisted before the branch and stays early when `prev` is read in each arm. That flips the other inline site too, so it produced no net gain.
+- **Inline helpers pin stores (2026-11-16 rounds 8-9).** A store written inside a small inline function stays where the source puts it, the same as a store in an inline sub-object constructor. The same store written flat in the caller sinks. Two places used this:
+  - Wheel::Wheel: `SetNormalY(normal)` replaced a `volatile` store and went from 27 to 8 bytes.
+  - ModelCacheState::Reload: two inline sites need different orders, so phase 1 calls a twin `PopHeadB` with identical semantics that reads `prev` inside each arm, and went from 18 to 12 bytes.
+  
+  Two related forms:
+  - Accumulators move integer instructions earlier inside x87 code: `float s = b; s -= a; s *= inv;` instead of `(b - a) * inv` (FUN_00491c10, 2 -> 1 insn).
+  - Writing the constant first, `ny = 0.85f; ny *= oldY`, moved a lea after the fmul (TrackSelectMenu::Run, 4 -> 3 insns).
+
+## Scratch registers and lea operand order (2026-11-16 study, ~45 synthetic compiles; no residual fixed)
+- **`lea r,[a+b]`.** The base is whichever operand is defined LATER in the IL. Source spelling never matters: `len+ptr`, `&ptr[len]`, casts and `ptr-(0-len)` all compile identically. A member of a stack object that is reloaded after a call counts as a fresh, late definition, so it becomes the base. Copying it into a local before the other operand flips the order in synthetic tests. In Car::LoadDriver that local takes a callee-saved register and wrecks the function (984 insns).
+- **A temp loaded as `[r+off]` reuses r when r dies at that load.** If r stays live, the temp takes edx instead, and an independent two-load chain is not hoisted above a following shl/sub/lea multiply. This is exactly the ReplayMenu::DrawField split (ours reuses the dying register, the original keeps it live). No code-free way to keep `rec` live was found.
+- **An independent load chain is hoisted above a multiply only when a scratch register is free.** The heavier subtree goes first, whatever the source order.
+- **First temps.** Pointer temps take eax, then ecx. A value later needed in cl or eax is allocated there. Inside an EH frame, a result instead reuses the register of an operand that is dying. These are weak rules. Synthetic tests reproduce StageScreen::LoadLayout's original shape, but no source lever reproduces it in the real function.
+- **Disproved:** the lea base is not chosen by register number, by listing order, or by source operand order.
+- **Helper sweep on constructors (2026-11-16 rounds 12-14).** Wrapping groups of member stores in `static __forceinline` free helpers matched four functions: SceneXform::SceneXform, BmfReader::BmfReader (`Zero3`), CarBody::CarBody (`Z3` on eight vectors, which also removed a volatile) and AIDriver::Init (`StoreTuning345`). Each match needed EVERY drifting group wrapped; wrapping only some groups was worse. The helper does nothing when the residual is a register choice or a register copy (ServiceMenu::Init, ReplayHeader::Load, StageScreen::LoadLayout) or a loop-entry compare (WindowRain::Init).

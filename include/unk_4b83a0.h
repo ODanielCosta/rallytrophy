@@ -26,15 +26,14 @@ public:
     iterator Erase(iterator f, iterator l);          // 0x484380
 };
 struct EntryBase { int head[11]; ~EntryBase() {} };
-struct EntryMeshList { char flag2c; MeshVec meshes; EntryMeshList() : flag2c(0), meshes() {}
-    ~EntryMeshList() {} };
 class SceneEntry : public EntryBase {
 public:
     SceneEntry();                                    // 0x4b8640
     SceneEntry& operator=(const SceneEntry& o);      // 0x4b8680
     SceneEntry& LinkDeformVertices();                    // 0x4b9170 (MeshModel layout)
     ~SceneEntry();                                   // 0x4b89f0
-    EntryMeshList ml;                                // 0x2c: flag, meshes at 0x30
+    char flag2c;                                     // 0x2c
+    MeshVec meshes;                                  // 0x30
     int count40, count44;                            // 0x40 (vertex count), 0x44
     EntryVec3* verts;                                // 0x48
     float* data4c;                                   // 0x4c: count44 * 16 bytes
