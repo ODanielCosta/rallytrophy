@@ -80,6 +80,10 @@ They expect locally supplied game files and toolchain components; see
   source forms that produced the same instructions elsewhere; `-e 'REGEX'` greps the corpus
   (`a;b` consecutive instructions, `-w N` one regex over N joined instructions with groups tying
   registers). Read the hit in context and copy its form, not its names.
+- [`v100.py`](v100.py): second witness. Maps every 1.01 function onto the 1.00 build from the disc (same source,
+  four months earlier) and classifies it as same / numbers / changed / none; `v100.py 0xADDR` prints the
+  instruction diff 1.00 -> 1.01. A function that changed between the builds shows the same source compiled in
+  two contexts (0x41b270: matrix as a member in 1.00, a local in 1.01).
 - [`triage.py`](triage.py): classify every NONMATCHING function by its first differences (size, order,
   registers, EH state) after a full `match.py` run; a full run rewrites `analysis/nonmatching-triage.md`.
   `original_size()` gives the original function size exactly as the matcher compares it.
