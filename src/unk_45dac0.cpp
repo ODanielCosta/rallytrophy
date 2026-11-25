@@ -58,6 +58,24 @@ void BarycentricWeights(const SunVertex* a, const SunVertex* b, const SunVertex*
     __asm fstp dword ptr [eax+4]
 
 struct SunMeshV { BYTE unk0[0x30]; std::vector<SunPart*> parts; };
+// 2026-11-23: this body is the hill-climbing permuter's best for the range
+// (tools/permute.py -r 40 -n 24 -s 7): hoisted `verts`/`dx` declarations, pre-increment
+// loop counters, commuted pointer additions, (int) copies for `cand`/`best`, and the
+// hit-store order best/hitA/hitTri/hit/hitB/hitC/hits. 108 -> 98 differing bytes (58 ->
+// 53 instructions); the function stays 921 bytes and the semantics are unchanged from
+// the previous body (same tests, same stores, same call arguments).
+// Residual 98 bytes are all codegen choice, in five fixed clusters: (1) the outer
+// `parts[i]` load is held in edx and re-loaded in edx (built: eax), (2) the WORD count
+// temporary is eax with no [ebp-0x20] store (built: edx plus the store), (3) the
+// triangle-record cursor is edx and is never spilled to [ebp-0x1c]/[ebp-0x20] (built:
+// ebx plus both stores), (4) the three plane dot-product first terms load from
+// [ebp-0x58]/[ebp-0x54]/[ebp-0x50] (built: [ebx-0x10]/[ebx-0xc]/[ebx-0x14]), (5) the
+// post-`continue` block uses eax/edi/edx/ebx instead of built ebx/esi/esi/ecx with
+// [ebp-0x60] (built [ebp-0x68]) and [ebp-0x70] (built [ebp-0x14]) homes. From there the
+// fmul/fadd ladder and the three fstp stores re-align byte-for-byte; only the loop
+// tail (add edx,0x20; spill edx/eax to [ebp-0x1c]/[ebp-0x20]) and the epilogue stack
+// argument homes remain. About 100 further hand probes of homes, registers, argument
+// shapes and float temporaries did not reduce the count.
 // NONMATCHING: RALLYTROPHY 0x45dac0
 // One advancing triangle-record cursor for plane fields and nx, alongside the separately advancing tri pointer,
 // cuts the differing-byte count from 468 to 403. A volatile WORD read assigned to int preserves the target's later
@@ -81,11 +99,11 @@ float Car::SunFactor(void* models)
     Vec3 p;
     {
         BYTE* body = ((SunCar*)this)->body;
-        const float* point;
         const float* matrix;
+        const float* point;
         float* result;
         matrix = (const float*)(body + 0x60);
-        point = (const float*)(body + 0xb8);
+        point = (const float*)(0xb8 + body);
         result = (float*)&p;
         SUN_TRANSFORM();
     }
@@ -96,7 +114,7 @@ float Car::SunFactor(void* models)
     int hits = 0;
     const SunVertex* hitB;
     const SunVertex* hitC;
-    for (int m = 0; m < list->count; m++) {
+    for (int m = 0; m < list->count; ++m) {
         SunModel* model = list->models[m];
         if (model->kind != 1 || !(model->flags & 4) || !(model->flagsCc & 1)) {
             continue;
@@ -106,7 +124,8 @@ float Car::SunFactor(void* models)
         if (!tris) {
             continue;
         }
-        float dx = p.x - model->centreX;
+        float dx;
+        dx = p.x - model->centreX;
         float dz = p.z - model->centreZ;
         float dist = dx * dx + dz * dz;
         float r = model->radius;
@@ -114,9 +133,10 @@ float Car::SunFactor(void* models)
         if (*(int*)&dist > *(int*)&r2) {
             continue;
         }
-        for (unsigned i = 0; i < tris->size(); i++) {
+        for (unsigned i = 0; i < tris->size(); ++i) {
+            SunVertex* verts;
             int n = ((SunMeshV*)mesh)->parts[i]->count;
-            SunVertex* verts = ((SunMeshV*)mesh)->parts[i]->vertices;
+            verts = ((SunMeshV*)mesh)->parts[i]->vertices;
             const unsigned short* idx = ((SunMeshV*)mesh)->parts[i]->indices;
             SunTri* tri = (*tris)[i];
             if (!n) {
@@ -138,30 +158,31 @@ float Car::SunFactor(void* models)
                                 float t = h / q[-5];
                                 if (!(t > best)) {
                                     Vec3 cand;
-                                    float cy = p.y - t;
                                     cand.z = p.z;
-                                    cand.x = p.x;
+                                    float cy = p.y - t;
+                                    int cp35805__ = *(int*)&(p.x);
+                                    *(int*)&(cand.x) = cp35805__;
                                     cand.y = cy;
                                     const SunVertex* c = &verts[idx[2]];
                                     const SunVertex* b = &verts[idx[1]];
                                     const SunVertex* a = &verts[idx[0]];
                                     if (PointInTriangle(&cand, tri, a, b, c)) {
-                                        best = t;
-                                        hitTri = tri;
+                                        *(int*)&(best) = (*(int*)&(t));
                                         hitA = a;
+                                        hitTri = tri;
+                                        hit = cand;
                                         hitB = b;
                                         hitC = c;
                                         hits++;
-                                        hit = cand;
                                     }
                                 }
                             }
                         }
                     }
                 }
-                q += 8;
-                tri++;
-                idx += 3;
+                q = (8) + q;
+                ++tri;
+                idx = (3) + idx;
             } while (--n);
         }
     }

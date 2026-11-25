@@ -312,6 +312,8 @@ extern int DAT_00501458;
 // 2026-11-12: all 16 placements of the a/b/mode/flag initialisers (declaration vs both branches) tried; the declaration form (17 insns) stays best.
 // Same size and flow; VC6 gives the four live values (a, b, setup, mode) other registers
 // (original: ebx=0x501428 value, edi=0x50142c value, ebp=setup pointer, esi=mode).
+// 2026-11-25: `register BYTE* setup` left the 354-byte candidate at 38 differing bytes; restored.
+// 2026-11-25: a separate `register int mode` declaration preserved declaration order but also left 38 differences; restored.
 // Tried 2026-10-30 night: local declaration reorders, a/b clamp order and forms, mode/branch/zeroing restructures, Car* temp, permute -r 20 (no MATCH, best 18); register allocation of a/b/setup/mode still differs (22 insns), hand edits only reach 20-21.
 // Tried 2026-10-31 re-pass: ~20 variants (decl order, clamp forms, zeroing-store order, volatile flag, early mode=1); zeroing order setup,flag,b,mode,a gave 22->17; permute -r 40 no MATCH; a/b/setup/mode still get other registers.
 void Player::FUN_00491130()

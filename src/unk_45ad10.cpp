@@ -1624,6 +1624,12 @@ void Car::PhysicsStep(float dt)
 // Tried 2026-10-31 re-pass: 20 more variants (named-temp spring compress pair, init of dead/arm/world Vec3 from body fields, store order of lastLoad/load, volatile lastLoad store, arb fill order, decl order of body/c, rp increment placement, per-component force); still 84-87 insns differ; dead=*(Vec3*)rotation init makes size 756 = original but 84 insns; remaining diff is the original fld A; fld B; fxch; fsub st,st(1) compress pair and its four distinct induction pointer temps, not reproduced.
 // Pass 2026-11-16 (r25): 87 -> 77 insns differ (739 -> 754 bytes, orig 756): W6_Sub takes float temps (t=b; u=a) and its first args are read through W6_Rd, which reproduces the `fld A; fld B; fxch; fsub st,st(1); fstp st(0)` pairs; arb[3] copied as int bits (original fstp/mov eax). Open: loop induction slot numbers (arb/w/count at -0x18/-0x1c/-0x20 in the original, asm operand temps after them), dead/arm Vec3 slot swap, torque add operand order.
 // Pass 2026-11-17 (ws7): 77 -> 76 insns differ (754 bytes): `trans` declared after the force multiply (original assigns it between the two xforms). Tried without gain: ap/lp pointer induction, arm/dead/world decl order, contact int local, AddTo operand forms for torque, Vec3 arg temp for arm, statement swaps of force add/arm. Next: original keeps contact in ebx and pushes the cross-call args mid-force-add.
+// 2026-11-25: current original and baseline already load the cross-product result first for the x torque add. A typed forceinline helper taking that Vec3 before W6_Body flipped only this pair to load torque first; 754 bytes / 645 differing in either version. Reverted: the baseline matches the original in this hunk.
+// 2026-11-25: replacing W6_AddTo(body->torque, cross) with the existing `Vec3& torque; torque += cross` idiom from PhysicsStep compiled to identical function bytes after relocation masking; no change.
+// 2026-11-25: the direct POD hidden-result call, ignoring its returned pointer, gives 640 differing bytes vs baseline 645 (5 fewer, 0.78%) but raises Hamming distance 2389->2409 (+20); selected as the current byte-level improvement. Consuming the returned pointer through const Vec3& lowered Hamming distance by 8 (2389->2381) but left differing bytes at 645. A value-return const Vec3& form had 640 differing bytes / 2409 bits and caused two static-initializer DIFFs; reverted. Still NONMATCHING.
+// 2026-11-25: following the exact Draw459270 pattern, changed only the hidden-result local from POD W3_Vec to destructor-bearing Vec3 and consumed its returned Vec3*. This restored EH/lifetime work but worsened the comparison to 754/756 bytes, 647 differing bytes / 2408 differing bits; reverted to the 640-byte POD form.
+// 2026-11-25: moved the POD cross-result local before the body-force add, predicting its address would be staged with the target's early cross-call pushes; VC6 emitted identical code (755/756, 640 bytes / 2409 bits differ), so restored it. The local's declaration position does not control this argument scheduling.
+// 2026-11-25: VC6 rejects casting the explicit-result cross function to a POD-return function-pointer type. A __forceinline wrapper returning W3_Vec compiled but left the target at 640 differing bytes and regressed two generated initializer markers (7/9 exact, 2 DIFF); both forms were reverted. Do not repeat the function-pointer cast or this wrapper shape.
 // Per wheel: spring force + anti-roll term, applied to the body force and (arm x force) torque.
 void Car::ApplySuspensionForces()
 {
@@ -1667,7 +1673,9 @@ void Car::ApplySuspensionForces()
             arm.x = world.x - body->centre[0];
             arm.y = world.y - body->centre[1];
             arm.z = world.z - body->centre[2];
-            W6_AddTo(body->torque, FUN_004203e0(force, arm));
+            W3_Vec cross;
+            FUN_004203e0(&cross, *(const W3_Vec*)&force, *(const W3_Vec*)&arm);
+            W6_AddTo(body->torque, *(const Vec3*)&cross);
             float lf = (*(unsigned int*)&f & 0x80000000) ? 0.0f : f;
             c->lastLoad[i] = lf;
             w->load = lf;
