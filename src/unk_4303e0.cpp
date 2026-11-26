@@ -3767,6 +3767,7 @@ struct G13_WarpPoint {
 // 2026-11-25 continuation: `register int first` leaves the sole 4-byte choice/wait prologue-store swap unchanged; reverted.
 // 2026-11-25 continuation: inline-asm stores to uninitialized `choice`, `wait`, and `first` forced an EBP frame, changed the remaining function schedule, and triggered C4405 for `wait`; reverted.
 // 2026-11-25 continuation: `permute.py -r 30 -n 16 -j 2` (seed 20261126) kept the best at 1 differing instruction / 4 bytes; no candidate matched or was adopted.
+// 2026-11-26: uninitialized choice/wait/first with `wait=0; __asm {}; choice=1; first=1;` forced an EBP frame and rewrote the function-wide register/stack schedule; focused diff expanded far beyond the four-byte baseline. Reverted.
 // Modal "question / Yes / No" dialog: Left/Right or the mouse pick the answer, Enter or a click confirms, Esc cancels.
 // Returns 1 for Yes (class Game in the merged header). original: FUN_00436250
 int GameObj::FUN_00436250(MenuScreen* screen)

@@ -1630,6 +1630,7 @@ void Car::PhysicsStep(float dt)
 // 2026-11-25: following the exact Draw459270 pattern, changed only the hidden-result local from POD W3_Vec to destructor-bearing Vec3 and consumed its returned Vec3*. This restored EH/lifetime work but worsened the comparison to 754/756 bytes, 647 differing bytes / 2408 differing bits; reverted to the 640-byte POD form.
 // 2026-11-25: moved the POD cross-result local before the body-force add, predicting its address would be staged with the target's early cross-call pushes; VC6 emitted identical code (755/756, 640 bytes / 2409 bits differ), so restored it. The local's declaration position does not control this argument scheduling.
 // 2026-11-25: VC6 rejects casting the explicit-result cross function to a POD-return function-pointer type. A __forceinline wrapper returning W3_Vec compiled but left the target at 640 differing bytes and regressed two generated initializer markers (7/9 exact, 2 DIFF); both forms were reverted. Do not repeat the function-pointer cast or this wrapper shape.
+// 2026-11-26: keeping the explicit-result cross call's returned W3_Vec* in `crossResult` and consuming it through the torque helper changed the x87 add order and stayed at 645 differing bytes; reverted. The exact 0x459270 pointer-local pattern does not transfer to this call site's register/lifetime schedule.
 // Per wheel: spring force + anti-roll term, applied to the body force and (arm x force) torque.
 void Car::ApplySuspensionForces()
 {

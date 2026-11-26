@@ -28,6 +28,7 @@ extern "C" long __cdecl _ftol(void);
 // both array pointers are read back through this->mesh (no volatile reloads), and the vertex loop is
 // `if (n > 0) { ...; int j = n; while (j--) {...} }`, which puts the cursor setup after the guard and reloads n
 // before this at the loop exit.
+// 2026-11-26: splitting n * 32 into allocBytes preserved the same four-byte load-order mismatch; reverted.
 SnowFall::SnowFall(TextureLoader* loader, int count_)
 {
     if (DAT_00501428 == 2) {
