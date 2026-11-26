@@ -162,6 +162,8 @@ static __forceinline int RoundF(float v)
 // Tried 2026-11-15: volatile tail replaced by e2[] reads of a second e->dst alias (blocks store forwarding); a before d; operand order `x >= frames`; offsets computed in the loop body; float temp fr0 for the first fraction (314 -> 105 bytes, 116 -> 73 insns). Statement-order/decl/temp-local variants of idx/frames did not move the register swap.
 // Tried 2026-10-30 night: plain double/int locals, cached frames, volatile stores, b-load sinking; best is union word only for the first RoundF + separate idx local + volatile reads of d[3..5] (177->151); still differs in register assignment (idx/frames swap esi/ebx), spilled offset slots and an extra 12-byte frame.
 // Tried 2026-11-01 re-pass: normalize tail via volatile loads into locals z,y,x (151->116 insns); 13 more variants (offset placement, decl order, count local, clamp form, self ptr) all stay at 116; remaining diff is this/idx/frames register assignment (esi/edi/ebx) and offset-hoist order after the count test.
+// 2026-11-25 continuation: `register int idx` left the 824-byte candidate and its 105-byte register-swap residual codegen-identical; reverted.
+// 2026-11-25 continuation: reusing `indexSpline.words[1]` as the live index instead of copying it to `idx` kept the 824-byte size but widened the diff from 105 to 114 bytes; reverted.
 void MeshSet::Interp(float t)
 {
     if (owner == 0)
