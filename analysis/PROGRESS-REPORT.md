@@ -11,16 +11,16 @@ conventions are in [`NOTES.md`](NOTES.md); the work queue and log are in
 ## Progress
 
 <!-- progress:begin -->
-_Updated 2026-11-26 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
+_Updated 2026-11-27 by `tools/progress.py` (game code `0x401000`–`0x4bcfc6`)._
 
 | | Functions | Code bytes |
 |---|---|---|
-| Byte-exact | 1947 / 2084 (93.43%) | 454,865 / 742,276 (61.28%) |
-| Written, not yet exact | 137 | 287,411 |
+| Byte-exact | 1952 / 2084 (93.67%) | 459,580 / 742,276 (61.91%) |
+| Written, not yet exact | 132 | 282,696 |
 | Written in total | 2084 / 2084 (100.00%) | 742,276 / 742,276 (100.00%) |
 
 ```
-exact   ██████████████████░░░░░░░░░░░░ 61.28% of code bytes
+exact   ███████████████████░░░░░░░░░░░ 61.91% of code bytes
 written ██████████████████████████████ 100.00% of code bytes
 ```
 
@@ -30,10 +30,10 @@ Progress by module (ranges in `analysis/modules.csv`):
 
 | Module | Range | Exact / written / total | % exact | % written | |
 |---|---|---|---|---|---|
-| Startup helpers | `0x401000`–`0x404d50` | 61 / 65 / 65 | 74.2% | 100.0% | `████████████` |
+| Startup helpers | `0x401000`–`0x404d50` | 63 / 65 / 65 | 83.9% | 100.0% | `████████████` |
 | Language / text table | `0x404d50`–`0x405580` | 13 / 13 / 13 | 100.0% | 100.0% | `████████████` |
 | Config files | `0x405580`–`0x409690` | 34 / 34 / 34 | 100.0% | 100.0% | `████████████` |
-| Stage scene and collision | `0x409690`–`0x420490` | 177 / 201 / 201 | 30.4% | 100.0% | `████████████` |
+| Stage scene and collision | `0x409690`–`0x420490` | 178 / 201 / 201 | 31.5% | 100.0% | `████████████` |
 | StageTable/control/credits screens | `0x420490`–`0x4266c0` | 35 / 39 / 39 | 57.3% | 100.0% | `████████████` |
 | Mode select screen | `0x4266c0`–`0x427600` | 9 / 9 / 9 | 100.0% | 100.0% | `████████████` |
 | Game settings screen | `0x427600`–`0x4295c0` | 11 / 11 / 11 | 100.0% | 100.0% | `████████████` |
@@ -62,8 +62,8 @@ Progress by module (ranges in `analysis/modules.csv`):
 | Car input | `0x458700`–`0x459230` | 27 / 28 / 28 | 46.7% | 100.0% | `████████████` |
 | Car environment map | `0x459230`–`0x459890` | 7 / 7 / 7 | 100.0% | 100.0% | `████████████` |
 | Car damage and contacts | `0x459890`–`0x45ad10` | 16 / 17 / 17 | 27.3% | 100.0% | `████████████` |
-| Car update and physics | `0x45ad10`–`0x45dac0` | 9 / 14 / 14 | 22.8% | 100.0% | `████████████` |
-| Car sun factor | `0x45dac0`–`0x45de90` | 2 / 3 / 3 | 3.9% | 100.0% | `████████████` |
+| Car update and physics | `0x45ad10`–`0x45dac0` | 10 / 14 / 14 | 34.9% | 100.0% | `████████████` |
+| Car sun factor | `0x45dac0`–`0x45de90` | 3 / 3 / 3 | 100.0% | 100.0% | `████████████` |
 | Car lights update | `0x45de90`–`0x45e480` | 3 / 3 / 3 | 100.0% | 100.0% | `████████████` |
 | Car constructor file | `0x45e480`–`0x464ab0` | 20 / 24 / 24 | 10.0% | 100.0% | `████████████` |
 | Rear-view mirror | `0x464ab0`–`0x4654c0` | 27 / 27 / 27 | 100.0% | 100.0% | `████████████` |
